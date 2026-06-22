@@ -1,0 +1,13 @@
+{
+  "name": "zhl-librebooking-e2e",
+  "version": "0.1.0",
+  "private": true,
+  "description": "ZHL E2E tests (Playwright) against the local LibreBooking instance",
+  "scripts": {
+    "test": "playwright test",
+    "report": "playwright show-report"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.50.0"
+  }
+}

@@ -39,3 +39,6 @@ Frontpage/UX** + mehr Konfiguration. Details: [STRATEGY.md](STRATEGY.md).
 
 ## Changelog
 - 2026-06-22: Fork angelegt, lokale Umgebung + DB-Kopie aufgebaut, Upgrade-Rehearsal erfolgreich, altes Repo archiviert.
+- 2026-06-22: Agentischen Prozess + kanonische FEATURES.md erstellt; **Codex-Gate gelaufen** (Findings eingearbeitet: F6/F20/F22/F26/F28/F33/F35/F36 korrigiert, Querschnitt-Risiken ergänzt). PR #1 (Landing-Page) offen.
+- 2026-06-22: **Neuer Feature-Request F40** (Einweisungs-/Berechtigungspflicht) aufgenommen — Gating nativ (Resource-Permissions), Badge/Zertifikat-Lifecycle = Custom.
+- 2026-06-22: Lokaler Server auf docroot=`Web/` umgestellt → App unter `http://127.0.0.1:8080/` (vorher CSS-Stolperfalle ohne Trailing-Slash).

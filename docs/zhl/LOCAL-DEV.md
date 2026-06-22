@@ -29,9 +29,13 @@ In `config/config.php`: Host `127.0.0.1`, Port `13306`, DB `zhl_buchung`, User `
 
 ## 3. Starten
 ```bash
-php -S 127.0.0.1:8080         # DocumentRoot = Repo-Wurzel
+php -S 127.0.0.1:8080 -t Web   # DocumentRoot = Web/  -> App unter http://127.0.0.1:8080/
+# config.php: 'script.url' => 'http://127.0.0.1:8080'   (ohne /Web)
 # tpl_c/ und uploads/ müssen beschreibbar sein
 ```
+> Gotcha: Ohne `-t Web` und mit `script.url=.../Web` lädt das CSS nur, wenn man die
+> URL **mit** Trailing-Slash öffnet (`/Web/`), weil LibreBooking relative Asset-Pfade
+> nutzt. Der PHP-Testserver macht keine Verzeichnis-Umleitung (Apache schon).
 
 ## Live-Dump neu ziehen (read-only)
 Container-Shell vorhanden (`zhl-buchung@buchung.zhl-ubt.de:22`), aber **kein

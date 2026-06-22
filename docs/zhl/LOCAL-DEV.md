@@ -27,15 +27,16 @@ docker exec -i zhl-mariadb mariadb -uroot -proot zhl_buchung \
 ```
 In `config/config.php`: Host `127.0.0.1`, Port `13306`, DB `zhl_buchung`, User `root`, Pass `root`.
 
-## 3. Starten
+## 3. Starten (Produktion spiegeln: App unter /Web/)
 ```bash
-php -S 127.0.0.1:8080 -t Web   # DocumentRoot = Web/  -> App unter http://127.0.0.1:8080/
-# config.php: 'script.url' => 'http://127.0.0.1:8080'   (ohne /Web)
+php -S 127.0.0.1:8080          # DocumentRoot = Repo-Wurzel
+# config.php: 'script.url' => 'http://127.0.0.1:8080/Web'   (MIT Pfad, wie Live)
+# Aufruf:    http://127.0.0.1:8080/Web/
 # tpl_c/ und uploads/ müssen beschreibbar sein
 ```
-> Gotcha: Ohne `-t Web` und mit `script.url=.../Web` lädt das CSS nur, wenn man die
-> URL **mit** Trailing-Slash öffnet (`/Web/`), weil LibreBooking relative Asset-Pfade
-> nutzt. Der PHP-Testserver macht keine Verzeichnis-Umleitung (Apache schon).
+> Wichtig (siehe ISSUES.md #1): `script.url` muss **einen Pfad** haben (`/Web`), sonst
+> baut LibreBooking nach dem Login einen kaputten Redirect `//schedule.php`. Lokal also
+> immer unter `/Web/` servieren — das spiegelt die Live-Struktur (`…/Web`).
 
 ## Live-Dump neu ziehen (read-only)
 Container-Shell vorhanden (`zhl-buchung@buchung.zhl-ubt.de:22`), aber **kein

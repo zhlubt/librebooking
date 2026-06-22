@@ -23,11 +23,14 @@ Quick-Wins, die bereits in LibreBooking stecken — nur einschalten.
 // Self-Service vs. Manager-Übergabe (F8): pro Ressource im Admin steuern
 ```
 
-## Branding (eigener PR)
+## Branding (umgesetzt, PR #2)
 ```php
-'app.title' => 'Medienausleihe ZHL',
-'css.extension.file' => 'zhl-theme.css',   // unter Web/css/ ablegen
+'css.extension.file' => 'css/zhl-theme.css',   // Datei im Repo: Web/css/zhl-theme.css
+'app.title' => 'Medienausleihe ZHL',           // optional (Live nutzt 'Reservierungen')
 ```
+`Web/css/zhl-theme.css` ist versioniert (UBT-Grün-Overlay, upgrade-sicher). Der Config-Key
+lebt in `config.php` (nicht im Repo), Wert `css/zhl-theme.css`. Verifiziert: Login-Button
+rgb(0,146,96), Test `tests-e2e/tests/branding.spec.js`.
 
 ## Deutsche/vereinfachte Begriffe ohne lang/ zu patchen
 `config/lang-overrides.php` nutzen (Upstream-Mechanismus), z.B. „Resource" → „Gerät".

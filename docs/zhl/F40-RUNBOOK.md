@@ -1,0 +1,32 @@
+# F40 Runbook — Einweisungs-/Berechtigungspflicht (Stufe 1, ohne Code)
+
+> An der lokalen Kopie verifiziert (Playwright `f40.spec.js` grün). Reines Config über
+> Gruppen + Resource-Permissions — überlebt LibreBooking-Upgrades. Hintergrund:
+> [F40-KONZEPT.md](F40-KONZEPT.md).
+
+## Ergebnis (bewiesen)
+- Beschränktes Medium (Gaming-PC, `autoassign=0`): **nicht eingewiesener User** bekommt
+  beim Buchen *„You do not have permission to access one or more of the requested
+  resources."* — **eingewiesener User** (Cert-Gruppe) kommt am Gate vorbei.
+
+## Schritte im Admin-UI (so macht es ZHL produktiv)
+1. **Ressource beschränken:** Ressource → „Automatically grant permissions to new
+   users" **aus** (= `autoassign=0`). (Die 5 betroffenen Geräte sind das bereits.)
+2. **Einweisungs-Gruppe anlegen:** Admin → Groups → „Eingewiesen: <Gerät>".
+3. **Gruppe berechtigen:** der Gruppe für die beschränkte(n) Ressource(n) **Full**-
+   Permission geben (Group → Permissions).
+4. **Einweisungstermin als buchbare Ressource** (optional, Self-Service): Ressource
+   „Einweisung <Gerät>" auf einem Schedule „Einweisungen", für alle buchbar, ggf.
+   `RequiresApproval`.
+5. **Nach absolvierter Einweisung:** User der Einweisungs-Gruppe hinzufügen → darf sofort
+   buchen. Entfernen → sofort gesperrt (wirkt bei Buchung/Änderung, **nicht** rückwirkend;
+   siehe Caveats in F40-KONZEPT).
+
+## Reproduzierbar an der Kopie
+`./docs/zhl/seed-test-users.sh` legt die Gruppe „Eingewiesen: Gaming-PC", die Freigabe
+für 53–56 und `certuser@zhl.local` (Mitglied) an. Test: `cd tests-e2e && npx playwright
+test f40.spec.js`.
+
+## Offen für Stufe 2 (Custom, später)
+Zertifikat-**Ablauf/Gültigkeit** + „Zugang anfragen"-Flow + Auto-Entzug (Cron/Plugin) —
+siehe WORKPACKAGES CM-4 / F40-KONZEPT.

@@ -50,6 +50,7 @@ Frontpage/UX** + mehr Konfiguration. Details: [STRATEGY.md](STRATEGY.md).
 - Funde: siehe [ISSUES.md](ISSUES.md) (#1 script.url-Pfad/Redirect, #2 500 bei unautor. Admin-Zugriff).
 
 ## Changelog
+- 2026-06-23: **F40 Stufe 1 durchgestochen** (Gruppen-Gate, nur Config): Gruppe „Eingewiesen: Gaming-PC" → Geräte 53-56 freigegeben; `certuser@zhl.local` Mitglied. Browser-Beweis (Playwright `f40.spec.js`, 16/16 grün): Nicht-Cert-User „do not have permission", Cert-User kommt durch. Runbook `F40-RUNBOOK.md`. Erkenntnis: „beschränkt" = `resources.autoassign=0` (nur 5 Geräte).
 - 2026-06-22: Fork angelegt, lokale Umgebung + DB-Kopie aufgebaut, Upgrade-Rehearsal erfolgreich, altes Repo archiviert.
 - 2026-06-22: Agentischen Prozess + kanonische FEATURES.md erstellt; **Codex-Gate gelaufen** (Findings eingearbeitet: F6/F20/F22/F26/F28/F33/F35/F36 korrigiert, Querschnitt-Risiken ergänzt). PR #1 (Landing-Page) offen.
 - 2026-06-22: **Neuer Feature-Request F40** (Einweisungs-/Berechtigungspflicht) aufgenommen — Gating nativ (Resource-Permissions), Badge/Zertifikat-Lifecycle = Custom.

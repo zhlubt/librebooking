@@ -9,6 +9,7 @@ const ROLES = {
   resourceAdmin: { email: 'resourceadmin@zhl.local', label: 'Resource Admin' },
   scheduleAdmin: { email: 'scheduleadmin@zhl.local', label: 'Schedule Admin' },
   user:          { email: 'user@zhl.local',          label: 'Regular User' },
+  cert:          { email: 'certuser@zhl.local',      label: 'Eingewiesener User (F40)' },
 };
 
 // Loggt einen User ein. Wartet auf den Seitenwechsel (kein networkidle -> robuster).
@@ -31,4 +32,22 @@ async function logout(page) {
   await page.goto('index.php?logout=true').catch(() => {});
 }
 
-module.exports = { ROLES, PASSWORD, login, logout, expect };
+// Versucht eine Buchung und gibt die Antwort von reservation_save.php zurück.
+// Das Permission-Gate (F40) schlägt hier zu: nicht-berechtigte User bekommen
+// eine "permission"-Fehlermeldung, berechtigte kommen daran vorbei.
+async function attemptBooking(page, rid, sid) {
+  await page.goto(`reservation.php?rid=${rid}&sid=${sid}`, { waitUntil: 'domcontentloaded' });
+  await page.fill('#reservationTitle', 'E2E F40');
+  if (await page.locator('#BeginPeriod option').count() > 1) {
+    await page.selectOption('#BeginPeriod', { index: 1 }).catch(() => {});
+    await page.selectOption('#EndPeriod', { index: 2 }).catch(() => {});
+  }
+  const respPromise = page.waitForResponse(
+    r => r.url().includes('reservation_save'), { timeout: 12000 }
+  );
+  await page.locator('.btnCreate').first().click();
+  const resp = await respPromise;
+  return resp.text();
+}
+
+module.exports = { ROLES, PASSWORD, login, logout, attemptBooking, expect };

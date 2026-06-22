@@ -35,5 +35,19 @@ q "INSERT IGNORE INTO user_resource_permissions (user_id,resource_id,permission_
    WHERE u.email='user@zhl.local';"
 echo "auto-assigned non-restricted resources to user@zhl.local"
 
+# --- F40-Demo: Einweisungs-/Berechtigungspflicht (Stufe 1, nur Config) ---
+# Cert-Gruppe anlegen und ihr die beschränkten Gaming-PCs (53-56, autoassign=0) freigeben.
+q "INSERT INTO groups (name,isdefault) SELECT 'Eingewiesen: Gaming-PC',0
+   WHERE NOT EXISTS (SELECT 1 FROM groups WHERE name='Eingewiesen: Gaming-PC');"
+CERTGID=$(q "SELECT group_id FROM groups WHERE name='Eingewiesen: Gaming-PC';" | tr -d '[:space:]')
+q "INSERT IGNORE INTO group_resource_permissions (group_id,resource_id,permission_type)
+   SELECT $CERTGID,resource_id,0 FROM resources WHERE resource_id IN (53,54,55,56);"
+# certuser: in Cert-Gruppe + autoassign-Rechte (kann offene + die Gaming-PCs buchen)
+mk Test CertUser zhl_certuser certuser@zhl.local "$CERTGID"
+q "INSERT IGNORE INTO user_resource_permissions (user_id,resource_id,permission_id,permission_type)
+   SELECT u.user_id,r.resource_id,1,0 FROM users u JOIN resources r ON r.autoassign=1
+   WHERE u.email='certuser@zhl.local';"
+echo "F40-Demo: Gruppe 'Eingewiesen: Gaming-PC' (id $CERTGID) -> 53-56; certuser@zhl.local Mitglied"
+
 echo "--- Test-Logins (Passwort: $PW) ---"
 q "SELECT u.email, COALESCE(g.name,'(regular user)') FROM users u LEFT JOIN user_groups ug ON u.user_id=ug.user_id LEFT JOIN groups g ON ug.group_id=g.group_id WHERE u.email LIKE '%@zhl.local' ORDER BY u.user_id;"

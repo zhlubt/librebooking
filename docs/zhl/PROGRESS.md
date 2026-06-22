@@ -44,6 +44,11 @@ Frontpage/UX** + mehr Konfiguration. Details: [STRATEGY.md](STRATEGY.md).
 - F40-Betriebsprozess: Wer trägt Zertifikats-Gruppen ein/entzieht; Umgang mit bestehenden
   Buchungen bei Entzug/Ablauf (Gate wirkt nicht rückwirkend).
 
+## Test-Zugänge & E2E
+- Lokale Test-Logins (alle Rollen, Passwort `zhltest123`): `admin@/groupadmin@/resourceadmin@/scheduleadmin@/user@zhl.local` — Doku `CREDENTIALS-LOCAL.md` (gitignored), Seed `seed-test-users.sh`.
+- **Playwright-E2E** (`tests-e2e/`, 12 Tests grün): Login je Rolle, Zugriffskontrolle, Smoke aller Kernseiten, Buchungs-UI. App lokal unter **`http://127.0.0.1:8080/Web/`**.
+- Funde: siehe [ISSUES.md](ISSUES.md) (#1 script.url-Pfad/Redirect, #2 500 bei unautor. Admin-Zugriff).
+
 ## Changelog
 - 2026-06-22: Fork angelegt, lokale Umgebung + DB-Kopie aufgebaut, Upgrade-Rehearsal erfolgreich, altes Repo archiviert.
 - 2026-06-22: Agentischen Prozess + kanonische FEATURES.md erstellt; **Codex-Gate gelaufen** (Findings eingearbeitet: F6/F20/F22/F26/F28/F33/F35/F36 korrigiert, Querschnitt-Risiken ergänzt). PR #1 (Landing-Page) offen.

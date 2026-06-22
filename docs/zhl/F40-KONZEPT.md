@@ -15,6 +15,17 @@ LibreBookings natives Permission-Modell trägt das Gate vollständig:
 - Permission-Zuweisung pro Gruppe (Full/View/none) rein über die Admin-UI
   (`lib/Application/Admin/ResourcePermissionService.php`).
 
+## „Beschränkt" = `resources.autoassign` (verifiziert an Live-Daten)
+- `autoassign=1` → Ressource wird **bei Registrierung jedem neuen User automatisch
+  freigegeben** (= nicht beschränkt). Aktuell **54** Ressourcen.
+- `autoassign=0` → **kein** Auto-Recht; nur explizit Berechtigte (User/Gruppe) buchen
+  (= beschränkt, F40). Aktuell **5** (Funkmikrofone, 4 Gaming-PCs) — die natürlichen
+  Einweisungs-Kandidaten.
+- Rechte liegen in `user_resource_permissions` (per-User, 13365 Zeilen live) bzw.
+  `group_resource_permissions` (per-Gruppe, aktuell leer).
+- **Wichtig:** Per-SQL angelegte User (Tests) bekommen die Auto-Rechte NICHT — daher
+  weist `seed-test-users.sh` dem Test-User die `autoassign=1`-Ressourcen explizit zu.
+
 ## Lösung — nativ (Config + Gruppen, KEIN Code)
 1. Pro einweisungspflichtigem Medium eine **Zertifikats-Gruppe** anlegen
    (z.B. „Cert: Lasercutter"). Ressource → diese Gruppe `Full`, „Alle" → `none`.

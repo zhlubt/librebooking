@@ -28,5 +28,12 @@ mk Test ResourceAdmin zhl_resadmin   resourceadmin@zhl.local 3
 mk Test ScheduleAdmin zhl_schedadmin scheduleadmin@zhl.local 4
 mk Test User          zhl_user       user@zhl.local
 
+# Registrierung weist 'autoassign=1'-Ressourcen automatisch zu. Da wir per SQL anlegen,
+# holen wir das für den regulären User nach (sonst kann er nichts buchen).
+q "INSERT IGNORE INTO user_resource_permissions (user_id,resource_id,permission_id,permission_type)
+   SELECT u.user_id, r.resource_id, 1, 0 FROM users u JOIN resources r ON r.autoassign=1
+   WHERE u.email='user@zhl.local';"
+echo "auto-assigned non-restricted resources to user@zhl.local"
+
 echo "--- Test-Logins (Passwort: $PW) ---"
 q "SELECT u.email, COALESCE(g.name,'(regular user)') FROM users u LEFT JOIN user_groups ug ON u.user_id=ug.user_id LEFT JOIN groups g ON ug.group_id=g.group_id WHERE u.email LIKE '%@zhl.local' ORDER BY u.user_id;"

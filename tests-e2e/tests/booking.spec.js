@@ -14,6 +14,16 @@ test('Reservierungsformular für eine Ressource lädt mit Speichern-Button', asy
   await expect(page.locator('.btnCreate').first()).toHaveCount(1);
 });
 
+test('Regulärer User kann ein nicht-beschränktes Medium buchen (Formular lädt)', async ({ page }) => {
+  // Ressource 5 (Meta Quest) ist autoassign=1 -> für reguläre User freigegeben.
+  await login(page, ROLES.user.email);
+  await page.goto('reservation.php?rid=5&sid=2', { waitUntil: 'domcontentloaded' });
+  const body = (await page.content()).toLowerCase();
+  expect(body).not.toMatch(/fatal error|parse error|uncaught/);
+  await expect(page.locator('#reservationTitle')).toHaveCount(1);
+  await expect(page.locator('.btnCreate').first()).toHaveCount(1);
+});
+
 test('Schedule-Seite zeigt Ressourcen', async ({ page }) => {
   await login(page, ROLES.appAdmin.email);
   await page.goto('schedule.php', { waitUntil: 'domcontentloaded' });

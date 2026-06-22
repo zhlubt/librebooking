@@ -39,6 +39,14 @@ gewünscht ist (Gruppen kennen kein „gültig bis"):
    (`CanBookResource` zusätzlich gegen `expires_at`). Nur additiv; das Gruppen-Gate
    bleibt primär (robuster).
 
+## Caveats (Codex-Gate)
+- Das Gruppen-Gate wirkt **bei Buchung/Änderung**, **nicht rückwirkend**: bestehende
+  Reservierungen werden durch Gruppenentzug/Ablauf **nicht automatisch storniert** →
+  bei Bedarf Custom-Job, der laufende/künftige Buchungen behandelt.
+- **Admins sind vom Permission-Check ausgenommen** — Gate gilt für normale User.
+- Ablauf/Gültigkeit ist nicht nativ (siehe Custom-Teil).
+- **Betriebsprozess klären:** Wer trägt Gruppenmitgliedschaft ein/entzieht sie?
+
 ## Empfehlung / Reihenfolge
 - **Stufe 1 (jetzt, ohne Code):** Gruppen-Gate (1) + Einweisung-als-Ressource (2)
   konfigurieren und an der lokalen Kopie durchspielen.

@@ -1,44 +1,57 @@
 | Feature/Plan | Befund | Beleg (Pfad) | Empfehlung |
 |---|---|---|---|
-| F1 Registrierung/Profile | Nativ stimmt; Self-Registration und Profilfelder sind konfigurierbar. | `config/config.dist.php:419`, `lib/Config/ConfigKeys.php:938` | Als 🟦 markieren, wenn Live-Config gemeint ist. |
-| F2 Rollen/Rechte | Nativ stimmt. Gruppenrollen plus Resource/Schedule/Admin-Logik vorhanden. | `database_schema/create-schema.sql:70`, `database_schema/create-data.sql:2`, `database_schema/upgrades/2.1/data.sql:1`, `Presenters/DashboardPresenter.php:34` | Behalten. |
-| F3 User-Verwaltung | Nativ stimmt. | `Pages/Admin/ManageUsersPage.php:177`, `Presenters/Admin/ManageUsersPresenter.php:144` | Behalten. |
-| F4 Item/Inventar-CRUD | Nativ stimmt: Resources sind das Inventar. | `Pages/Admin/ManageResourcesPage.php:466`, `Presenters/Admin/ManageResourcesPresenter.php:93`, `database_schema/create-schema.sql:183` | Behalten. |
-| F5 Custom-Attribute | Nativ stimmt für User/Resource/Resource-Type/Reservation. | `Domain/CustomAttribute.php:3`, `WebServices/Controllers/AttributeSaveController.php:186` | Behalten; Reichweite dokumentieren. |
-| F6 Kategorien | Zu optimistisch als ✅: Resource Groups und Resource Types existieren, aber keine frei modellierbare Kategorie-/Kachel-UX. | `Pages/Admin/ManageResourceGroupsPage.php:64`, `Pages/Admin/ManageResourceTypesPage.php:54`, `Domain/ResourceGroup.php:140` | Auf 🟨/🟦 setzen; Frontpage-Kategorien separat planen. |
-| F7 Status/Verfügbarkeit | Nativ stimmt: Resource-Status, Blackouts, aktive/verborgene Ressourcen. | `Pages/Admin/ManageResourceStatusPage.php:17`, `Pages/Admin/ManageBlackoutsPage.php:251`, `database_schema/create-schema.sql:191` | Behalten. |
-| F11 Multi-Item-Buchung | Nativ stimmt: Additional Resources pro Reservierung. | `tpl/Reservation/create.tpl:208`, `Domain/ReservationSeries.php:131`, `database_schema/create-schema.sql:340` | Behalten. |
-| F12 Buchungs-Dashboard | Nativ stimmt. | `Pages/DashboardPage.php`, `Presenters/DashboardPresenter.php:34` | Behalten. |
-| F13 Kalenderübersicht | Nativ stimmt; FullCalendar vorhanden. | `Pages/CalendarPage.php`, `Web/scripts/calendar.js:82`, `tpl/javascript-includes.tpl:73` | Behalten. |
-| F14 Approval-Workflow | Nativ stimmt pro Ressource. | `database_schema/create-schema.sql:197`, `Domain/BookableResource.php:962`, `lib/Application/Reservation/Validation/RequiresApprovalRule.php:26` | Behalten. |
-| F15 Vorlaufzeiten | Nativ stimmt; je Ressource für Add/Update/Delete und Max Notice. | `database_schema/upgrades/2.7/schema.sql:117`, `Presenters/Admin/ManageResourcesPresenter.php:290`, `Domain/BookableResource.php:1035` | Behalten. |
-| F18 Blackout-Daten | Nativ stimmt. | `Pages/Admin/ManageBlackoutsPage.php:251`, `Domain/Blackout.php:186`, `lib/Application/Reservation/ManageBlackoutsService.php` | Behalten. |
-| F20 iCal-Feed | Nativ stimmt, aber Subscription muss pro Schedule/Resource erlaubt sein. | `Pages/Export/CalendarSubscriptionPage.php`, `Presenters/CalendarSubscriptionPresenter.php:35`, `Domain/Schedule.php:160`, `Domain/BookableResource.php:1271` | Als ✅/🟦 präzisieren. |
-| F21 E-Mail-Benachrichtigungen | Nativ stimmt für create/update/delete/approve. | `lib/Application/Reservation/Notification/AddReservationNotificationService.php:10`, `UpdateReservationNotificationService.php:10`, `DeleteReservationNotificationService.php:11`, `ApproveReservationNotificationService.php:10` | Behalten. |
-| F26 Mehrsprachigkeit | Nativ stimmt, aber „Default umgestellt“ ist im Repo nicht belegt; `config.dist.php` bleibt `en_us`. | `config/config.dist.php:47`, `lang/de_de.php`, `lang/de_de/ReservationCreated.tpl` | Als 🟦 markieren: Config-Änderung nötig. |
-| F28 REST-API | Nativ stimmt, aber default aus. | `lib/Config/ConfigKeys.php:1790`, `config/config.dist.php:746`, `WebServices/ReservationsWebService.php` | Als ✅/🟦 statt rein ✅ führen. |
-| F29 Analytics/Reports | Nativ stimmt, Zugriff aber konfigurierbar/rollenabhängig. | `Pages/Reports/GenerateReportPage.php:117`, `Presenters/Reports/GenerateReportPresenter.php:50`, `lib/Config/ConfigKeys.php:925` | Behalten; Rollen klären. |
-| F31 Max. Buchungsdauer | Nativ stimmt je Ressource. | `database_schema/create-schema.sql:192`, `database_schema/create-schema.sql:194`, `lib/Application/Reservation/Validation/ResourceMaximumDurationRule.php:3` | Behalten. |
-| F32 User-Buchungslimits | Nativ stimmt über Quotas. | `database_schema/create-schema.sql:411`, `Pages/Admin/ManageQuotasPage.php:99`, `Domain/Quota.php:201` | Behalten. |
-| F33 Storno-Fristen | Nativ stimmt für Mindestfrist vor Delete; kein komplexer Storno-Workflow. | `database_schema/upgrades/2.7/schema.sql:123`, `Presenters/Admin/ManageResourcesPresenter.php:292`, `Domain/BookableResource.php:1083` | Als ✅ nur für Fristen, nicht Workflow. |
-| F35 Verlängerungen | Zu optimistisch als vollwertiges Feature: Reservierung ändern ist nativ, expliziter Verlängerungsprozess nicht. | `Presenters/Reservation/ReservationUpdatePresenter.php:76`, `Domain/ExistingReservationSeries.php:308` | Auf 🟨 setzen, falls ZHL echte Verlängerungslogik meint. |
-| F36 Waitlist | Capability nativ, aber default aus; nicht „sofort nativ aktiv“. | `config/config.dist.php:341`, `lib/Config/ConfigKeys.php:755`, `database_schema/upgrades/2.6/schema.sql:202` | Als 🟦 markieren. |
-| F39 Mobile-Responsive | Nativ plausibel: Bootstrap 5 und responsive DataTables eingebunden. | `tpl/globalheader.tpl:39`, `tpl/globalheader.tpl:46`, `Web/assets/vendor/bootstrap/5.3.3/metadata.json` | Behalten, aber UX mobil testen. |
-| Strategie: Core/Templates direkt anpassen | Riskant formuliert. Viele UX/Branding-Punkte gehen über Config, `lang-overrides`, `css.extension.file`, Styling-Plugin. | `config/config.dist.php:47`, `config/lang-overrides.example.php`, `Pages/StylingPluginPage.php` | Core-Edits nur nach Plugin/CSS/Config-Ausschluss. |
-| Strategie: Webhooks via Plugin | Stimmt als Custom-Pfad, nicht nativ. PostReservation-Plugin kann Hooks auslösen. | `config/config.dist.php:735`, `plugins/PostReservation/PostReservationExample/PostReservationExample.php:19` | F24 klar 🔧/Plugin nennen. |
-| Strategie: E-Mail-Templates | Global/dateibasiert, nicht per Item. | `Presenters/Admin/ManageEmailTemplatesPresenter.php:36`, `Presenters/Admin/ManageEmailTemplatesPresenter.php:134` | F22 nicht als Per-Item verkaufen; Custom nötig für resource-spezifische Templates. |
-| Strategie: Upgrade 4.0 → 5.1 keine DB-Breaks | Im Repo plausibel: Upgrade-Verzeichnisse enden bei 4.0; 5.1-Changelog vorhanden. Trotzdem Live-DB-Rehearsal Pflicht. | `database_schema/upgrades/4.0/data.sql:1`, `CHANGELOG.md:6` | Nicht „niedriges Risiko“ ohne Dump/Restore-Test formulieren. |
+| F1 Registrierung/Profile | Weitgehend richtig: Domain-Restrict + Aktivierung nativ; ToS-Akzeptanzzeitpunkt pro User nicht nativ belegt. | `lib/Config/ConfigKeys.php:1012`, `lib/Config/ConfigKeys.php:1414`, `database_schema/upgrades/2.2/schema.sql:30`, `database_schema/upgrades/2.7/schema.sql:93` | ✅🟦 lassen, ToS-Zeitpunkt als Custom-Mini ausweisen. |
+| F2 Rollen/Rechte | Richtig. Rollen/Gruppen/Resource-Permissions nativ. | `database_schema/create-schema.sql:104`, `database_schema/create-schema.sql:236`, `lib/Application/Admin/ResourcePermissionService.php` | ✅ lassen. |
+| F3 User-Verwaltung | Richtig. | `Pages/Admin/ManageUsersPage.php`, `Presenters/Admin/ManageUsersPresenter.php` | ✅ lassen. |
+| F4 Item/Inventar-CRUD | Richtig als LibreBooking-Resource-CRUD. | `Pages/Admin/ManageResourcesPage.php`, `Presenters/Admin/ManageResourcesPresenter.php` | ✅ lassen. |
+| F5 Custom-Attribute | Richtig. | `Domain/CustomAttribute.php`, `Domain/Access/AttributeRepository.php`, `WebServices/AttributesWebService.php` | ✅ lassen. |
+| F6 Kategorien | FEATURES korrekt vorsichtig; STRATEGY zu optimistisch (`✅`). Resource Groups/Types sind keine freie Frontpage-Kachel-UX. | `Domain/ResourceGroup.php`, `Domain/ResourceType.php` | STRATEGY auf 🟨🟦 ändern. |
+| F7 Status/Verfügbarkeit | Richtig. Resource-Status + Blackouts nativ. | `Domain/Values/ResourceStatus.php`, `Domain/Blackout.php`, `database_schema/create-schema.sql:357` | ✅ lassen. |
+| F8 Item-Typen/Übergabe | FEATURES richtig: Übergabe-Flag/Flow nicht nativ. | `Domain/BookableResource.php:1375`, kein `handover` im Code/Schema | Custom-Modul; ggf. erst Custom Attribute als Übergangsflag. |
+| F9 Medien/Doku | FEATURES richtig, STRATEGY zu optimistisch: Bilder nativ, Ressourcen-Doku-Anhänge nicht. Attachments hängen an Reservierungen; MIME nur Extension. | `Domain/BookableResource.php:698`, `database_schema/upgrades/2.2/schema.sql:44`, `lib/Application/Reservation/Validation/ReservationAttachmentRule.php:24`, `lib/Common/Validators/FileTypeValidator.php:34` | `resource_attachments` + `finfo`/Max-Size als Custom einplanen. |
+| F10 QR-Verifikation | FEATURES stimmt: QR + Check-in/out nativ, Checkliste fehlt. STRATEGY falsch, wenn “QR → Custom” behauptet wird. | `Presenters/Admin/ManageResourcesPresenter.php:891`, `Pages/ResourceQRRouterPage.php:13`, `Presenters/Reservation/ReservationCheckinPresenter.php:52` | QR als nativ markieren; nur Verifikations-Checkliste custom. |
+| F11 Multi-Item-Buchung | Richtig. Additional resources gehen über `AllResourceIds()`/Ressourcenliste. | `lib/Application/Reservation/Validation/PermissionValidationRule.php:29`, `Presenters/Reservation/ReservationUpdatePresenter.php` | ✅ lassen. |
+| F12 Buchungs-Dashboard | Richtig. | `Presenters/DashboardPresenter.php`, `Presenters/Dashboard/UpcomingReservationsPresenter.php` | ✅ lassen. |
+| F13 Kalenderübersicht | Richtig. | `Pages/SchedulePage.php`, `Presenters/Schedule/SchedulePresenter.php`, `Pages/CalendarPage.php` | ✅ lassen. |
+| F14 Approval-Workflow | Richtig pro Ressource. | `Domain/BookableResource.php`, `lib/Application/Reservation/Validation/RequiresApprovalRule.php` | ✅ lassen. |
+| F15 Vorlaufzeiten | Richtig als Resource-Regeln. | `Domain/BookableResource.php:704`, `lib/Application/Reservation/Validation/ResourceMaximumNoticeRule.php` | ✅ lassen. |
+| F16/F17 Personal-Übergabe-Timeslots | FEATURES richtig: kein Staff-/Schicht-/Slot-Modell. | kein `staff/shift/handover` im Schema; nur `reservation_users` | Custom nötig. |
+| F18 Blackout-Daten | Richtig. | `Domain/Blackout.php`, `database_schema/create-schema.sql:357` | ✅ lassen. |
+| F19 Timeslot-Storno Staff→Peer | Richtig als Custom. Waitlist ist user/resource-getrieben, kein Staff-Takeover. | `database_schema/upgrades/2.6/schema.sql:203`, `Jobs/sendwaitlist.php` | An CM-1 koppeln. |
+| F20 iCal-Feed | Richtig, aber Freigabe/Privacy prüfen. | `Presenters/CalendarSubscriptionPresenter.php`, `Pages/Export/CalendarSubscriptionPage.php` | ✅🟦 lassen; öffentliche Feeds als Risiko aufnehmen. |
+| F21 E-Mail-Benachrichtigungen | Richtig. | `lib/Application/Reservation/Notification/PostReservationFactory.php:48` | ✅ lassen. |
+| F22 Mailtemplates DE/per-Item | FEATURES stimmt: Sprach-/Custom-Templates nativ, per Resource nicht. | `lib/Email/EmailMessage.php:42`, `lib/Common/SmartyPage.php:89`, `lib/Common/SmartyPage.php:118`, `Presenters/Admin/ManageEmailTemplatesPresenter.php:99` | Per-Resource explizit 🔧 lassen. |
+| F23 Reminder-Timing | FEATURES stimmt: global/UI-Reminder nativ, nicht pro Ressource/erzwungen. | `config/config.dist.php:370`, `lib/Application/Reservation/NewReservationInitializer.php:128`, `Jobs/sendreminders.php:4` | QW okay; “Pflicht-Reminder”/per Ressource custom. |
+| F24 Webhooks | Richtig: Hook-Punkt nativ, HTTP-Webhook selbst nicht. | `config/config.dist.php:734`, `lib/Common/PluginManager.php:133`, `plugins/PostReservation/PostReservationExample/PostReservationExample.php:91` | Kleines Plugin statt Core-Edit. |
+| F25 Robuste Suche | Richtig: LIKE-Suche, kein Fuzzy/Fulltext/Resource-Autocomplete. | `lib/Database/SqlFilter.php:238`, `Pages/Ajax/AutoCompletePage.php:14`, `Pages/Ajax/AutoCompletePage.php:227` | 🔧 lassen. |
+| F26 Mehrsprachigkeit | Richtig. | `config/config.dist.php:47`, `config/lang-overrides.example.php` | Config/lang-overrides statt `lang/` patchen. |
+| F27 Public Homepage | Custom/UX, nicht LibreBooking-nativ. | `Web/zhl-welcome.php` laut FEATURES | Als ZHL-eigene Datei/Redirect halten. |
+| F28 REST-API | Richtig, Default aus. | `lib/Config/ConfigKeys.php:1790`, `WebServices/` | Nur gezielt aktivieren; API-Gruppen nutzen. |
+| F29 Analytics/Reports | Richtig als Reports-Modul. | `Pages/Reports/`, `Presenters/Reports/` | ✅ lassen; Rollen klären. |
+| F30 Komponenten/Sub-Objekte | FEATURES stimmt: Accessories nativ nur Name/Menge/min/max, kein Zustand/Seriennummer. | `Domain/Accessory.php:31`, `Domain/Accessory.php:157`, `database_schema/upgrades/2.6/schema.sql:29`, `lib/Application/Reservation/Validation/AccessoryResourceRule.php:64` | CM-3 vor CM-2 oder gemeinsam liefern. |
+| F31 Max. Buchungsdauer | Richtig. | `Domain/BookableResource.php`, Resource-Duration-Regeln | ✅ lassen. |
+| F32 User-Buchungslimits | Richtig: Quotas. | `Domain/Quota.php`, `database_schema/create-schema.sql:418` | ✅ lassen. |
+| F33 Storno-Fristen | Nativ nur Fristen/Regeln, kein Storno-Workflow. | `Domain/BookableResource.php`, Delete-Min-Notice | In STRATEGY nicht als Workflow verkaufen. |
+| F34 Overdue-Handling | FEATURES richtig: Checkout-Missing kann gesucht werden, Cron mailt nur missed check-in. Keine Eskalation/Auto-Sperre. | `Jobs/sendmissedcheckin.php:29`, `lib/Database/Commands/Queries.php:1328`, `Domain/Access/ReservationViewRepository.php:369` | QW-4 nicht als F34-Lösung formulieren. CM-5 bleibt nötig. |
+| F35 Verlängerungen | “Reservierung ändern” nativ, kein eigener Verlängerungsprozess. | `Pages/Reservation/ExistingReservationPage.php`, `Presenters/Reservation/ReservationUpdatePresenter.php` | 🟨 statt rein ✅, falls eigener Flow gewünscht. |
+| F36 Waitlist | Richtig, Config default aus. | `config/config.dist.php:341`, `ReservationHandler.php:113`, `database_schema/upgrades/2.6/schema.sql:203` | QW sinnvoll; Cron `sendwaitlist.php` mit einplanen. |
+| F37 Audit-Log | FEATURES richtig: kein systemweites Audit. Payment/Credit-Logs und Monolog ersetzen Audit nicht. | `config/config.dist.php:209`, `lib/Common/Logging/Log.php`, `database_schema/upgrades/2.7/schema.sql:42` | STRATEGY von 🟡 auf 🔧 korrigieren. |
+| F38 DSGVO | FEATURES richtig: Privacy-Config ja, Export/Anonymisierung/Consent nicht nativ. User-Delete ist Hard Delete. | `config/config.dist.php:534`, `lib/Database/Commands/Queries.php:296` | STRATEGY von 🟡 auf 🔧 korrigieren. |
+| F39 Mobile-Responsive | Plausibel richtig. | Bootstrap-basierte Templates/CSS | Trotzdem reale Mobile-Smoke-Tests einplanen. |
+| F40 Einweisungs-/Berechtigungspflicht | Gruppen-Gate ist tragfähig für neue/ändernde Buchungen normaler User. Caveats: Admins sind ausgenommen; bestehende Reservierungen werden durch Gruppenentzug nicht automatisch storniert; Ablauf/Lifecycle ist nicht nativ. | `PermissionService.php:72`, `PermissionValidationRule.php:31`, `PreReservationFactory.php:175`, `ScheduleUserRepository.php:212`, `database_schema/upgrades/2.7/schema.sql:148` | Konzept Stufe 1 ok; ergänzen: “wirkt bei Buchung/Änderung, nicht rückwirkend”. Ablauf per Job/Plugin. |
+| STRATEGY Feature-Mapping | Zu optimistisch gegenüber FEATURES.md: F6, F9, F10, F34, F37, F38 und Custom-Anzahl sind falsch/alt. | `docs/zhl/STRATEGY.md` vs. obige Codebelege | STRATEGY aus FEATURES.md neu ableiten. |
+| WORKPACKAGES Reihenfolge | Widerspruch: Strategie sagt Upgrade zuerst, WORKPACKAGES stellt UP-1 nach Config/UX/Custom. Außerdem CM-2 nutzt F30, CM-3 erweitert F30 erst danach. | `docs/zhl/WORKPACKAGES.md` | UP-1/Rehearsal vor produktiven Config-/UX-PRs; CM-3 vor/mit CM-2; CM-4 Stufe 1 als Config-Runbook, nicht Custom-PR. |
 
 **Fehlt**
 
-- Betrieb/Deploy: SFTP-only, Schreibrechte für `tpl_c/`, `uploads/`, Attachment-Pfad und Smarty-Cache als eigenes Risiko aufnehmen.
-- Security/Datenschutz: Anhänge, Rich-Text, öffentliche Kalenderfeeds, API-Aktivierung und Rollenmodell explizit in die Strategie.
-- Datenmodell für ZHL-Übergabe: Personalverfügbarkeit, Übergabeprotokoll, QR-Scan, Checkliste, Verantwortliche und Eskalation fehlen als klares Custom-Modul.
-- Suche: vorhandene Suche ist SQL-LIKE auf Titel/Beschreibung/Referenz, keine Synonyme/Fuzzy-Suche.
+- Explizite Betriebs-Tasks: Cron für `sendreminders.php`, `sendwaitlist.php`, `sendmissedcheckin.php`; bei SFTP-only muss klar sein, wer Cron/Job-Ausführung kontrolliert.
+- Berechtigungskonzept für API/iCal/public views: `api.enabled`, Calendar-Feeds und `privacy.*` können unbeabsichtigt Daten exponieren.
+- Datenmodell-Entscheidung für ZHL-Übergabe-Modul: eine gebündelte Spezifikation für F8/F10/F16/F17/F19/F30/F34 fehlt noch.
+- F40-Betriebsprozess: Wer trägt Gruppenmitgliedschaft ein, wer entzieht sie, was passiert mit bestehenden Reservierungen nach Entzug/Ablauf?
 
 **Risiken**
 
-- Mehrere ✅ sind eigentlich „nativ vorhanden, aber per Config aus“: F20, F26, F28, F36.
-- F6, F22, F35 sind zu optimistisch und sollten vor Umsetzung abgewertet werden.
-- Core-Edits für Frontpage/UX erhöhen Merge-Konflikte; zuerst `config.php`, `lang-overrides`, `css.extension.file`, Styling-Plugin und PostReservation-Plugin ausschöpfen.
-- Upgrade nicht nur Code tauschen: alte Live-Config gegen neue `config.dist.php` diffen, Upload-/Cache-Pfade sichern, DB-Dump-Restore real proben.
+- Upgrade-Reihenfolge ist riskant, wenn erst UX/Config gebaut wird und danach 4.0.0 → 5.1.0 produktiv kommt. Erst Rehearsal/Upgrade, dann UX.
+- SFTP-only macht Rollback, DB-Dump, Cache-Cleanup, Upload-Pfade und Cron-Verifikation zum Hauptbetriebsrisiko.
+- Core-Edits für Branding/UX sollten weitgehend durch `css.extension.file`, Styling-Plugin, `lang-overrides.php`, eigene Pages und Plugins ersetzt werden.
+- F40 ist als Gruppen-Gate brauchbar, aber nicht als vollständiges Zertifikatssystem. Für Ablauf, Audit, Entzug und rückwirkende Reservierungsbehandlung braucht es Custom-Logik.

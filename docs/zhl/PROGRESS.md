@@ -36,11 +36,16 @@ Frontpage/UX** + mehr Konfiguration. Details: [STRATEGY.md](STRATEGY.md).
 
 ## Offene Entscheidungen
 - Umfang UX-Vereinfachung (welche Ansichten für Standard-User verstecken?).
-- Wartungsfenster fürs Produktiv-Upgrade.
+- Wartungsfenster fürs Produktiv-Upgrade (UP-1 **vor** produktiver Config/UX).
+- **Cron bei SFTP-only:** Wer steuert die Job-Ausführung im Container (`sendreminders.php`,
+  `sendwaitlist.php`, `sendmissedcheckin.php`)? — relevant für QW-3/QW-4.
+- F40-Betriebsprozess: Wer trägt Zertifikats-Gruppen ein/entzieht; Umgang mit bestehenden
+  Buchungen bei Entzug/Ablauf (Gate wirkt nicht rückwirkend).
 
 ## Changelog
 - 2026-06-22: Fork angelegt, lokale Umgebung + DB-Kopie aufgebaut, Upgrade-Rehearsal erfolgreich, altes Repo archiviert.
 - 2026-06-22: Agentischen Prozess + kanonische FEATURES.md erstellt; **Codex-Gate gelaufen** (Findings eingearbeitet: F6/F20/F22/F26/F28/F33/F35/F36 korrigiert, Querschnitt-Risiken ergänzt). PR #1 (Landing-Page) offen.
 - 2026-06-22: **Neuer Feature-Request F40** (Einweisungs-/Berechtigungspflicht) aufgenommen — Gating nativ (Resource-Permissions), Badge/Zertifikat-Lifecycle = Custom.
 - 2026-06-22: Lokaler Server auf docroot=`Web/` umgestellt → App unter `http://127.0.0.1:8080/` (vorher CSS-Stolperfalle ohne Trailing-Slash).
+- 2026-06-22: **Codex-Gate Runde 2**: FEATURES.md bestätigt; STRATEGY §5 auf FEATURES.md umgestellt (alte Tabelle war zu optimistisch); WORKPACKAGES-Reihenfolge korrigiert (UP-1 zuerst; QW-4≠F34; CM-3 vor CM-2); F40-Caveats ergänzt (Gate nicht rückwirkend, Admins exempt); Cron-bei-SFTP-only als offene Frage.
 - 2026-06-22: **Feature-Verifikations-Runde** (4 Scout-Agenten am Code): alle 40 Features belegt. Schlüsselbefunde: QR+Check-in/out und Resource-Permission-Gating sind **nativ**; echte Custom-Lücken: Personal-Übergabe-Slots (F16/17), Übergabe-Flag (F8), QR-Checkliste (F10), Accessory-Zustand (F30), Audit (F37), DSGVO (F38), Overdue-Eskalation (F34), Fuzzy-Suche (F25). F40-Konzept ([F40-KONZEPT.md](F40-KONZEPT.md)) + Arbeitspakete ([WORKPACKAGES.md](WORKPACKAGES.md)) erstellt.

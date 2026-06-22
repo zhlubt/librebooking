@@ -97,52 +97,16 @@ Nur was LibreBooking nicht kann, gezielt ergänzen:
   Personal-Verfügbarkeit für Aushändigung. → Custom.
 - **Erweiterte Suche** (Fuzzy/Synonyme, F25) — falls nach UX-Phase noch nötig.
 
-## 5. Feature-Mapping (39 Wünsche → LibreBooking)
+## 5. Feature-Mapping
 
-Legende: ✅ nativ vorhanden · 🟡 vorhanden, Konfiguration/Anpassung nötig · 🔧 Custom-Arbeit
+> Die kanonische, **am Code belegte** Feature-Liste (40 Features inkl. F40, mit
+> Status/Beleg/nächstem Schritt) ist **[FEATURES.md](FEATURES.md)** — durch Scout-
+> Agenten + **Codex-Gate** verifiziert. Diese ältere Tabelle wurde dorthin überführt.
 
-| # | Feature | LB-Status | Hinweis |
-|---|---|---|---|
-| F1 | Registrierung/Profile | ✅ | Self-Registration aktiv, E-Mail-Aktivierung konfigurierbar |
-| F2 | Rollen/Rechte | ✅ | Admin/Resource-Admin/Group-Admin/User + Permissions |
-| F3 | User-Verwaltung | ✅ | Admin-UI vorhanden |
-| F4 | Item/Inventar-CRUD | ✅ | „Resources" |
-| F5 | Custom-Attribute | ✅ | Custom Attributes (Resource/User/Reservation) |
-| F6 | Kategorien | ✅ | Resource Groups + Resource Types |
-| F7 | Status/Verfügbarkeit | ✅ | available/unavailable/hidden + Blackouts |
-| F8 | Item-Typen / Übergabe | 🟡/🔧 | self-service via Config; Personal-Übergabe → Custom (Säule 4) |
-| F9 | Medien/Doku | 🟡 | Resource-Images + Attachments |
-| F10 | QR-Verifikation | 🔧 | Check-in vorhanden, QR/Checkliste → Custom |
-| F11 | Multi-Item-Buchung | ✅ | Additional Resources je Reservierung |
-| F12 | Buchungs-Dashboard | ✅ | „My Reservations" |
-| F13 | Kalenderübersicht | ✅ | Schedule/Calendar (FullCalendar 6.1 ab 5.0) |
-| F14 | Approval-Workflow | ✅ | pro Ressource, granular |
-| F15 | Vorlaufzeiten | ✅ | Reservierungsregeln je Ressource |
-| F16/F17 | Personal-Timeslots | 🔧 | echte Lücke → Custom |
-| F18 | Blackout-Daten | ✅ | Blackout Times |
-| F19 | Timeslot-Storno-Workflow | 🔧 | abhängig von F16/F17 |
-| F20 | iCal-Feed | ✅ | Subscription-Feeds vorhanden |
-| F21 | E-Mail-Benachrichtigungen | ✅ | create/update/delete/approve |
-| F22 | Per-Item-Mailtemplates | 🟡 | E-Mail-Templates anpassbar |
-| F23 | Reminder-Timing | 🟡 | `reminders.enabled` + Start/End-Reminder |
-| F24 | Webhooks | 🟡/🔧 | API vorhanden; Webhooks ggf. via PostReservation-Plugin |
-| F25 | Robuste Suche | 🟡/🔧 | Basis-Suche da; Fuzzy/Synonyme → Custom |
-| F26 | Mehrsprachigkeit | ✅ | de_de installiert, nur Default umstellen |
-| F27 | Public Homepage | 🔧 | **Hauptaufgabe** (Säule 3) |
-| F28 | REST-API | ✅ | `api.enabled` aktiv |
-| F29 | Analytics/Reports | ✅ | Reports-Modul |
-| F30 | Komponenten/Sub-Objekte | 🟡/🔧 | Accessories (Mengen) da; Checkliste → Custom |
-| F31 | Max. Buchungsdauer | ✅ | min/max je Ressource |
-| F32 | User-Buchungslimits | ✅ | Quotas |
-| F33 | Storno-Fristen | ✅ | Reservierungsregeln |
-| F34 | Overdue-Handling | 🟡 | Check-in/-out + Reminder; Eskalation ggf. Custom |
-| F35 | Verlängerungen | ✅ | Reservierung ändern (Approval-abhängig) |
-| F36 | Waitlist | ✅ | `allow.wait.list` |
-| F37 | Audit-Log | 🟡 | Activity/History teilweise; je nach Anspruch Custom |
-| F38 | DSGVO | 🟡 | manuell; Export/Löschung ggf. Custom |
-| F39 | Mobile-Responsive | ✅ | bereits responsiv |
-
-**Quintessenz:** ~26 ✅ nativ, ~9 🟡 Konfiguration, ~4–6 🔧 echte Custom-Lücken.
+Kurz-Quintessenz (nach Verifikation): ~18 ✅ nativ · ~7 🟦 Konfig · ~6 🟨 teilweise ·
+~9 🔧 Custom. Custom-Schwerpunkte: Personal-Übergabe-Slots (F16/F17), Übergabe-Flag (F8),
+QR-Checkliste (F10), Accessory-Zustand (F30), Audit (F37), DSGVO (F38), Overdue-Eskalation
+(F34), Fuzzy-Suche (F25), Zertifikat-Lifecycle (F40). Arbeitspakete: [WORKPACKAGES.md](WORKPACKAGES.md).
 
 ## 6. Empfohlene Reihenfolge
 

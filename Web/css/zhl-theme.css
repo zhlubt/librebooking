@@ -1,0 +1,55 @@
+/*
+ * ZHL-Theme — Branding-Overlay über LibreBooking/Bootstrap.
+ * Upgrade-sicher: wird via config 'css.extension.file' => 'css/zhl-theme.css'
+ * NACH dem Standard-CSS geladen. Keine Core-Datei wird verändert.
+ * Markenfarbe: UBT-Grün #009260.
+ */
+:root {
+  --zhl-green: #009260;
+  --zhl-green-dark: #00744c;
+  --bs-primary: #009260;
+  --bs-primary-rgb: 0, 146, 96;
+  --bs-link-color: #00744c;
+  --bs-link-color-rgb: 0, 116, 76;
+  --bs-link-hover-color: #009260;
+}
+
+/* Buttons / aktive Elemente */
+.btn-primary {
+  --bs-btn-bg: var(--zhl-green);
+  --bs-btn-border-color: var(--zhl-green);
+  --bs-btn-hover-bg: var(--zhl-green-dark);
+  --bs-btn-hover-border-color: var(--zhl-green-dark);
+  --bs-btn-active-bg: var(--zhl-green-dark);
+  --bs-btn-active-border-color: var(--zhl-green-dark);
+}
+.btn-outline-primary {
+  --bs-btn-color: var(--zhl-green-dark);
+  --bs-btn-border-color: var(--zhl-green);
+  --bs-btn-hover-bg: var(--zhl-green);
+  --bs-btn-hover-border-color: var(--zhl-green);
+}
+.link-primary { color: var(--zhl-green-dark) !important; }
+.text-primary { color: var(--zhl-green) !important; }
+.bg-primary { background-color: var(--zhl-green) !important; }
+
+/* Navigation / Markenkopf */
+.navbar-brand, .nav-brand { color: var(--zhl-green-dark) !important; font-weight: 700; }
+.navbar .nav-link.active { color: var(--zhl-green-dark) !important; }
+
+/* Login-Karte dezent akzentuieren */
+#login-box, .default-box { border-top: 3px solid var(--zhl-green); }
+
+/* Fokus-/Form-Akzente */
+.form-control:focus, .form-select:focus {
+  border-color: var(--zhl-green);
+  box-shadow: 0 0 0 0.2rem rgba(0, 146, 96, 0.15);
+}
+.form-check-input:checked {
+  background-color: var(--zhl-green);
+  border-color: var(--zhl-green);
+}
+
+/* Badges/Hervorhebungen in der Markenfarbe */
+.badge.bg-primary { background-color: var(--zhl-green) !important; }
+a { text-decoration-color: rgba(0, 146, 96, 0.4); }

@@ -50,6 +50,7 @@ Frontpage/UX** + mehr Konfiguration. Details: [STRATEGY.md](STRATEGY.md).
 - Funde: siehe [ISSUES.md](ISSUES.md) (#1 script.url-Pfad/Redirect, #2 500 bei unautor. Admin-Zugriff).
 
 ## Changelog
+- 2026-06-23: **Vollständige E2E-Buchung** grün (`reservation.spec.js`): regulärer User bucht nicht-beschränktes Medium end-to-end. Suite jetzt **18/18**. Befund: ZHL verlangt bei jeder Buchung Pflicht-Attribute „Haftpflicht" (Checkbox) + „3 Terminvorschläge für Abholung" (Text) — manueller Workaround für die Abhol-Koordination (→ Input fürs Übergabe-Modul F8/F16).
 - 2026-06-23: **PRs #1+#2 gemergt** → `zhl-main` hat Landing-Page (`Web/zhl-welcome.php`) + **ZHL-Branding** (`Web/css/zhl-theme.css`, UBT-Grün, via `css.extension.file`; Login-Button rgb(0,146,96), Test `branding.spec.js`). E2E 17/18 grün.
 - 2026-06-23: **F40 Stufe 1 durchgestochen** (Gruppen-Gate, nur Config): Gruppe „Eingewiesen: Gaming-PC" → Geräte 53-56 freigegeben; `certuser@zhl.local` Mitglied. Browser-Beweis (Playwright `f40.spec.js`, 16/16 grün): Nicht-Cert-User „do not have permission", Cert-User kommt durch. Runbook `F40-RUNBOOK.md`. Erkenntnis: „beschränkt" = `resources.autoassign=0` (nur 5 Geräte).
 - 2026-06-22: Fork angelegt, lokale Umgebung + DB-Kopie aufgebaut, Upgrade-Rehearsal erfolgreich, altes Repo archiviert.

@@ -14,7 +14,7 @@
 | F5 | Custom-Attribute | ✅ | Custom Attributes (User/Resource/Type/Reservation) | Reichweite dokumentieren | codex |
 | F6 | Kategorien | 🟨🟦 | Resource Groups/Types da, **keine freie Kategorie-/Kachel-UX** | Frontpage-Kategorien separat | codex |
 | F7 | Status/Verfügbarkeit | ✅ | Resource-Status + Blackouts | — | codex |
-| F8 | Item-Typen / Übergabe | 🔧 | **Kein** Selbstbedienung/Übergabe-Flag (grep 0); nur `requires_approval`, `enable_check_in` | Custom-Spalte `resources.handover_required` o. custom_attribute + Auswertung im Flow | scout |
+| F8 | Item-Typen / Übergabe | 🔧 | **Kein** Selbstbedienung/Übergabe-Flag (grep 0); nur `requires_approval`, `enable_check_in`. **ZHL behilft sich heute** mit Pflicht-Custom-Attributen „Haftpflicht" + „3 Terminvorschläge für Abholung" (manueller Workaround) | Custom-Spalte `resources.handover_required` o. custom_attribute + Auswertung im Flow | session |
 | F9 | Medien/Doku | 🟨 | Multi-Bild ✅ `resource_images` (`BookableResource.php:698`); **Doku-Anhänge nur an Reservierung** (`reservation_files`), nicht an Ressource; MIME nur per Endung (`FileTypeValidator.php:33`) | Custom: `resource_attachments`-Tabelle; echte MIME-Prüfung (finfo) + Max-Size | scout |
 | F10 | QR-Verifikation | ✅🔧 | **QR nativ** (BaconQrCode, `ManageResourcesPresenter.php:891`, `ResourceQRRouterPage.php`) + Check-in/out (`Ajax/ReservationCheckinPage.php`). **Checkliste/Zustand fehlt** (Toggle ohne Erfassung) | Custom-Checklisten-Step in `ReservationCheckinPresenter` (listet F30-Accessories) | scout |
 | F11 | Multi-Item-Buchung | ✅ | Additional Resources je Reservierung | — | codex |

@@ -50,4 +50,26 @@ async function attemptBooking(page, rid, sid) {
   return resp.text();
 }
 
-module.exports = { ROLES, PASSWORD, login, logout, attemptBooking, expect };
+// Führt eine VOLLSTÄNDIGE Buchung durch (inkl. ZHL-Pflicht-Attribute) und gibt die
+// Antwort von reservation_save.php zurück. ZHL verlangt aktuell bei jeder Reservierung:
+//  - psiattribute5 (Checkbox): "Ich besitze eine Haftpflichtversicherung"
+//  - psiattribute6 (Text):     "3 Terminvorschläge für Abholung"
+async function completeBooking(page, rid, sid) {
+  await page.goto(`reservation.php?rid=${rid}&sid=${sid}`, { waitUntil: 'domcontentloaded' });
+  await page.waitForTimeout(1200); // Custom-Attribute laden per JS nach
+  await page.fill('#reservationTitle', 'E2E Vollbuchung');
+  if (await page.locator('#BeginPeriod option').count() > 1) {
+    await page.selectOption('#BeginPeriod', { index: 1 }).catch(() => {});
+    await page.selectOption('#EndPeriod', { index: 2 }).catch(() => {});
+  }
+  await page.check('#psiattribute5').catch(() => {});
+  await page.fill('#psiattribute6', 'Mo 10:00, Di 14:00, Mi 09:00').catch(() => {});
+  const respPromise = page.waitForResponse(
+    r => r.url().includes('reservation_save'), { timeout: 12000 }
+  );
+  await page.locator('.btnCreate').first().click();
+  const resp = await respPromise;
+  return resp.text();
+}
+
+module.exports = { ROLES, PASSWORD, login, logout, attemptBooking, completeBooking, expect };

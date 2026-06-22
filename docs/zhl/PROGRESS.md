@@ -21,7 +21,8 @@ Frontpage/UX** + mehr Konfiguration. Details: [STRATEGY.md](STRATEGY.md).
 | Altes Repo `zhl-buchungssystem` | ✅ | Archiv (`archive/custom-rewrite-v1`), PR #1 geschlossen |
 | Deutsche Default-Sprache | ⏳ | Config `default.language=de_de` (Quick-Win) |
 | Frontpage-Prototyp | ⏳ | Branch `feat/landing-page` |
-| Agentischer Feature-Review-Prozess | ⏳ | siehe [AGENTIC-PLAN.md](AGENTIC-PLAN.md) |
+| Agentischer Feature-Review-Prozess | ✅ läuft | [AGENTIC-PLAN.md](AGENTIC-PLAN.md); 1. Runde durch |
+| Feature-Verifikation (40 Features am Code) | ✅ | 4 Scout-Agenten; [FEATURES.md](FEATURES.md) belegt; [WORKPACKAGES.md](WORKPACKAGES.md) |
 | Produktiv-Upgrade | ⛔ offen | Wartungsfenster + finales Backup nötig |
 
 ## Verifizierte Eckdaten
@@ -42,3 +43,4 @@ Frontpage/UX** + mehr Konfiguration. Details: [STRATEGY.md](STRATEGY.md).
 - 2026-06-22: Agentischen Prozess + kanonische FEATURES.md erstellt; **Codex-Gate gelaufen** (Findings eingearbeitet: F6/F20/F22/F26/F28/F33/F35/F36 korrigiert, Querschnitt-Risiken ergänzt). PR #1 (Landing-Page) offen.
 - 2026-06-22: **Neuer Feature-Request F40** (Einweisungs-/Berechtigungspflicht) aufgenommen — Gating nativ (Resource-Permissions), Badge/Zertifikat-Lifecycle = Custom.
 - 2026-06-22: Lokaler Server auf docroot=`Web/` umgestellt → App unter `http://127.0.0.1:8080/` (vorher CSS-Stolperfalle ohne Trailing-Slash).
+- 2026-06-22: **Feature-Verifikations-Runde** (4 Scout-Agenten am Code): alle 40 Features belegt. Schlüsselbefunde: QR+Check-in/out und Resource-Permission-Gating sind **nativ**; echte Custom-Lücken: Personal-Übergabe-Slots (F16/17), Übergabe-Flag (F8), QR-Checkliste (F10), Accessory-Zustand (F30), Audit (F37), DSGVO (F38), Overdue-Eskalation (F34), Fuzzy-Suche (F25). F40-Konzept ([F40-KONZEPT.md](F40-KONZEPT.md)) + Arbeitspakete ([WORKPACKAGES.md](WORKPACKAGES.md)) erstellt.

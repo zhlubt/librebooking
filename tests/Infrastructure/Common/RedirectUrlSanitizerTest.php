@@ -35,6 +35,16 @@ class RedirectUrlSanitizerTest extends TestBase
         $this->assertSame(self::FALLBACK, $actual);
     }
 
+    public function testNullPathIsTreatedAsEmptyPrefix(): void
+    {
+        // Decorated SecurePage instances can leave $path uninitialized (null);
+        // a null path must behave like an empty prefix instead of crashing.
+        // Regression: anonymous GET of schedule.php returned HTTP 500.
+        $actual = RedirectUrlSanitizer::Sanitize('index.php?redirect=schedule.php', null, self::SCRIPT_URL, self::FALLBACK);
+
+        $this->assertSame('index.php?redirect=schedule.php', $actual);
+    }
+
     /**
      * @return array<string, array{string, string, string}>
      */

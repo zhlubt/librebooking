@@ -6,8 +6,13 @@ class RedirectUrlSanitizer
      * Normalizes a redirect target and falls back to an internal URL when the
      * target is external, malformed, or uses an unsafe scheme.
      */
-    public static function Sanitize(string $url, string $path, string $scriptUrl, string $fallback): string
+    public static function Sanitize(string $url, ?string $path, string $scriptUrl, string $fallback): string
     {
+        // $path may be null for pages that never initialize it (e.g. decorated
+        // SecurePage instances); the relative-prefix branch below already guards
+        // with !empty(), so normalize null to '' and keep the contract simple.
+        $path = $path ?? '';
+
         $url = trim(html_entity_decode($url, ENT_QUOTES));
         if ($url === '') {
             return $fallback;

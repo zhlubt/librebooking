@@ -7,7 +7,8 @@
  * klicken muss. Die eigentlichen Daten werden weiterhin PULL-seitig aus terminplaner
  * gezogen (zhl_handover_sync) — dieser Endpunkt löst den Pull nur aus.
  *
- * Auth: X-API-Key == config/zhl-handover.php['terminplaner_api_key'] (gemeinsames Secret).
+ * Auth: X-API-Key Header == config/zhl-handover.php['terminplaner_api_key'] (gemeinsames Secret).
+ *       Bewusst NUR Header (kein ?key=), damit das Secret nicht in Zugriffslogs/URLs leakt.
  * Body/Query: token=<handover-token>
  */
 
@@ -19,7 +20,7 @@ header('Content-Type: application/json; charset=utf-8');
 
 $conf = zhl_handover_config();
 $expected = (string)($conf['terminplaner_api_key'] ?? '');
-$provided = (string)($_SERVER['HTTP_X_API_KEY'] ?? ($_GET['key'] ?? ''));
+$provided = (string)($_SERVER['HTTP_X_API_KEY'] ?? ''); // nur Header, kein Query-Leak
 
 if ($expected === '' || $expected === 'REPLACE_WITH_CROSSBOOK_API_KEY'
     || !$provided || !hash_equals($expected, $provided)) {

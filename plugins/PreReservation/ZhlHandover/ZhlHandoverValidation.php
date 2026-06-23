@@ -65,8 +65,9 @@ class ZhlHandoverValidation implements IReservationValidationService
             . 'Rückgabe-Termin über den Übergabe-Assistenten wählen und das Übergabe-Token '
             . 'eintragen.';
 
+        // Fehler als string[] (Vertrag des Konstruktors; Template iteriert {foreach from=$Errors}).
         if ($token === '' || !preg_match('/^[A-Za-z0-9]{8,64}$/', $token)) {
-            return new ReservationValidationResult(false, $message);
+            return new ReservationValidationResult(false, [$message]);
         }
 
         // 3. Bestätigte Abholung UND Rückgabe zum Token vorhanden?
@@ -75,7 +76,7 @@ class ZhlHandoverValidation implements IReservationValidationService
             return new ReservationValidationResult();
         }
 
-        return new ReservationValidationResult(false, $message);
+        return new ReservationValidationResult(false, [$message]);
     }
 
     /**

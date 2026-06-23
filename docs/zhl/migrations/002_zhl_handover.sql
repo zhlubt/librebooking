@@ -24,6 +24,10 @@ CREATE TABLE IF NOT EXISTS zhl_booking_handover (
   status                  ENUM('requested','confirmed','done') NOT NULL DEFAULT 'requested',
   created_at              DATETIME NOT NULL,
   updated_at              DATETIME NOT NULL,
+  -- Bewusst PRO VORGANG/RESERVIERUNG (Kapazität 1, ZHL-Entscheidung), NICHT pro
+  -- Ressource/Instanz: eine Übergabe = ein Termin (der terminplaner-Kalender erzwingt das).
+  -- Für künftige Multi-Resource-/Instanz-genaue Übergaben würde der Constraint um
+  -- resource_id/reservation_instance_id erweitert (Phase B/C).
   UNIQUE KEY uq_token_type (handover_token, type),           -- 1 Abholung + 1 Rückgabe je Vorgang
   INDEX idx_reference (reference_number),
   INDEX idx_status (status)

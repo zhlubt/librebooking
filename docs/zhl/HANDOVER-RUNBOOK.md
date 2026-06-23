@@ -47,7 +47,17 @@ Setup dort:
 5. Optional: terminplaner/Cron ruft `Web/zhl-handover-notify.php?token=…` (X-API-Key) zum
    Auto-Abgleich; sonst genügt der „Status aktualisieren"-Button.
 
+## Codex-Gate (2026-06-23) — Befunde eingearbeitet
+Codex bestätigte: Queries schema-kompatibel, `php -l` sauber, PreReservation ist der richtige
+Hook. **Sofort gefixt:** Fehlermeldung als `string[]` statt String (Template iteriert `$Errors`);
+`zhl-handover-notify.php` nur noch Header-Auth (kein `?key=`-Leak in Logs); Unique-Constraint-
+Scope „pro Reservierung, Kapazität 1" explizit dokumentiert. **Volle Findings:** `codex-findings.md`.
+
 ## Offen / vor Prod zu prüfen (ehrlich)
+- **HÖCHSTES RISIKO (Codex): Auth-Bindung von `zhl-handover-select.php`.** Aktuell auth-light
+  (Sync per GET, keine Login-/Owner-Bindung). Token ist zwar 128-bit-zufällig (nicht ratbar),
+  aber wer es kennt, kann Status sehen/syncen. Vor Prod: an LB-Login + Reservation-Owner binden,
+  Sync auf POST+CSRF. Das serverseitige Gate (Plugin) ist davon unberührt und bleibt wirksam.
 - **Live-Cross-App-Test**: terminplaner lokal nicht lauffähig → Slot-Liste, Buchung mit Marker,
   Lookup und Sync end-to-end auf einer Test-/Staging-Instanz verifizieren.
 - **Auth-Härtung** von `zhl-handover-select.php` (aktuell auth-light wie `zhl-welcome.php`;

@@ -92,89 +92,87 @@ class ZhlHandoverSelectPage extends SecurePage
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Übergabe-Termin wählen — ZHL Medienausleihe</title>
-    <link href="css/zhl-theme.css" rel="stylesheet">
+    <!-- Lokale App-Assets (kein CDN) -> Optik wie der Rest der App -->
+    <link rel="stylesheet" href="assets/vendor/bootstrap/5.3.3/css/bootstrap.css">
+    <link rel="stylesheet" href="assets/vendor/bootstrap-icons/1.11.3/css/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="css/zhl-theme.css">
     <style>
-        body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background:#f6f8f7; color:#1f2a26; margin:0; }
-        .wrap { max-width: 760px; margin: 2.5rem auto; padding: 0 1rem; }
-        .card { background:#fff; border:1px solid #e3e8e5; border-radius:12px; padding:1.75rem; box-shadow:0 1px 3px rgba(0,0,0,.05); }
-        h1 { font-size:1.4rem; margin:0 0 .25rem; }
-        .muted { color:#6b7770; }
-        .step { margin:1.5rem 0; }
-        .step-head { display:flex; justify-content:space-between; align-items:center; }
-        .badge { font-size:.78rem; padding:.15rem .55rem; border-radius:999px; }
-        .b-ok { background:#e3f3ec; color:#0a7a52; } .b-open { background:#eef1ef; color:#6b7770; }
-        .b-primary { background:#e3f3ec; color:#0a7a52; } .b-backup { background:#eef1ef; color:#6b7770; }
-        .row-link { display:block; padding:.7rem .9rem; border:1px solid #e3e8e5; border-left-width:4px; border-radius:8px; margin-bottom:.5rem; text-decoration:none; color:inherit; }
-        .row-link:hover { background:#f3f7f5; }
-        .role-primary { border-left-color:#009260; } .role-backup { border-left-color:#b9c2bd; }
-        .name { font-weight:600; } .small { font-size:.85rem; }
-        .btn { display:inline-block; background:#009260; color:#fff; border:0; padding:.55rem 1rem; border-radius:8px; cursor:pointer; font-size:.95rem; }
-        .alert { padding:1rem; border-radius:8px; margin-top:1rem; }
-        .alert-ok { background:#e3f3ec; } .alert-light { background:#fafbfa; border:1px solid #e3e8e5; }
-        .token-box { font-family: ui-monospace, monospace; font-size:1.15rem; padding:.5rem .7rem; background:#fff; border:1px solid #e3e8e5; border-radius:8px; }
+        body { background:#f6f8f7; }
+        .zhl-wrap { max-width: 760px; }
+        .row-link { border-left-width:4px !important; }
+        .role-primary { border-left-color:#009260 !important; }
+        .role-backup  { border-left-color:#b9c2bd !important; }
+        .token-box { font-family: ui-monospace, SFMono-Regular, monospace; letter-spacing:.02em; }
+        .btn-zhl { background:#009260; border-color:#009260; color:#fff; }
+        .btn-zhl:hover { background:#007a50; border-color:#007a50; color:#fff; }
     </style>
 </head>
 <body>
-<div class="wrap">
-  <div class="card">
-    <h1>Übergabe-Termin wählen</h1>
-    <p class="muted">
-      Dieses Gerät wird persönlich ausgegeben und zurückgenommen. Bitte wählen Sie einen
-      <strong>Abhol-</strong> und einen <strong>Rückgabe-Termin</strong>.
-      <?php if ($ref !== null): ?><br><span class="small">Vorgang: <?= $h($ref) ?></span><?php endif; ?>
-    </p>
-
-    <?php if ($base === '' || empty($members)): ?>
-      <div class="alert alert-light">
-        Es konnten gerade keine Übergabe-Slots geladen werden. Bitte später erneut versuchen
-        oder das ZHL-Team kontaktieren.
-      </div>
-    <?php endif; ?>
-
-    <?php foreach (['pickup' => '1. Abholung', 'return' => '2. Rückgabe'] as $type => $heading): ?>
-      <div class="step">
-        <div class="step-head">
-          <h2 style="font-size:1.05rem;margin:0 0 .5rem;"><?= $h($heading) ?></h2>
-          <span class="badge <?= $status[$type] ? 'b-ok' : 'b-open' ?>">
-            <?= $status[$type] ? '✓ gebucht' : 'offen' ?>
-          </span>
-        </div>
-        <?php foreach ($members as $m):
-            $role = ($m['handover_role'] ?? 'backup') === 'primary' ? 'primary' : 'backup'; ?>
-          <a class="row-link role-<?= $role ?>" target="_blank" rel="noopener"
-             href="<?= $h($bookLink((int)$m['member_id'], $type)) ?>">
-            <span class="name"><?= $h((string)$m['member_name']) ?></span>
-            <span class="badge <?= $role === 'primary' ? 'b-primary' : 'b-backup' ?>">
-              <?= $role === 'primary' ? 'Hilfskraft' : 'Team (Backup)' ?>
-            </span>
-            <span class="small muted" style="display:block;"><?= $h((string)$m['type_label']) ?></span>
-          </a>
-        <?php endforeach; ?>
-      </div>
-    <?php endforeach; ?>
-
-    <form method="POST" action="zhl-handover-select.php?token=<?= urlencode($token) ?><?= $ref !== null ? '&ref=' . urlencode($ref) : '' ?>">
-      <input type="hidden" name="<?= FormKeys::CSRF_TOKEN ?>" value="<?= $h($csrf) ?>">
-      <input type="hidden" name="action" value="sync">
-      <button type="submit" class="btn">Status aktualisieren</button>
-      <span class="small muted" style="margin-left:.5rem;">Nach dem Buchen beider Termine hier klicken.</span>
-    </form>
-
-    <div class="alert <?= $bothDone ? 'alert-ok' : 'alert-light' ?>">
-      <div style="font-weight:600;margin-bottom:.4rem;">
-        <?= $bothDone ? '✓ Übergabe terminiert' : 'Übergabe-Token' ?>
-      </div>
-      <p class="small" style="margin:.2rem 0 .6rem;">
-        Tragen Sie dieses Token im Reservierungsformular in das Feld
-        <em>„Übergabe-Token (handover_token)"</em> ein:
+<div class="container zhl-wrap py-5">
+  <div class="card shadow-sm">
+    <div class="card-body p-4">
+      <h1 class="h4 mb-1"><i class="bi bi-box-seam text-success"></i> Übergabe-Termin wählen</h1>
+      <p class="text-muted">
+        Dieses Gerät wird persönlich ausgegeben und zurückgenommen. Bitte wählen Sie einen
+        <strong>Abhol-</strong> und einen <strong>Rückgabe-Termin</strong>.
+        <?php if ($ref !== null): ?><br><small>Vorgang: <?= $h($ref) ?></small><?php endif; ?>
       </p>
-      <div class="token-box"><?= $h($token) ?></div>
-      <?php if (!$bothDone): ?>
-        <p class="small muted" style="margin:.6rem 0 0;">
-          Die Reservierung lässt sich erst speichern, wenn <strong>Abholung und Rückgabe</strong>
-          gebucht und bestätigt sind.
-        </p>
+
+      <?php if ($base === '' || empty($members)): ?>
+        <div class="alert alert-warning">
+          <i class="bi bi-exclamation-triangle"></i>
+          Es konnten gerade keine Übergabe-Slots geladen werden. Bitte später erneut versuchen
+          oder das ZHL-Team kontaktieren.
+        </div>
       <?php endif; ?>
+
+      <?php foreach (['pickup' => '1. Abholung', 'return' => '2. Rückgabe'] as $type => $heading): ?>
+        <div class="mb-4">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <h2 class="h6 mb-0"><?= $h($heading) ?></h2>
+            <span class="badge <?= $status[$type] ? 'text-bg-success' : 'text-bg-secondary' ?>">
+              <?= $status[$type] ? '✓ gebucht' : 'offen' ?>
+            </span>
+          </div>
+          <?php foreach ($members as $m):
+              $role = ($m['handover_role'] ?? 'backup') === 'primary' ? 'primary' : 'backup'; ?>
+            <a class="list-group-item list-group-item-action row-link role-<?= $role ?> border rounded mb-2 d-block"
+               target="_blank" rel="noopener"
+               href="<?= $h($bookLink((int)$m['member_id'], $type)) ?>">
+              <span class="fw-semibold"><?= $h((string)$m['member_name']) ?></span>
+              <span class="badge <?= $role === 'primary' ? 'text-bg-success' : 'text-bg-light' ?> ms-1">
+                <?= $role === 'primary' ? 'Hilfskraft' : 'Team (Backup)' ?>
+              </span>
+              <small class="text-muted d-block"><?= $h((string)$m['type_label']) ?></small>
+            </a>
+          <?php endforeach; ?>
+        </div>
+      <?php endforeach; ?>
+
+      <form method="POST" class="mb-3"
+            action="zhl-handover-select.php?token=<?= urlencode($token) ?><?= $ref !== null ? '&ref=' . urlencode($ref) : '' ?>">
+        <input type="hidden" name="<?= FormKeys::CSRF_TOKEN ?>" value="<?= $h($csrf) ?>">
+        <input type="hidden" name="action" value="sync">
+        <button type="submit" class="btn btn-zhl"><i class="bi bi-arrow-clockwise"></i> Status aktualisieren</button>
+        <small class="text-muted ms-2">Nach dem Buchen beider Termine hier klicken.</small>
+      </form>
+
+      <div class="alert <?= $bothDone ? 'alert-success' : 'alert-light border' ?> mb-0">
+        <div class="fw-semibold mb-1">
+          <?= $bothDone ? '✓ Übergabe terminiert' : 'Übergabe-Token' ?>
+        </div>
+        <p class="small mb-2">
+          Tragen Sie dieses Token im Reservierungsformular in das Feld
+          <em>„Übergabe-Token (handover_token)"</em> ein:
+        </p>
+        <div class="token-box fs-5 p-2 bg-white border rounded"><?= $h($token) ?></div>
+        <?php if (!$bothDone): ?>
+          <p class="small text-muted mt-2 mb-0">
+            Die Reservierung lässt sich erst speichern, wenn <strong>Abholung und Rückgabe</strong>
+            gebucht und bestätigt sind.
+          </p>
+        <?php endif; ?>
+      </div>
     </div>
   </div>
 </div>

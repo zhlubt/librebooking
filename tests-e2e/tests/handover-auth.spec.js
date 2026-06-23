@@ -18,7 +18,7 @@ test('Eingeloggt -> Assistent rendert mit Token + CSRF-Sync-Formular', async ({ 
   const html = await page.content();
   expect(html).toContain('Übergabe-Termin wählen');
   // 32-stelliges Token wird erzeugt und angezeigt.
-  expect(html).toMatch(/token-box">[a-f0-9]{32}/);
+  expect(html).toMatch(/class="token-box[^"]*">\s*[a-f0-9]{32}/);
   // Sync ist POST + CSRF (kein GET-Seiteneffekt mehr).
   expect(await page.locator('form[method="POST"] input[name="action"][value="sync"]').count()).toBeGreaterThan(0);
   expect(await page.locator('form[method="POST"] input[name="CSRF_TOKEN"]').count()).toBeGreaterThan(0);
@@ -28,7 +28,7 @@ test('Fremdes Token eines anderen Kontos -> 403', async ({ page, browser }) => {
   // User A erzeugt ein Token.
   await login(page, ROLES.user.email);
   await page.goto(PAGE, { waitUntil: 'domcontentloaded' });
-  const token = (await page.content()).match(/token-box">([a-f0-9]{32})/)[1];
+  const token = (await page.content()).match(/class="token-box[^"]*">\s*([a-f0-9]{32})/)[1];
 
   // User B (eigener Context) versucht, A's Token zu öffnen -> 403.
   const ctxB = await browser.newContext();

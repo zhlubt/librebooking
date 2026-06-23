@@ -152,6 +152,8 @@
 }
 .zhl-dash .zhl-mode:hover { border-color: #cfe9dd; color: var(--text); transform: translateY(-1px); }
 .zhl-dash .zhl-mode.active { background: var(--grad); color: #fff; border-color: transparent; box-shadow: 0 4px 12px rgba(0,146,96,.25); }
+.zhl-dash .zhl-mode-logout { margin-left: auto; color: var(--muted); }
+.zhl-dash .zhl-mode-logout:hover { color: var(--err); border-color: #fecaca; }
 
 /* Assistent: Schritte, Zurück, Vorhaben-Karten */
 .zhl-dash .zhl-steps { display: flex; gap: 8px; margin: 0 0 8px; }

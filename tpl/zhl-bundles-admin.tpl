@@ -4,7 +4,10 @@
 
 	<div class="d-flex justify-content-between align-items-center mb-3">
 		<h1 class="h3 mb-0">Bundles verwalten</h1>
-		<a class="btn btn-outline-primary btn-sm" href="{$Path}zhl-dashboard.php">← Zum Dashboard</a>
+		<div class="d-flex gap-2">
+			<a class="btn btn-outline-primary btn-sm" href="{$Path}zhl-dashboard.php">← Zum Dashboard</a>
+			<a class="btn btn-outline-secondary btn-sm" href="{$Path}logout.php">Abmelden</a>
+		</div>
 	</div>
 	<p class="text-muted">Bundles bündeln Geräte-Typen zu „Vorhaben". Typen kommen aus dem Attribut „Geräte-Typ" (im Geräte-Admin pflegbar).</p>
 

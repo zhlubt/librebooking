@@ -14,7 +14,8 @@
 	<nav class="zhl-modenav">
 		<a class="zhl-mode active" href="{$Path}zhl-assistant.php">🎯 Bundles buchen</a>
 		<a class="zhl-mode" href="{$Path}zhl-dashboard.php">🎛 Geräte einzeln buchen</a>
-		<a class="zhl-mode" href="{$Path}mycalendar.php">📅 Meine Buchungen</a>
+		<a class="zhl-mode" href="{$Path}my-calendar.php">📅 Meine Buchungen</a>
+		<a class="zhl-mode zhl-mode-logout" href="{$Path}logout.php">Abmelden</a>
 	</nav>
 
 	<form class="zhl-controls" method="get" action="{$Path}zhl-assistant.php">

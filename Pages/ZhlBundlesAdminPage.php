@@ -34,6 +34,7 @@ class ZhlBundlesAdminPage extends SecurePage implements IZhlBundlesAdminPage
 
         $this->presenter->Load();
         $this->Set('Message', $this->GetQuerystring('msg'));
+        $this->Set('HideNavBar', true);
         $this->Display('zhl-bundles-admin.tpl');
     }
 

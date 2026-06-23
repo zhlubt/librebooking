@@ -1,6 +1,6 @@
 # SPEC-UX-DASHBOARD — Neue Medienausleihe-Oberfläche
 
-> **Status:** Entwurf v0.4 (2026-06-23) · §7-Entscheidungen + Code-Recherche (§10) + Codex-Gate (§11) eingearbeitet · noch nicht gebaut.
+> **Status:** Entwurf v0.4 (2026-06-23) · §7/§10/§11 eingearbeitet · **v1-Prototyp gebaut + auf media deployt** (verfügbarkeit-first Raster, read-only).
 > **Grundlage:** Mock 3 „Dashboard" (`docs/zhl/mocks/3-dashboard.html`, live `https://media.zhl-ubt.de/Web/mocks/`).
 > **Optik:** zhl-studio Style Guide (UBT-Grün `#009260`), siehe Memory `zhl-studio-design-system`.
 > **Nordstern:** LibreBooking modernisieren — neue, einfachere UX (STRATEGY.md, Säule 3).
@@ -341,6 +341,14 @@ korrigierte aber drei zu optimistische Stellen (oben bereits eingearbeitet):
    automatisiert wiederanwendbar (Upgrade-Sicherheit).
 
 ---
-**Nächste Schritte:** (1) §11-Punkte 1+2 festklopfen (Verfügbarkeits-Service + stabile IDs); (2)
-**v1-Prototyp** `Web/zhl-dashboard.php` als **separate SecurePage** (verfügbarkeit-first Raster über den
-ZHL-Verfügbarkeits-Service), noch **ohne** Homepage-Core-Patch; (3) v2 Bundles/Pool, v3 Dialoge/Einweisung.
+**Stand v1 (gebaut + deployt):** `Web/zhl-dashboard.php` (separate SecurePage, read-only) +
+`Pages/ZhlDashboardPage.php` + `Presenters/ZhlDashboardPresenter.php` + `lib/Application/Zhl/ZhlAvailabilityService.php`
+(die §11.1-Wahrheitsquelle) + `tpl/zhl-dashboard.tpl` + `Web/css/zhl-dashboard.css` (zhl-studio-Optik).
+Kategorien = Schedules; verfügbarkeit-first Raster (frei/belegt je Tag, rechte-/status-gefiltert);
+„Buchen" übergibt an die native `reservation.php`. Smoke gegen echte media-Daten: 58 Geräte, 5 Kategorien,
+Belegung/Tag + Such-/Kategorie-Filter ok; Seite lädt sauber (302 unauth). **Bewusst noch nicht:**
+Laien-Tags (brauchen das Zähl-Typ/Tag-Attribut, v2), Bundles/Dialoge (v2/v3), Homepage-Core-Patch.
+
+**Nächste Schritte:** (1) eingeloggt ansehen (`https://media.zhl-ubt.de/Web/zhl-dashboard.php`,
+admin@zhl.local) → Optik/Wegführung abnehmen; (2) v2: Zähl-Typ-/Tag-Attribut + Pool-Zählung +
+Laien-Tags + Bundles; (3) v3: Vorhaben-Dialoge + Einweisungs-Stufen.

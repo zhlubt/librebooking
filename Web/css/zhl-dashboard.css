@@ -1,0 +1,99 @@
+/* ZHL-Dashboard (v1) — verfügbarkeit-first Raster. Optik aus zhl-studio Style Guide
+   (UBT-Grün #009260). Scoped unter .zhl-dash, um das native Bootstrap nicht zu stören. */
+.zhl-dash {
+  --zg: #009260; --zg-d: #007a50;
+  --grad: linear-gradient(135deg, #009260 0%, #007a50 100%);
+  --text: #2d3748; --text2: #4a5568; --muted: #718096;
+  --border: #e2e8f0; --bg-soft: #f7fafc; --ok: #48bb78;
+  color: var(--text2);
+  margin-top: 8px;
+}
+.zhl-dash .zhl-uplabel { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); margin-bottom: 4px; }
+.zhl-dash .zhl-h1 { font-size: 28px; font-weight: 600; color: var(--text); margin: 0 0 4px; }
+.zhl-dash .zhl-h2 { font-size: 20px; font-weight: 600; color: var(--text); margin: 0; }
+.zhl-dash .zhl-sub { color: var(--text2); margin: 0; }
+.zhl-dash .zhl-muted { color: var(--muted); }
+.zhl-dash .zhl-small { font-size: 13px; }
+
+.zhl-dash .zhl-head { margin-bottom: 18px; }
+
+/* Steuerleiste */
+.zhl-dash .zhl-controls {
+  display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap;
+  background: #fff; border: 1px solid var(--border); border-radius: 12px;
+  box-shadow: 0 2px 6px rgba(0,0,0,.06); padding: 16px; margin: 18px 0 22px;
+}
+.zhl-dash .zhl-field { display: flex; flex-direction: column; gap: 5px; }
+.zhl-dash .zhl-field.zhl-grow { flex: 1; min-width: 200px; }
+.zhl-dash .zhl-field label { font-size: 13px; font-weight: 500; color: var(--text2); }
+.zhl-dash .zhl-input {
+  padding: 9px 12px; border: 1px solid var(--border); border-radius: 10px;
+  font-size: 15px; background: #fff; color: var(--text); width: 100%;
+}
+.zhl-dash .zhl-input:focus { outline: none; border-color: var(--zg); box-shadow: 0 0 0 3px rgba(0,146,96,.1); }
+
+.zhl-dash .zhl-btn {
+  display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
+  background: var(--grad); color: #fff; border: none; white-space: nowrap;
+  padding: 10px 20px; border-radius: 10px; font-size: 15px; font-weight: 600;
+  box-shadow: 0 4px 12px rgba(0,146,96,.25); transition: transform .12s, box-shadow .12s;
+  text-decoration: none;
+}
+.zhl-dash .zhl-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(0,146,96,.35); color: #fff; }
+.zhl-dash .zhl-btn-sm { padding: 7px 14px; font-size: 13px; }
+
+/* Shell: Sidebar + Main */
+.zhl-dash .zhl-shell { display: grid; grid-template-columns: 230px 1fr; gap: 22px; align-items: start; }
+@media (max-width: 820px) { .zhl-dash .zhl-shell { grid-template-columns: 1fr; } }
+
+.zhl-dash .zhl-side {
+  background: #fff; border: 1px solid var(--border); border-radius: 12px;
+  box-shadow: 0 2px 6px rgba(0,0,0,.06); padding: 16px;
+}
+.zhl-dash .zhl-nav { display: flex; flex-direction: column; gap: 3px; margin-top: 8px; }
+.zhl-dash .zhl-navlink {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 9px 12px; border-radius: 10px; color: var(--text2); font-weight: 500;
+  font-size: 15px; text-decoration: none;
+}
+.zhl-dash .zhl-navlink:hover { background: var(--bg-soft); color: var(--text); }
+.zhl-dash .zhl-navlink.active { background: #f0fdf4; color: var(--zg); font-weight: 600; }
+.zhl-dash .zhl-count { font-size: 12px; color: var(--muted); background: var(--bg-soft); border-radius: 20px; padding: 1px 9px; }
+.zhl-dash .zhl-navlink.active .zhl-count { color: var(--zg); background: #dcfce7; }
+
+.zhl-dash .zhl-results-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 14px; }
+
+/* Geräte-Raster */
+.zhl-dash .zhl-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+@media (max-width: 1100px) { .zhl-dash .zhl-grid { grid-template-columns: 1fr; } }
+.zhl-dash .zhl-card {
+  background: #fff; border: 1px solid var(--border); border-radius: 12px;
+  box-shadow: 0 2px 6px rgba(0,0,0,.06); padding: 16px 18px;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.zhl-dash .zhl-card.is-full { opacity: .72; }
+.zhl-dash .zhl-card-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.zhl-dash .zhl-card-title { font-size: 16px; font-weight: 600; color: var(--text); margin: 0; }
+
+.zhl-dash .zhl-badge { font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 20px; white-space: nowrap; }
+.zhl-dash .zhl-badge.free { background: #f0fdf4; color: #166534; }
+.zhl-dash .zhl-badge.full { background: #fef2f2; color: #991b1b; }
+
+.zhl-dash .zhl-days { display: flex; gap: 4px; flex-wrap: wrap; }
+.zhl-dash .zhl-day {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  width: 38px; height: 40px; border-radius: 8px; font-weight: 600; line-height: 1.1;
+}
+.zhl-dash .zhl-day.f { background: var(--ok); color: #fff; }
+.zhl-dash .zhl-day.b { background: #edf2f7; color: var(--muted); }
+.zhl-dash .zhl-day-wd { font-size: 10px; opacity: .9; }
+.zhl-dash .zhl-day-dt { font-size: 11px; }
+
+.zhl-dash .zhl-card-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 2px; }
+
+.zhl-dash .zhl-empty, .zhl-dash .zhl-note { grid-column: 1 / -1; }
+.zhl-dash .zhl-empty {
+  background: var(--bg-soft); border: 1px dashed var(--border); border-radius: 12px;
+  padding: 28px; text-align: center; color: var(--muted);
+}
+.zhl-dash .zhl-note { font-size: 13px; color: var(--muted); margin-top: 18px; }

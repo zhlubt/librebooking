@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mock 1 — Klassisch · ZHL Medienausleihe</title>
+<link rel="stylesheet" href="mock.css">
+<style>
+  .hero { background: var(--white); border: 1px solid var(--border); border-radius: var(--r-lg); box-shadow: var(--sh-1); padding: 34px; margin-bottom: 34px; }
+  .hero h1 { margin-bottom: 6px; }
+  .finder { display: grid; grid-template-columns: 2fr 1.6fr auto; gap: 14px; align-items: end; margin-top: 22px; }
+  @media (max-width: 720px){ .finder { grid-template-columns: 1fr; } }
+  .section-h { display: flex; align-items: baseline; justify-content: space-between; margin: 0 2px 16px; }
+</style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="brand"><span class="dot">🎬</span> ZHL Medienausleihe</div>
+    <div><a class="btn-ghost btn" href="#">Anmelden ▸</a></div>
+  </div>
+
+  <div class="wrap">
+    <section class="hero">
+      <span class="uplabel">Schnell zur Buchung</span>
+      <h1>Was möchtest du ausleihen?</h1>
+      <p class="muted">Sag uns <strong>was</strong> und <strong>wann</strong> — wir zeigen dir nur, was du buchen darfst und was frei ist.</p>
+      <div class="finder">
+        <div class="field">
+          <label>Was?</label>
+          <select class="input">
+            <option>🎙️ Audio-Aufnahme</option>
+            <option>🎥 Video-Aufnahme</option>
+            <option>🚁 Drohne</option>
+            <option>🥽 VR-Brillen</option>
+            <option>🎬 Videostudio-Aufzeichnung</option>
+            <option>🗣️ Moderationsmaterial</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Zeitraum</label>
+          <input class="input" value="15.07.2026 – 21.07.2026">
+        </div>
+        <button class="btn">Freie Geräte zeigen ▸</button>
+      </div>
+    </section>
+
+    <div class="section-h">
+      <h2>… oder stöbern, was es alles gibt</h2>
+      <span class="muted">6 Kategorien · 59 Geräte</span>
+    </div>
+    <div class="grid-tiles">
+      <div class="tile"><div class="ico">🎙️</div><h3>Audio-Aufnahme</h3><p class="muted" style="font-size:14px;margin:.2em 0 .6em">Mikrofone, Recorder, Funkstrecken</p><span class="count">12 Geräte ›</span></div>
+      <div class="tile"><div class="ico">🎥</div><h3>Video-Aufnahme</h3><p class="muted" style="font-size:14px;margin:.2em 0 .6em">Kameras, Gimbals, Objektive</p><span class="count">18 Geräte ›</span></div>
+      <div class="tile"><div class="ico">🚁</div><h3>Drohne</h3><p class="muted" style="font-size:14px;margin:.2em 0 .6em">DJI Mini & Mavic, mit Einweisung</p><span class="count">2 Geräte ›</span></div>
+      <div class="tile"><div class="ico">🥽</div><h3>VR-Brillen</h3><p class="muted" style="font-size:14px;margin:.2em 0 .6em">Meta Quest, Pico, Controller</p><span class="count">6 Geräte ›</span></div>
+      <div class="tile"><div class="ico">🎬</div><h3>Videostudio</h3><p class="muted" style="font-size:14px;margin:.2em 0 .6em">Studio-Slot, Greenscreen, Licht</p><span class="count">1 Studio ›</span></div>
+      <div class="tile"><div class="ico">🗣️</div><h3>Moderationsmaterial</h3><p class="muted" style="font-size:14px;margin:.2em 0 .6em">Koffer, Pinnwände, Flipcharts</p><span class="count">7 Sets ›</span></div>
+    </div>
+
+    <p class="foot">Mock 1 · „Klassisch / Hero-Suche" — Suche oben, Stöbern darunter. Eine Seite, ruhiger Fluss.</p>
+  </div>
+  <div class="mocktag">MOCK 1 · Klassisch</div>
+</body>
+</html>

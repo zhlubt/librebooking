@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mock 2 — Assistent · ZHL Medienausleihe</title>
+<link rel="stylesheet" href="mock.css">
+<style>
+  .stage { max-width: 760px; margin: 0 auto; }
+  .steps { display: flex; gap: 8px; justify-content: center; margin: 4px 0 26px; }
+  .step { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; color: var(--muted); }
+  .step .n { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; background: var(--border); color: var(--muted); font-size: 13px; }
+  .step.active { color: var(--green); }
+  .step.active .n { background: var(--grad); color: #fff; box-shadow: var(--sh-brand); }
+  .step .bar { width: 34px; height: 2px; background: var(--border); }
+  .wizard { padding: 30px 32px 32px; }
+  .wizard h2 { text-align: center; }
+  .sub { text-align: center; color: var(--muted); margin: -2px 0 24px; }
+  .chips { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; margin-bottom: 24px; }
+  @media (max-width:620px){ .chips { grid-template-columns: 1fr 1fr; } }
+  .chip { border: 1.5px solid var(--border); border-radius: var(--r-sm); padding: 16px 12px; text-align: center; cursor: pointer; transition: .15s; background: var(--white); }
+  .chip .e { font-size: 26px; display: block; margin-bottom: 6px; }
+  .chip span.t { font-size: 14px; font-weight: 600; color: var(--text); }
+  .chip:hover { border-color: #cfe9dd; transform: translateY(-2px); box-shadow: var(--sh-1); }
+  .chip.sel { border-color: var(--green); background: #f0fdf4; box-shadow: 0 0 0 3px rgba(0,146,96,.1); }
+  .daterow { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 26px; }
+  .actions { display: flex; justify-content: space-between; align-items: center; }
+  .ghostlink { font-size: 14px; }
+  .preview-steps { opacity: .5; }
+</style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="brand"><span class="dot">🎬</span> ZHL Medienausleihe</div>
+    <div><a class="btn-ghost btn" href="#">Anmelden ▸</a></div>
+  </div>
+
+  <div class="wrap stage">
+    <div class="steps">
+      <div class="step active"><span class="n">1</span> Was?</div><span class="bar"></span>
+      <div class="step"><span class="n">2</span> Wann?</div><span class="bar"></span>
+      <div class="step"><span class="n">3</span> Auswahl</div>
+    </div>
+
+    <div class="card wizard">
+      <h2>Wobei sollen wir dir helfen?</h2>
+      <p class="sub">Wähle eine Kategorie — danach Zeitraum, dann schlagen wir passende, freie Geräte vor.</p>
+
+      <div class="chips">
+        <div class="chip sel"><span class="e">🎙️</span><span class="t">Audio-Aufnahme</span></div>
+        <div class="chip"><span class="e">🎥</span><span class="t">Video-Aufnahme</span></div>
+        <div class="chip"><span class="e">🚁</span><span class="t">Drohne</span></div>
+        <div class="chip"><span class="e">🥽</span><span class="t">VR-Brillen</span></div>
+        <div class="chip"><span class="e">🎬</span><span class="t">Videostudio</span></div>
+        <div class="chip"><span class="e">🗣️</span><span class="t">Moderation</span></div>
+      </div>
+
+      <span class="uplabel">Wann brauchst du es?</span>
+      <div class="daterow" style="margin-top:8px">
+        <div class="field"><label>Von</label><input class="input" value="15.07.2026"></div>
+        <div class="field"><label>Bis</label><input class="input" value="21.07.2026"></div>
+      </div>
+
+      <div class="actions">
+        <a class="ghostlink muted" href="#">↩ Lieber direkt stöbern</a>
+        <button class="btn">Weiter: freie Geräte ▸</button>
+      </div>
+    </div>
+
+    <p class="foot">Mock 2 · „Assistent-zentriert" — ein geführter 3-Schritte-Weg steht im Mittelpunkt. Zeigt nur, was erlaubt &amp; frei ist. Stöbern ist der Nebenweg.</p>
+  </div>
+  <div class="mocktag">MOCK 2 · Assistent</div>
+</body>
+</html>

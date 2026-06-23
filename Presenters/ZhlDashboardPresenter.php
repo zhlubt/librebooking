@@ -88,6 +88,7 @@ class ZhlDashboardPresenter
             'search' => $search,
             'startInput' => $start->Format('Y-m-d'),
             'days' => $days,
+            'isAdmin' => ($user->IsAdmin || $user->IsResourceAdmin || $user->IsScheduleAdmin || $user->IsGroupAdmin),
             'rangeLabel' => $start->ToTimezone($tz)->Format('d.m.Y') . ' – '
                 . $end->AddDays(-1)->ToTimezone($tz)->Format('d.m.Y'),
             'totalVisible' => $grid['totalVisible'],

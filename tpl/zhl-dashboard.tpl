@@ -9,6 +9,7 @@
 			<h1 class="zhl-h1">Was möchtest du ausleihen?</h1>
 			<p class="zhl-sub">Wähle eine Kategorie und einen Zeitraum — du siehst sofort, welche Geräte frei sind. <span class="zhl-muted">(Prototyp · {$TotalVisible} Geräte für dich sichtbar)</span></p>
 		</div>
+		{if $IsAdmin}<div><a class="zhl-btn zhl-btn-sm" href="{$Path}zhl-bundles-admin.php">⚙ Bundles verwalten</a></div>{/if}
 	</div>
 
 	<form class="zhl-controls" method="get" action="{$Path}zhl-dashboard.php">

@@ -15,7 +15,7 @@
 .zhl-dash .zhl-muted { color: var(--muted); }
 .zhl-dash .zhl-small { font-size: 13px; }
 
-.zhl-dash .zhl-head { margin-bottom: 18px; }
+.zhl-dash .zhl-dash-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; margin-bottom: 18px; }
 
 /* Steuerleiste */
 .zhl-dash .zhl-controls {

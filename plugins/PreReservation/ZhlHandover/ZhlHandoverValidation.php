@@ -70,7 +70,15 @@ class ZhlHandoverValidation implements IReservationValidationService
             return new ReservationValidationResult(false, [$message]);
         }
 
-        // 3. Bestätigte Abholung UND Rückgabe zum Token vorhanden?
+        // 3. Token muss dem buchenden User gehören (Auth-Bindung, Codex-Finding):
+        //    fremde Token sind nicht verwendbar. Token ohne Eigentümer-Datensatz
+        //    (nur via server-to-server notify möglich) werden nicht blockiert.
+        $ownerId = $this->tokenOwner($token);
+        if ($ownerId !== null && $ownerId !== (int)$series->UserId()) {
+            return new ReservationValidationResult(false, [$message]);
+        }
+
+        // 4. Bestätigte Abholung UND Rückgabe zum Token vorhanden?
         $types = $this->confirmedHandoverTypes($token);
         if (in_array('pickup', $types, true) && in_array('return', $types, true)) {
             return new ReservationValidationResult();
@@ -114,6 +122,19 @@ class ZhlHandoverValidation implements IReservationValidationService
         }
         $value = strtolower(trim((string)$row['attribute_value']));
         return in_array($value, ['1', 'true', 'yes', 'ja', 'on'], true);
+    }
+
+    /**
+     * @return int|null User-ID, der das Token erzeugt hat, oder null (kein Eigentümer-Datensatz).
+     */
+    private function tokenOwner($token)
+    {
+        $cmd = new AdHocCommand('SELECT user_id FROM zhl_handover_token WHERE handover_token = @token');
+        $cmd->AddParameter(new Parameter('@token', $token));
+        $reader = ServiceLocator::GetDatabase()->Query($cmd);
+        $row = $reader->GetRow();
+        $reader->Free();
+        return $row ? (int)$row['user_id'] : null;
     }
 
     /**

@@ -146,6 +146,38 @@ function zhl_handover_sync(string $token): array
     return $result;
 }
 
+/** User-ID, der ein Token erzeugt hat, oder null (Token noch nicht vergeben). */
+function zhl_handover_token_owner(string $token): ?int
+{
+    if (!zhl_handover_valid_token($token)) {
+        return null;
+    }
+    $stmt = zhl_handover_db()->prepare('SELECT user_id FROM zhl_handover_token WHERE handover_token = ?');
+    $stmt->execute([$token]);
+    $v = $stmt->fetchColumn();
+    return $v === false ? null : (int)$v;
+}
+
+/**
+ * Token für einen User beanspruchen (idempotent). Gibt true zurück, wenn das Token
+ * danach diesem User gehört (frisch beansprucht ODER ihm bereits gehörend), false,
+ * wenn es einem anderen User gehört.
+ */
+function zhl_handover_claim_token(string $token, int $userId, ?string $ref): bool
+{
+    if (!zhl_handover_valid_token($token) || $userId <= 0) {
+        return false;
+    }
+    $pdo = zhl_handover_db();
+    $stmt = $pdo->prepare(
+        'INSERT INTO zhl_handover_token (handover_token, user_id, reference_number, created_at)
+         VALUES (?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE handover_token = handover_token' // no-op: nie Eigentümer überschreiben
+    );
+    $stmt->execute([$token, $userId, $ref, gmdate('Y-m-d H:i:s')]);
+    return zhl_handover_token_owner($token) === $userId;
+}
+
 /** Aktueller Bestätigungsstatus eines Tokens aus der DB (ohne terminplaner-Aufruf). */
 function zhl_handover_status(string $token): array
 {

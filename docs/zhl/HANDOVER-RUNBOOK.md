@@ -53,11 +53,16 @@ Hook. **Sofort gefixt:** Fehlermeldung als `string[]` statt String (Template ite
 `zhl-handover-notify.php` nur noch Header-Auth (kein `?key=`-Leak in Logs); Unique-Constraint-
 Scope „pro Reservierung, Kapazität 1" explizit dokumentiert. **Volle Findings:** `codex-findings.md`.
 
+## Auth-Bindung — ERLEDIGT (2026-06-23, Codex-Finding #1)
+`zhl-handover-select.php` ist jetzt eine **`SecurePage`** (nicht eingeloggt → Redirect auf
+LB-Login). Tokens sind über **`zhl_handover_token`** (Migration `003`) an den erzeugenden
+User gebunden; fremde Token → **403**. Sync läuft nur noch per **POST + CSRF**
+(`FormKeys::CSRF_TOKEN`). Das **Gate-Plugin** prüft zusätzlich, dass das im Reservierungs-
+Attribut eingetragene Token dem buchenden User (`$series->UserId()`) gehört. Verifiziert:
+E2E `tests-e2e/tests/handover-auth.spec.js` (3/3: Redirect, Render+CSRF, Cross-User-403) +
+`verify-handover-sql.php` 8/8 (inkl. Ownership).
+
 ## Offen / vor Prod zu prüfen (ehrlich)
-- **HÖCHSTES RISIKO (Codex): Auth-Bindung von `zhl-handover-select.php`.** Aktuell auth-light
-  (Sync per GET, keine Login-/Owner-Bindung). Token ist zwar 128-bit-zufällig (nicht ratbar),
-  aber wer es kennt, kann Status sehen/syncen. Vor Prod: an LB-Login + Reservation-Owner binden,
-  Sync auf POST+CSRF. Das serverseitige Gate (Plugin) ist davon unberührt und bleibt wirksam.
 - **Live-Cross-App-Test**: terminplaner lokal nicht lauffähig → Slot-Liste, Buchung mit Marker,
   Lookup und Sync end-to-end auf einer Test-/Staging-Instanz verifizieren.
 - **Auth-Härtung** von `zhl-handover-select.php` (aktuell auth-light wie `zhl-welcome.php`;

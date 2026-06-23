@@ -55,6 +55,11 @@ $ins->execute([$tokenIncomplete, 'pickup', $now, $now]);
 $ins->execute([$tokenComplete, 'pickup', $now, $now]);
 $ins->execute([$tokenComplete, 'return', $now, $now]);
 
+// Token-Ownership: tokenComplete gehört User 100100.
+$ownerUserId = 100100;
+$pdo->prepare('INSERT INTO zhl_handover_token (handover_token, user_id, created_at) VALUES (?, ?, ?)')
+    ->execute([$tokenComplete, $ownerUserId, $now]);
+
 // --- Spiegel-Queries (identisch zum Plugin) ---
 $resolve = function (string $label, int $cat) use ($pdo): ?int {
     $s = $pdo->prepare('SELECT custom_attribute_id FROM custom_attributes WHERE display_label = ? AND attribute_category = ? LIMIT 1');
@@ -89,10 +94,23 @@ $gate = fn(array $t) => in_array('pickup', $t, true) && in_array('return', $t, t
 check('nur Abholung -> Gate BLOCKT', $gate($t1) === false);
 check('Abholung+Rückgabe -> Gate ERLAUBT', $gate($t2) === true);
 
+// Token-Ownership (Auth-Bindung)
+$owner = function (string $token) use ($pdo): ?int {
+    $s = $pdo->prepare('SELECT user_id FROM zhl_handover_token WHERE handover_token = ?');
+    $s->execute([$token]);
+    $v = $s->fetchColumn();
+    return $v === false ? null : (int)$v;
+};
+$ownerOk = fn(string $token, int $bookingUser) => $owner($token) === null || $owner($token) === $bookingUser;
+check('Token-Eigentümer == buchender User -> ERLAUBT', $ownerOk($tokenComplete, $ownerUserId) === true);
+check('fremder User mit fremdem Token -> BLOCKT', $ownerOk($tokenComplete, 999999) === false);
+check('Token ohne Eigentümer-Datensatz -> nicht geblockt', $ownerOk($tokenIncomplete, 555) === true);
+
 // --- Cleanup ---
 $pdo->prepare('DELETE FROM custom_attribute_values WHERE custom_attribute_id = ?')->execute([$attrId]);
 $pdo->prepare('DELETE FROM custom_attributes WHERE custom_attribute_id = ?')->execute([$attrId]);
 $pdo->prepare('DELETE FROM zhl_booking_handover WHERE handover_token IN (?, ?)')->execute([$tokenIncomplete, $tokenComplete]);
+$pdo->prepare('DELETE FROM zhl_handover_token WHERE handover_token IN (?, ?)')->execute([$tokenIncomplete, $tokenComplete]);
 
 echo "\n$pass PASS / $fail FAIL\n";
 exit($fail === 0 ? 0 : 1);

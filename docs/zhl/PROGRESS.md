@@ -50,6 +50,9 @@ Frontpage/UX** + mehr Konfiguration. Details: [STRATEGY.md](STRATEGY.md).
 - Funde: siehe [ISSUES.md](ISSUES.md) (#1 script.url-Pfad/Redirect, #2 500 bei unautor. Admin-Zugriff).
 
 ## Changelog
+- 2026-06-23: **F40 Stufe 2** (PR #3, gemergt): Permission-Plugin `ZhlCertificate` erzwingt Zertifikat-Ablauf beim Buchen (cron-frei). E2E: certuser(gültig) bucht, certexpired(abgelaufen, gleiche Gruppe) gesperrt. **Wichtig:** 5.1.0 validiert Plugin-Namen gegen `choices`-Whitelist → minimaler markierter Core-Edit in `ConfigKeys.php` nötig. Suite **21/21**.
+- 2026-06-23: **Übergabe-Modul-Spec** (`SPEC-UEBERGABE.md`, Codex-gegengeprüft) — bündelt F8/F10/F16/F17/F19/F30/F34; Hooks korrigiert (PreReservation für Slot-Pflicht), eigene QR-Seite, Instanz-/Ressourcen-Datenmodell.
+- 2026-06-23: **UX**: lang-overrides „Ressource→Gerät" (`config/lang-overrides.php`); Landing-Wiring-Weg dokumentiert (Domain-Wurzel, App unter /Web).
 - 2026-06-23: **Vollständige E2E-Buchung** grün (`reservation.spec.js`): regulärer User bucht nicht-beschränktes Medium end-to-end. Suite jetzt **18/18**. Befund: ZHL verlangt bei jeder Buchung Pflicht-Attribute „Haftpflicht" (Checkbox) + „3 Terminvorschläge für Abholung" (Text) — manueller Workaround für die Abhol-Koordination (→ Input fürs Übergabe-Modul F8/F16).
 - 2026-06-23: **PRs #1+#2 gemergt** → `zhl-main` hat Landing-Page (`Web/zhl-welcome.php`) + **ZHL-Branding** (`Web/css/zhl-theme.css`, UBT-Grün, via `css.extension.file`; Login-Button rgb(0,146,96), Test `branding.spec.js`). E2E 17/18 grün.
 - 2026-06-23: **F40 Stufe 1 durchgestochen** (Gruppen-Gate, nur Config): Gruppe „Eingewiesen: Gaming-PC" → Geräte 53-56 freigegeben; `certuser@zhl.local` Mitglied. Browser-Beweis (Playwright `f40.spec.js`, 16/16 grün): Nicht-Cert-User „do not have permission", Cert-User kommt durch. Runbook `F40-RUNBOOK.md`. Erkenntnis: „beschränkt" = `resources.autoassign=0` (nur 5 Geräte).

@@ -45,7 +45,7 @@
 | F37 | Audit-Log | 🔧 | **Kein systemweites Audit-Log**; keine audit/activity-Tabelle; `Log.php` = Monolog file (Dev-Logs) | Custom: Audit-Tabelle + Schreib-Hooks + Admin-View | scout |
 | F38 | DSGVO | 🔧 | **Kein** User-Export, **keine** Anonymisierung; `DELETE_USER` hart; `privacy.*` nur Sichtbarkeit | Custom: Export, Anonymisierung statt Hard-Delete, Consent | scout |
 | F39 | Mobile-Responsive | ✅ | Bootstrap 5 responsiv | mobil testen | codex |
-| **F40** | **Einweisungs-/Berechtigungspflicht** | ✅🔧 | **Stufe 1 verifiziert** (Gruppen-Gate, Playwright `f40.spec.js`): Nicht-Cert-User → „do not have permission", Cert-User kommt durch. Runbook [F40-RUNBOOK.md](F40-RUNBOOK.md). **Custom (Stufe 2):** Zertifikat-Lifecycle/Ablauf | Stufe 2 (CM-4) | session+E2E |
+| **F40** | **Einweisungs-/Berechtigungspflicht** | ✅✅ | **Stufe 1+2 umgesetzt & getestet**. Stufe 1: Gruppen-Gate. Stufe 2: Permission-Plugin `ZhlCertificate` erzwingt Zertifikat-**Ablauf beim Buchen** (cron-frei). E2E `f40.spec.js`+`f40-stufe2.spec.js`. Runbook [F40-RUNBOOK.md](F40-RUNBOOK.md). Core-Edit (markiert): Plugin in `plugins.permission`-choices | Folge: „Zugang anfragen"-Flow + Admin-UI | session+E2E |
 
 ## Zusammenfassung (nach Scout + Codex-Gate, 2026-06-22)
 - ✅ nativ: ~18 · 🟦/✅🟦 Konfig: ~7 · 🟨 teilweise: ~6 · 🔧 Custom: ~9

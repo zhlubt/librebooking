@@ -16,6 +16,7 @@
 
 define('ROOT_DIR', __DIR__ . '/../');
 require_once(ROOT_DIR . 'Domain/Access/namespace.php');
+require_once(ROOT_DIR . 'Domain/Values/AccountStatus.php'); // für AccountStatus::INACTIVE (User-Sperre)
 require_once(ROOT_DIR . 'Jobs/JobCop.php');
 require_once(ROOT_DIR . 'lib/Email/namespace.php');
 
@@ -159,8 +160,26 @@ try {
         $resourceName = $row['resource_name'] ?: 'Gerät';
         $fullName = trim(($user['fname'] ?? '') . ' ' . ($user['lname'] ?? ''));
 
-        // Versand pro Datensatz absichern: schlägt eine Mail fehl, blockiert sie weder die
-        // anderen noch wird die Stufe als „versandt" protokolliert (→ Retry im nächsten Lauf).
+        // 1. Stufe ATOMAR beanspruchen (Unique handover_id+stage) — gegen parallele Cron-Läufe.
+        //    Duplicate-Key (parallele Instanz war schneller) → diese Stufe überspringen.
+        $ins = new AdHocCommand(
+            'INSERT INTO zhl_overdue_notice (handover_id, handover_token, reference_number, stage, recipient_email, sent_at) ' .
+            'VALUES (@hid, @token, @ref, @stage, @email, @sent)'
+        );
+        $ins->AddParameter(new Parameter('@hid', $handoverId));
+        $ins->AddParameter(new Parameter('@token', $row['handover_token']));
+        $ins->AddParameter(new Parameter('@ref', $row['reference_number']));
+        $ins->AddParameter(new Parameter('@stage', $nextStage));
+        $ins->AddParameter(new Parameter('@email', $user['email']));
+        $ins->AddParameter(new Parameter('@sent', $now->ToDatabase()));
+        try {
+            $db->Execute($ins);
+        } catch (Exception $claimEx) {
+            continue; // bereits beansprucht (parallel) → kein Doppel-Versand
+        }
+
+        // 2. Senden. Schlägt der Versand fehl, Anspruch ZURÜCKNEHMEN (Retry im nächsten Lauf),
+        //    statt eine nie zugestellte Stufe als „versandt" zu führen.
         if ($emailEnabled) {
             try {
                 ServiceLocator::GetEmailService()->Send(new ZhlOverdueEmail(
@@ -174,28 +193,20 @@ try {
                 ));
             } catch (Exception $mailEx) {
                 Log::Error('zhl_overdue: Mailversand fehlgeschlagen (handover %s): %s', $handoverId, $mailEx->getMessage());
+                $del = new AdHocCommand('DELETE FROM zhl_overdue_notice WHERE handover_id = @hid AND stage = @stage');
+                $del->AddParameter(new Parameter('@hid', $handoverId));
+                $del->AddParameter(new Parameter('@stage', $nextStage));
+                $db->Execute($del);
                 continue;
             }
         }
         Log::Debug('zhl_overdue: Stufe %s an %s (handover %s, %s Tage überfällig)',
             $nextStage, $user['email'], $handoverId, $daysOverdue);
 
-        // Versand protokollieren (Unique handover_id+stage verhindert Doppel).
-        $ins = new AdHocCommand(
-            'INSERT INTO zhl_overdue_notice (handover_id, handover_token, reference_number, stage, recipient_email, sent_at) ' .
-            'VALUES (@hid, @token, @ref, @stage, @email, @sent)'
-        );
-        $ins->AddParameter(new Parameter('@hid', $handoverId));
-        $ins->AddParameter(new Parameter('@token', $row['handover_token']));
-        $ins->AddParameter(new Parameter('@ref', $row['reference_number']));
-        $ins->AddParameter(new Parameter('@stage', $nextStage));
-        $ins->AddParameter(new Parameter('@email', $user['email']));
-        $ins->AddParameter(new Parameter('@sent', $now->ToDatabase()));
-        $db->Execute($ins);
-
-        // Optional: Schlussstufe sperrt den User (Default AUS).
+        // 3. Optional: Schlussstufe sperrt den User (Default AUS). INACTIVE = 3 (keine Magic Number).
         if (ZHL_OVERDUE_LOCK_USER && $nextStage >= $finalStage) {
-            $lock = new AdHocCommand('UPDATE users SET status_id = 2 WHERE user_id = @uid'); // 2 = inaktiv
+            $lock = new AdHocCommand('UPDATE users SET status_id = @inactive WHERE user_id = @uid');
+            $lock->AddParameter(new Parameter('@inactive', AccountStatus::INACTIVE));
             $lock->AddParameter(new Parameter('@uid', (int)$user['user_id']));
             $db->Execute($lock);
             Log::Debug('zhl_overdue: User %s gesperrt (Schlussstufe)', $user['user_id']);

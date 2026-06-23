@@ -5,7 +5,7 @@
 
 CREATE TABLE IF NOT EXISTS zhl_overdue_notice (
   id               INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
-  handover_id      INT UNSIGNED NULL,                 -- zhl_booking_handover.id (return)
+  handover_id      INT UNSIGNED NOT NULL,             -- zhl_booking_handover.id (return); NOT NULL → Unique greift (MySQL behandelt NULLs als verschieden)
   handover_token   VARCHAR(64)  NULL,
   reference_number VARCHAR(255) NULL,
   stage            TINYINT UNSIGNED NOT NULL,         -- 1,2,3 … (Eskalationsstufe)

@@ -1754,6 +1754,7 @@ class ConfigKeys extends AbstractConfigKeys
             '' => 'None',
             'AdminCheckOnly' => 'AdminCheckOnly',
             'PreReservationExample' => 'PreReservationExample',
+            'ZhlHandover' => 'ZHL Übergabe-Gate (Phase A)', // ZHL: Custom-Plugin in choices-Whitelist
         ],
         'label' => 'Pre-Reservation Plugin',
         'description' => 'Plugin used before making a reservation',

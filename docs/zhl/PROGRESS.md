@@ -49,6 +49,14 @@ Frontpage/UX** + mehr Konfiguration. Details: [STRATEGY.md](STRATEGY.md).
 - Funde: siehe [ISSUES.md](ISSUES.md) (#1 script.url-Pfad/Redirect, #2 500 bei unautor. Admin-Zugriff).
 
 ## Changelog
+- 2026-06-23: **Übergabe-Modul Phase A gebaut** (Token-Handshake). terminplaner_ubt additiv
+  erweitert (`handover_role`, `is_handover`, read-only `api/handover_slots.php` +
+  `api/handover_lookup.php`, `hue`-Durchreichung in book/member). LibreBooking: Migration
+  `002_zhl_handover.sql`, PreReservation-Plugin **`ZhlHandover`** (Gate blockt Speichern ohne
+  bestätigte Abholung+Rückgabe für `handover_required`-Geräte), `Web/zhl-handover-{select,notify,lib}.php`,
+  `config/zhl-handover.example.php`. **PULL** statt PUSH (Prod-Schreibpfad von terminplaner unberührt).
+  Gate-SQL lokal verifiziert (`verify-handover-sql.php` 5/5). Runbook [HANDOVER-RUNBOOK.md](HANDOVER-RUNBOOK.md).
+  Offen: Live-Cross-App-Test, PostReservation-`reference_number`-Verknüpfung, Auth-Härtung, Alt-Attribut-Migration.
 - 2026-06-23: **F40 Stufe 2** (PR #3, gemergt): Permission-Plugin `ZhlCertificate` erzwingt Zertifikat-Ablauf beim Buchen (cron-frei). E2E: certuser(gültig) bucht, certexpired(abgelaufen, gleiche Gruppe) gesperrt. **Wichtig:** 5.1.0 validiert Plugin-Namen gegen `choices`-Whitelist → minimaler markierter Core-Edit in `ConfigKeys.php` nötig. Suite **21/21**.
 - 2026-06-23: **Übergabe-Modul-Spec** (`SPEC-UEBERGABE.md`, Codex-gegengeprüft) — bündelt F8/F10/F16/F17/F19/F30/F34; Hooks korrigiert (PreReservation für Slot-Pflicht), eigene QR-Seite, Instanz-/Ressourcen-Datenmodell.
 - 2026-06-23: **UX**: lang-overrides „Ressource→Gerät" (`config/lang-overrides.php`); Landing-Wiring-Weg dokumentiert (Domain-Wurzel, App unter /Web).

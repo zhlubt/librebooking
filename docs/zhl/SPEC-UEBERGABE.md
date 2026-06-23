@@ -153,3 +153,26 @@ verhindert Doppelbelegung). Kein eigenes Kapazitätsmodell nötig.
 
 > Codex-Gate (`codex-findings.md`) eingearbeitet: PreReservation-Hook, eigene QR-Seite,
 > Instanz-/Ressourcenbezug, normalisierte Checklisten, ehrliche Core-Edit-Abgrenzung.
+
+## 7. Phase A — GEBAUT (2026-06-23)
+Umsetzung des Token-Handshake (löst Henne-Ei). **Detail-Runbook: [HANDOVER-RUNBOOK.md](HANDOVER-RUNBOOK.md).**
+Lokal SQL-verifiziert (`verify-handover-sql.php` 5/5); Cross-App-Flow vor Prod live testen.
+
+**terminplaner_ubt** (additiv, Schreibpfad unberührt):
+- `migrate.php`: `team_members.handover_role` + `meeting_types.is_handover`.
+- `api/handover_slots.php` (read-only, primary vor backup), `api/handover_lookup.php`
+  (Buchungen je Token, Typ aus Marker `[HUE:<token>:<typ>]`).
+- `book.php`/`member.php`: strikt validiertes `hue`/`hue_type` durchreichen.
+
+**LibreBooking** (Fork `zhl-main`):
+- Migration `migrations/002_zhl_handover.sql` (zhl_booking_handover token-keyed + check-Tabellen).
+- Plugin `plugins/PreReservation/ZhlHandover/` (Gate: blockt Speichern ohne bestätigte
+  Abholung+Rückgabe, nur für `handover_required`-Geräte). Whitelist-Eintrag in `ConfigKeys.php`.
+- `Web/zhl-handover-select.php` (Assistent), `Web/zhl-handover-notify.php` (Push-Trigger),
+  `Web/zhl-handover-lib.php` (Pull + transaktionaler Upsert), `config/zhl-handover.example.php`.
+
+**Bewusste Entscheidung:** PULL statt PUSH — LibreBooking zieht aus terminplaner, dessen
+produktiver Buchungs-Schreibpfad bleibt unverändert (CLAUDE.md-Disziplin: Prod nicht destabilisieren).
+
+**Folge-Tasks (Phase A-Rest):** PostReservation `reference_number`-Verknüpfung, Auth-Härtung
+der Assistent-Seite, Migration der Alt-Pflicht-Attribute, Live-Cross-App-Test.

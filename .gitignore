@@ -78,4 +78,11 @@ docs/zhl/CREDENTIALS-LOCAL.md
 /plugins/Permission/*
 !/plugins/Permission/ZhlCertificate
 !/plugins/Permission/ZhlCertificate/*
+
+# ZHL: track our custom pre-reservation plugin (Übergabe-Gate)
+!/plugins/PreReservation
+/plugins/PreReservation/*
+!/plugins/PreReservation/ZhlHandover
+!/plugins/PreReservation/ZhlHandover/*
 /config/zhl-cron.php
+/config/zhl-handover.php

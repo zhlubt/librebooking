@@ -33,10 +33,14 @@ lebt in `config.php` (nicht im Repo), Wert `css/zhl-theme.css`. Verifiziert: Log
 rgb(0,146,96), Test `tests-e2e/tests/branding.spec.js`.
 
 ## Deutsche/vereinfachte Begriffe ohne lang/ zu patchen
-`config/lang-overrides.php` nutzen (Upstream-Mechanismus), z.B. „Resource" → „Gerät".
-Siehe `config/lang-overrides.example.php`.
+**Umgesetzt:** `config/lang-overrides.php` (im Repo, trackbar) — de_de: „Ressource"→„Gerät"
+für Standard-User-Labels (Admin-Fachbegriffe unangetastet). Verifiziert (manage_quotas
+zeigt „Alle Geräte"), Test `tests-e2e/tests/i18n-overrides.spec.js`.
 
-## Landing-Page aktivieren
-Prototyp: `Web/zhl-welcome.php`. Für anonyme Besucher als Einstieg setzen — Optionen:
-- Link/Weiterleitung von der Wurzel `index.php` auf `Web/zhl-welcome.php`, oder
-- Web-Server-DocumentRoot/Rewrite. (Im nächsten PR sauber verdrahten.)
+## Landing-Page verdrahten (empfohlener, upgrade-sicherer Weg)
+Live läuft die App bereits unter `…/Web`. Daher **die Landing an die Domain-Wurzel**:
+`buchung.zhl-ubt.de/` → `zhl-welcome.php` (statisch/PHP), App bleibt unter `/Web`.
+Kein Core-Edit, keine Redirect-Schleife, eingeloggte Nutzer gehen direkt auf `/Web`.
+Konkret: `zhl-welcome.php` ins Web-Root (oberhalb von `/Web`) legen, CTAs zeigen auf
+`/Web/index.php` (Login) und `/Web/register.php`. (Lokal-Prototyp liegt unter
+`Web/zhl-welcome.php`.)

@@ -37,6 +37,9 @@ class ZhlDashboardPresenter
 
         $start = Date::Parse($startStr, $tz);
 
+        $db = ServiceLocator::GetDatabase();
+        $typeAttributeId = $this->lookupTypeAttributeId($db);
+
         $resourceService = new ResourceService(
             new ResourceRepository(),
             new SchedulePermissionService(PluginManager::Instance()->LoadPermission()),
@@ -44,7 +47,12 @@ class ZhlDashboardPresenter
             new UserRepository(),
             new AccessoryRepository()
         );
-        $service = new ZhlAvailabilityService($resourceService, new ResourceAvailability(new ReservationViewRepository()));
+        $service = new ZhlAvailabilityService(
+            $resourceService,
+            new ResourceAvailability(new ReservationViewRepository()),
+            $db,
+            $typeAttributeId
+        );
         $grid = $service->BuildGrid($user, $start, $days, $scheduleId, $search);
 
         // Kategorien = Schedules, nur solche mit sichtbaren Geräten.
@@ -63,6 +71,7 @@ class ZhlDashboardPresenter
         $this->page->BindDashboard([
             'categories' => $categories,
             'rows' => $grid['rows'],
+            'pools' => $grid['pools'],
             'activeSchedule' => $scheduleId,
             'search' => $search,
             'startInput' => $start->Format('Y-m-d'),
@@ -71,6 +80,19 @@ class ZhlDashboardPresenter
                 . $end->AddDays(-1)->ToTimezone($tz)->Format('d.m.Y'),
             'totalVisible' => $grid['totalVisible'],
         ]);
+    }
+
+    private function lookupTypeAttributeId($db)
+    {
+        $cmd = new AdHocCommand(
+            "SELECT custom_attribute_id FROM custom_attributes " .
+            "WHERE display_label = @label AND attribute_category = 4 LIMIT 1"
+        );
+        $cmd->AddParameter(new Parameter('@label', 'Geräte-Typ'));
+        $reader = $db->Query($cmd);
+        $row = $reader->GetRow();
+        $reader->Free();
+        return $row ? (int)$row['custom_attribute_id'] : 0;
     }
 
     private function readRaw($key)

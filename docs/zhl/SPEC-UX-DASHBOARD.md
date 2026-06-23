@@ -1,6 +1,6 @@
 # SPEC-UX-DASHBOARD — Neue Medienausleihe-Oberfläche
 
-> **Status:** Entwurf v0.4 (2026-06-23) · §7/§10/§11 eingearbeitet · **v1-Prototyp gebaut + auf media deployt** (verfügbarkeit-first Raster, read-only).
+> **Status:** Entwurf v0.4 (2026-06-23) · §7/§10/§11 eingearbeitet · **v1 + v2a gebaut + auf media deployt** (verfügbarkeit-first Raster + Geräte-Typ-Tags + Pools, read-only).
 > **Grundlage:** Mock 3 „Dashboard" (`docs/zhl/mocks/3-dashboard.html`, live `https://media.zhl-ubt.de/Web/mocks/`).
 > **Optik:** zhl-studio Style Guide (UBT-Grün `#009260`), siehe Memory `zhl-studio-design-system`.
 > **Nordstern:** LibreBooking modernisieren — neue, einfachere UX (STRATEGY.md, Säule 3).
@@ -349,6 +349,13 @@ Kategorien = Schedules; verfügbarkeit-first Raster (frei/belegt je Tag, rechte-
 Belegung/Tag + Such-/Kategorie-Filter ok; Seite lädt sauber (302 unauth). **Bewusst noch nicht:**
 Laien-Tags (brauchen das Zähl-Typ/Tag-Attribut, v2), Bundles/Dialoge (v2/v3), Homepage-Core-Patch.
 
-**Nächste Schritte:** (1) eingeloggt ansehen (`https://media.zhl-ubt.de/Web/zhl-dashboard.php`,
-admin@zhl.local) → Optik/Wegführung abnehmen; (2) v2: Zähl-Typ-/Tag-Attribut + Pool-Zählung +
-Laien-Tags + Bundles; (3) v3: Vorhaben-Dialoge + Einweisungs-Stufen.
+**Stand v2a (gebaut + deployt):** „Geräte-Typ" als Ressourcen-Custom-Attribut (Migration `006`,
+SINGLE_LINE, name-heuristischer Seed → 56/58 Geräte getaggt) dient gleichzeitig als **Laien-Tag**
+(Titel „Funkmikrofon", Modellname als Untertitel — US-6), als **Such-Schlüssel** (US-7) und als
+**Pool-Schlüssel**: das Dashboard zeigt je Typ „N von M frei" (US-12/US-14). Pflege/Verfeinerung der
+Typen nativ über „Manage Resources". (Codex-Hinweis: für Bundles später stabile Typ-Referenz statt
+Anzeigetext.) Smoke gegen echte media-Daten: 15 Pools korrekt, Typ-Suche ok.
+
+**Nächste Schritte:** (1) eingeloggt ansehen (`https://media.zhl-ubt.de/Web/zhl-dashboard.php`);
+(2) v2b: **Bundles** (`zhl_bundle`/`zhl_bundle_item` + Admin-Pflege-UI, stabile Typ-Referenzen,
+Pool-Reservierung über mehrere Einzelgeräte); (3) v3: Vorhaben-Dialoge + Einweisungs-Stufen.

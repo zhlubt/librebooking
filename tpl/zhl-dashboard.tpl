@@ -15,7 +15,7 @@
 		<input type="hidden" name="schedule" value="{$ActiveSchedule}">
 		<div class="zhl-field zhl-grow">
 			<label>Suche</label>
-			<input class="zhl-input" type="text" name="q" value="{$Search|escape}" placeholder="Gerät suchen, z. B. Mikrofon…">
+			<input class="zhl-input" type="text" name="q" value="{$Search|escape}" placeholder="Gerät oder Typ suchen, z. B. Funkmikrofon…">
 		</div>
 		<div class="zhl-field">
 			<label>Ab</label>
@@ -56,11 +56,27 @@
 				<span class="zhl-muted">{$RangeLabel}</span>
 			</div>
 
+			{if $Pools}
+				<div class="zhl-pools">
+					<span class="zhl-pools-label">Verfügbar je Typ:</span>
+					{foreach from=$Pools item=pool}
+						<span class="zhl-pool {if $pool.free == 0}empty{/if}">{$pool.type|escape} <strong>{$pool.free}/{$pool.total}</strong></span>
+					{/foreach}
+				</div>
+			{/if}
+
 			<div class="zhl-grid">
 				{foreach from=$Rows item=row}
 					<div class="zhl-card {if !$row->anyFree}is-full{/if}">
 						<div class="zhl-card-top">
-							<h3 class="zhl-card-title">{$row->name|escape}</h3>
+							<div class="zhl-card-titles">
+								{if $row->type}
+									<h3 class="zhl-card-title">{$row->type|escape}</h3>
+									<div class="zhl-card-sub">{$row->name|escape}</div>
+								{else}
+									<h3 class="zhl-card-title">{$row->name|escape}</h3>
+								{/if}
+							</div>
 							{if $row->anyFree}
 								<span class="zhl-badge free">{$row->freeCount}/{$row->totalDays} Tage frei</span>
 							{else}

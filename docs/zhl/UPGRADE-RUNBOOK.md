@@ -33,6 +33,16 @@
 4. DB-Upgrade über LibreBooking-Adminseite ausführen.
 5. Smoke-Test wie oben. Wartungshinweis entfernen.
 
+## Mit ausrollen: Cron-Runner + ZHL-Overlay (Entscheidung 2026-06-23)
+Container hat keinen Cron → beim Upgrade mitnehmen:
+1. `Web/zhl-cron.php` per SFTP hochladen; `config/zhl-cron.php` mit starkem Token auf dem
+   Server anlegen (nicht im Repo).
+2. Auf dem **Gaming-PC** die 5-Minuten-cron-Zeile eintragen (siehe CRON-RUNBOOK.md).
+3. ZHL-Overlay mit deployen: `Web/css/zhl-theme.css`, `config/lang-overrides.php`,
+   `plugins/Permission/ZhlCertificate/`, `docs/zhl/migrations/*.sql` (DB), Config-Keys
+   (`css.extension.file`, `plugins.permission`, `default.language=de_de`).
+4. Test: `curl -fsS ".../Web/zhl-cron.php?token=<TOKEN>"` → Jobs `exit 0`.
+
 ## Rollback
 - Code: Backup-Stand zurück-uploaden.
 - DB: Backup-Dump einspielen (nur nötig, falls DB-Upgrade lief).

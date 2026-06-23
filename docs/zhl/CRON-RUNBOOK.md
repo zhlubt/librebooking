@@ -40,7 +40,11 @@ Ruft alle 300 s `zhl-cron.php` auf, Log nach `/tmp/zhl-cron.log`.
 */5 * * * * curl -fsS "https://buchung.zhl-ubt.de/Web/zhl-cron.php?token=<TOKEN>" >/dev/null
 ```
 
-## Offen / Entscheidung
-- **Wo** soll der Scheduler laufen (Gaming-PC / Mac / externer Dienst)?
-- **Deploy-Zeitpunkt:** `zhl-cron.php` jetzt auf Live-4.0.0 oder erst mit dem 5.1.0-Upgrade?
-  (Vorher Backup — CLAUDE.md-Regel.)
+## Entscheidungen (2026-06-23)
+- **Scheduler: Gaming-PC** (immer an). Cron-Zeile dort eintragen:
+  ```cron
+  */5 * * * * curl -fsS "https://buchung.zhl-ubt.de/Web/zhl-cron.php?token=<TOKEN>" >/dev/null
+  ```
+- **Deploy: zusammen mit dem 5.1.0-Upgrade** (nicht vorher). `zhl-cron.php` + `config/zhl-cron.php`
+  sind Teil des Upgrade-Deploys → siehe [UPGRADE-RUNBOOK.md](UPGRADE-RUNBOOK.md). Bis dahin
+  laufen Reminder/Waitlist auf Live bewusst noch nicht.

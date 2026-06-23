@@ -62,6 +62,23 @@ Attribut eingetragene Token dem buchenden User (`$series->UserId()`) gehört. Ve
 E2E `tests-e2e/tests/handover-auth.spec.js` (3/3: Redirect, Render+CSRF, Cross-User-403) +
 `verify-handover-sql.php` 8/8 (inkl. Ownership).
 
+## PostReservation-Verknüpfung — ERLEDIGT (Phase A-Rest)
+Plugin **`plugins/PostReservation/ZhlHandoverLink`** trägt nach dem Speichern die
+Reservierung (`reference_number`, `series_id`, `reservation_instance_id`) in die
+token-gebundenen `zhl_booking_handover`-Zeilen + `zhl_handover_token` nach. Aktivieren:
+config `plugins.postreservation = 'ZhlHandoverLink'` (Name in `ConfigKeys.php`-Whitelist).
+Fehlertolerant (try/catch) — bricht eine Buchung nie. Eigener Klassenname ≠ PreReservation-Plugin.
+
+## Migration der Alt-Pflicht-Attribute (Plan, ZHL-Entscheidung „schrittweise")
+Heute erzwingt jede Buchung „Haftpflicht" (Checkbox) + „3 Terminvorschläge" (Text). Umstieg:
+1. **Parallelbetrieb:** `handover_required` (Resource) + `handover_token` (Reservierung) anlegen,
+   `ZhlHandover` aktivieren. Übergabepflichtige Geräte markieren. Alt-Attribute zunächst belassen.
+2. **Umgewöhnung:** „3 Terminvorschläge" auf optional stellen (nicht löschen — Bestandsbuchungen
+   referenzieren es), Nutzer auf den Assistenten lenken.
+3. **Abschalten:** wenn der Slot-Flow rund läuft, „3 Terminvorschläge" deaktivieren; „Haftpflicht"
+   bleibt unabhängig. **Bestehende Reservierungen nicht rückwirkend brechen** — Gate wirkt nur auf
+   neue Add/Update (siehe `ZhlHandoverValidation`: greift nur bei `handover_required`-Geräten).
+
 ## Offen / vor Prod zu prüfen (ehrlich)
 - **Live-Cross-App-Test**: terminplaner lokal nicht lauffähig → Slot-Liste, Buchung mit Marker,
   Lookup und Sync end-to-end auf einer Test-/Staging-Instanz verifizieren.

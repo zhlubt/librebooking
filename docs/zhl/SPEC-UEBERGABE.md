@@ -174,5 +174,14 @@ Lokal SQL-verifiziert (`verify-handover-sql.php` 5/5); Cross-App-Flow vor Prod l
 **Bewusste Entscheidung:** PULL statt PUSH — LibreBooking zieht aus terminplaner, dessen
 produktiver Buchungs-Schreibpfad bleibt unverändert (CLAUDE.md-Disziplin: Prod nicht destabilisieren).
 
-**Folge-Tasks (Phase A-Rest):** PostReservation `reference_number`-Verknüpfung, Auth-Härtung
-der Assistent-Seite, Migration der Alt-Pflicht-Attribute, Live-Cross-App-Test.
+**Phase A-Rest GEBAUT (2026-06-23):**
+- **Auth-Bindung** (Codex #1): `zhl-handover-select.php` ist `SecurePage`; Token an User
+  gebunden (`zhl_handover_token`, Migration 003), fremde Token → 403, Sync nur POST+CSRF;
+  Gate prüft zusätzlich Token-Eigentümer == `$series->UserId()`. E2E 3/3 + SQL 10/10, live verifiziert.
+- **PostReservation-Verknüpfung**: `plugins/PostReservation/ZhlHandoverLink` trägt nach dem
+  Speichern `reference_number`/`series_id`/`reservation_instance_id` in `zhl_booking_handover` +
+  `zhl_handover_token` nach (fehlertolerant).
+- **Alt-Attribut-Migration**: Plan dokumentiert (HANDOVER-RUNBOOK, „schrittweise").
+
+**Offen vor Prod:** Live-Cross-App-Test (terminplaner lokal nicht lauffähig); lokale Vendor-Assets
+für die Assistent-Seite statt CDN (Minor).

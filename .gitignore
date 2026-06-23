@@ -84,5 +84,11 @@ docs/zhl/CREDENTIALS-LOCAL.md
 /plugins/PreReservation/*
 !/plugins/PreReservation/ZhlHandover
 !/plugins/PreReservation/ZhlHandover/*
+
+# ZHL: track our custom post-reservation plugin (Übergabe-Verknüpfung)
+!/plugins/PostReservation
+/plugins/PostReservation/*
+!/plugins/PostReservation/ZhlHandoverLink
+!/plugins/PostReservation/ZhlHandoverLink/*
 /config/zhl-cron.php
 /config/zhl-handover.php

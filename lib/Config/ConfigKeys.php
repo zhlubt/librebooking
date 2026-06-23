@@ -1768,6 +1768,7 @@ class ConfigKeys extends AbstractConfigKeys
         'choices' => [
             '' => 'None',
             'PostReservation' => 'PostReservation',
+            'ZhlHandoverLink' => 'ZHL Übergabe-Verknüpfung (Phase A)', // ZHL: Custom-Plugin in choices-Whitelist
         ],
         'label' => 'Post-Reservation Plugin',
         'description' => 'Plugin used after making a reservation',

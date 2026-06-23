@@ -22,6 +22,9 @@ function zhl_handover_config(): array
     $root = dirname(__DIR__);
     $file = $root . '/config/zhl-handover.php';
     if (!is_readable($file)) {
+        // Fallback nur als Struktur-Quelle; der Platzhalter-Key lässt jeden
+        // terminplaner-Aufruf bewusst ins Leere laufen (kein stilles Fehlverhalten).
+        error_log('zhl-handover: config/zhl-handover.php fehlt — nutze .example (Modul inaktiv).');
         $file = $root . '/config/zhl-handover.example.php';
     }
     $conf = require $file;

@@ -106,6 +106,20 @@ check('Token-Eigentümer == buchender User -> ERLAUBT', $ownerOk($tokenComplete,
 check('fremder User mit fremdem Token -> BLOCKT', $ownerOk($tokenComplete, 999999) === false);
 check('Token ohne Eigentümer-Datensatz -> nicht geblockt', $ownerOk($tokenIncomplete, 555) === true);
 
+// PostReservation-Verknüpfung (ZhlHandoverLink): Referenz nachtragen.
+$pdo->prepare(
+    'UPDATE zhl_booking_handover SET reference_number = ?, series_id = ?, reservation_instance_id = ?, updated_at = ?
+     WHERE handover_token = ?'
+)->execute(['ZHL-REF-0042', 777, 888, $now, $tokenComplete]);
+$pdo->prepare('UPDATE zhl_handover_token SET reference_number = ? WHERE handover_token = ?')
+    ->execute(['ZHL-REF-0042', $tokenComplete]);
+$stamped = $pdo->prepare('SELECT COUNT(*) FROM zhl_booking_handover WHERE handover_token = ? AND reference_number = ? AND series_id = 777');
+$stamped->execute([$tokenComplete, 'ZHL-REF-0042']);
+check('PostReservation stempelt Referenz in beide Übergabe-Zeilen', (int)$stamped->fetchColumn() === 2);
+$tok = $pdo->prepare('SELECT reference_number FROM zhl_handover_token WHERE handover_token = ?');
+$tok->execute([$tokenComplete]);
+check('PostReservation stempelt Referenz in Token-Datensatz', $tok->fetchColumn() === 'ZHL-REF-0042');
+
 // --- Cleanup ---
 $pdo->prepare('DELETE FROM custom_attribute_values WHERE custom_attribute_id = ?')->execute([$attrId]);
 $pdo->prepare('DELETE FROM custom_attributes WHERE custom_attribute_id = ?')->execute([$attrId]);

@@ -49,6 +49,13 @@ Frontpage/UX** + mehr Konfiguration. Details: [STRATEGY.md](STRATEGY.md).
 - Funde: siehe [ISSUES.md](ISSUES.md) (#1 script.url-Pfad/Redirect, #2 500 bei unautor. Admin-Zugriff).
 
 ## Changelog
+- 2026-06-23: **Übergabe-Modul Phase A-Rest** (Auth + Verknüpfung). **Auth-Bindung** (Codex #1):
+  `zhl-handover-select.php` jetzt `SecurePage` (Login-Redirect), Token an User gebunden
+  (`zhl_handover_token`, Migration 003), fremde Token → 403, Sync nur POST+CSRF; Gate prüft
+  zusätzlich Token-Eigentümer == `$series->UserId()`. **PostReservation** `ZhlHandoverLink`
+  trägt `reference_number`/`series_id`/`instance_id` nach dem Speichern in die Übergabe-Datensätze
+  nach. Verifiziert: E2E `handover-auth.spec.js` 3/3 (live: unauth→302, auth→200+Token, fremd→403),
+  `verify-handover-sql.php` **10/10**. Alt-Attribut-Migrationsplan dokumentiert.
 - 2026-06-23: **Übergabe-Modul Phase A gebaut** (Token-Handshake). terminplaner_ubt additiv
   erweitert (`handover_role`, `is_handover`, read-only `api/handover_slots.php` +
   `api/handover_lookup.php`, `hue`-Durchreichung in book/member). LibreBooking: Migration

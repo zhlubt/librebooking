@@ -72,3 +72,9 @@ php8-report.log
 
 # ZHL: local-only test creds
 docs/zhl/CREDENTIALS-LOCAL.md
+
+# ZHL: track our custom permission plugin (rest of plugins/ stays ignored)
+!/plugins/Permission
+/plugins/Permission/*
+!/plugins/Permission/ZhlCertificate
+!/plugins/Permission/ZhlCertificate/*

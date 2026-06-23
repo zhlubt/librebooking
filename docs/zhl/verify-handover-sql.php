@@ -101,10 +101,11 @@ $owner = function (string $token) use ($pdo): ?int {
     $v = $s->fetchColumn();
     return $v === false ? null : (int)$v;
 };
-$ownerOk = fn(string $token, int $bookingUser) => $owner($token) === null || $owner($token) === $bookingUser;
-check('Token-Eigentümer == buchender User -> ERLAUBT', $ownerOk($tokenComplete, $ownerUserId) === true);
-check('fremder User mit fremdem Token -> BLOCKT', $ownerOk($tokenComplete, 999999) === false);
-check('Token ohne Eigentümer-Datensatz -> nicht geblockt', $ownerOk($tokenIncomplete, 555) === true);
+// Strikt (Codex): Token muss dem buchenden User gehören; null/fremd -> blockt.
+$ownerStrict = fn(string $token, int $bookingUser) => $owner($token) === $bookingUser;
+check('Token-Eigentümer == buchender User -> ERLAUBT', $ownerStrict($tokenComplete, $ownerUserId) === true);
+check('fremder User mit fremdem Token -> BLOCKT', $ownerStrict($tokenComplete, 999999) === false);
+check('Token ohne Eigentümer-Datensatz -> BLOCKT (strikt)', $ownerStrict($tokenIncomplete, 555) === false);
 
 // PostReservation-Verknüpfung (ZhlHandoverLink): Referenz nachtragen.
 $pdo->prepare(

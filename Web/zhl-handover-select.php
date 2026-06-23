@@ -43,17 +43,17 @@ class ZhlHandoverSelectPage extends SecurePage
 
         // --- Token bestimmen (an User gebunden) ---
         $token = (string)$this->GetQuerystring('token');
-        if (zhl_handover_valid_token($token)) {
-            $owner = zhl_handover_token_owner($token);
-            if ($owner !== null && $owner !== $userId) {
-                http_response_code(403);
-                echo 'Dieses Übergabe-Token gehört einem anderen Konto.';
-                return;
-            }
-            zhl_handover_claim_token($token, $userId, $ref);
-        } else {
+        if (!zhl_handover_valid_token($token)) {
             $token = bin2hex(random_bytes(16)); // 32 hex chars
-            zhl_handover_claim_token($token, $userId, $ref);
+        }
+        // Beanspruchen und DANACH Eigentümerschaft hart prüfen. Deckt fremde Token UND
+        // einen parallelen Erst-Claim ab (TOCTOU): gehört das Token nach dem Claim nicht
+        // diesem User, ist Schluss.
+        zhl_handover_claim_token($token, $userId, $ref);
+        if (zhl_handover_token_owner($token) !== $userId) {
+            http_response_code(403);
+            echo 'Dieses Übergabe-Token gehört einem anderen Konto.';
+            return;
         }
 
         // --- Sync nur per POST + CSRF ---

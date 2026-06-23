@@ -70,11 +70,12 @@ class ZhlHandoverValidation implements IReservationValidationService
             return new ReservationValidationResult(false, [$message]);
         }
 
-        // 3. Token muss dem buchenden User gehören (Auth-Bindung, Codex-Finding):
-        //    fremde Token sind nicht verwendbar. Token ohne Eigentümer-Datensatz
-        //    (nur via server-to-server notify möglich) werden nicht blockiert.
-        $ownerId = $this->tokenOwner($token);
-        if ($ownerId !== null && $ownerId !== (int)$series->UserId()) {
+        // 3. Token muss dem buchenden User gehören (Auth-Bindung, Codex-Finding, strikt):
+        //    fremde UND eigentümerlose Token werden blockiert. Legitime Token werden vom
+        //    Assistenten IMMER vor der Anzeige beansprucht → ein gültiger Vorgang hat stets
+        //    einen Eigentümer. Damit ist auch ein nur-via-notify befülltes Token ohne
+        //    Eigentümer-Datensatz nicht ausnutzbar.
+        if ($this->tokenOwner($token) !== (int)$series->UserId()) {
             return new ReservationValidationResult(false, [$message]);
         }
 

@@ -722,17 +722,18 @@ return [
             'export' => '',
 
             # Comma-separated list of plugin class names for permission management
+            # Options: ZhlCertificate
             'permission' => '',
 
             # Comma-separated list of plugin class names to run after user registration
             'postregistration' => '',
 
             # Comma-separated list of plugin class names to run before reservation creation
-            # Options: AdminCheckOnly, PreReservationExample
+            # Options: AdminCheckOnly, PreReservationExample, ZhlHandover
             'prereservation' => '',
 
             # Comma-separated list of plugin class names to run after reservation is created/updated
-            # Options: PostReservation
+            # Options: PostReservation, ZhlHandoverLink
             'postreservation' => '',
 
             # Comma-separated list of plugin class names to apply custom styling logic

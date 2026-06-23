@@ -20,7 +20,7 @@ class ZhlHandoverLinkNotification implements IReservationNotificationService
     {
         try {
             $this->LinkHandover($reservationSeries);
-        } catch (Exception $ex) {
+        } catch (Throwable $ex) {
             Log::Error('ZhlHandoverLink: %s', $ex->getMessage());
         }
         // Hauptablauf weiterlaufen lassen (Standard-Benachrichtigungen etc.).

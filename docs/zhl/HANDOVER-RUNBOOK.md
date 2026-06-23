@@ -79,6 +79,21 @@ Heute erzwingt jede Buchung „Haftpflicht" (Checkbox) + „3 Terminvorschläge"
    bleibt unabhängig. **Bestehende Reservierungen nicht rückwirkend brechen** — Gate wirkt nur auf
    neue Add/Update (siehe `ZhlHandoverValidation`: greift nur bei `handover_required`-Geräten).
 
+## Codex-Re-Gate (Phase A-Rest) — eingearbeitet
+Codex bestätigte: SecurePage-Login-Bindung korrekt, Sync POST+CSRF korrekt, PostReservation-
+Interface korrekt, Linkdaten passend. **Sofort gehärtet:** (a) Assistent prüft Eigentümerschaft
+**nach** dem Claim → deckt auch TOCTOU-Race ab; (b) Gate verlangt Eigentümer jetzt **strikt**
+(`tokenOwner == series->UserId()`, blockt auch eigentümerlose Token); (c) PostReservation fängt
+`Throwable` statt nur `Exception`; (d) `config.dist.php` + `.env.example` regeneriert (zeigen jetzt
+`ZhlHandover`/`ZhlHandoverLink`/`ZhlCertificate` als Optionen). **Offene Codex-Folgepunkte:**
+- **Token-Expiry/Cleanup**: `zhl_handover_token`/`zhl_booking_handover` wachsen unbegrenzt; nach
+  Reservierungsabbruch keine Invalidierung. → Cleanup-Job (mit Cron-Runner) + Ablaufpolicy planen.
+- **FK-Integrität**: keine FK `zhl_booking_handover`→`zhl_handover_token`/`users` (App-Check statt FK,
+  da Token-Zeilen teils vor den Handover-Zeilen entstehen) — bewusst, dokumentiert.
+- **PHPUnit-Tests** für `ZhlHandoverValidation`/`ZhlHandoverLinkNotification` (bisher SQL-Verify +
+  E2E; echte Plugin-Unit-Tests fehlen).
+- **Admin-/Betriebsansicht** offener/bestätigter/verknüpfter Übergaben (sonst nur in der DB sichtbar).
+
 ## Offen / vor Prod zu prüfen (ehrlich)
 - **Live-Cross-App-Test**: terminplaner lokal nicht lauffähig → Slot-Liste, Buchung mit Marker,
   Lookup und Sync end-to-end auf einer Test-/Staging-Instanz verifizieren.

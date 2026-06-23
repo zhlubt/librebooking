@@ -78,3 +78,4 @@ docs/zhl/CREDENTIALS-LOCAL.md
 /plugins/Permission/*
 !/plugins/Permission/ZhlCertificate
 !/plugins/Permission/ZhlCertificate/*
+/config/zhl-cron.php

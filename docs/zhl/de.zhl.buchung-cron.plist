@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ZHL Buchungssystem — Web-Cron-Scheduler (macOS launchd).
+  URL/Token unten anpassen, nach ~/Library/LaunchAgents/ kopieren, dann:
+    launchctl load ~/Library/LaunchAgents/de.zhl.buchung-cron.plist
+  Ruft alle 300s den Web-Cron-Endpunkt auf. Nur wirksam, solange der Mac läuft.
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>de.zhl.buchung-cron</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/bin/curl</string>
+        <string>-fsS</string>
+        <string>https://buchung.zhl-ubt.de/Web/zhl-cron.php?token=REPLACE_WITH_TOKEN</string>
+    </array>
+    <key>StartInterval</key>
+    <integer>300</integer>
+    <key>StandardOutPath</key>
+    <string>/tmp/zhl-cron.log</string>
+    <key>StandardErrorPath</key>
+    <string>/tmp/zhl-cron.err</string>
+    <key>RunAtLoad</key>
+    <true/>
+</dict>
+</plist>

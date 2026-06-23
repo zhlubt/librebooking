@@ -1727,6 +1727,7 @@ class ConfigKeys extends AbstractConfigKeys
         'default' => '',
         'choices' => [
             '' => 'None',
+            'ZhlCertificate' => 'ZHL Certificate (F40)', // ZHL: register custom permission plugin
         ],
         'label' => 'Permission Plugin',
         'description' => 'Plugin used for permission management',

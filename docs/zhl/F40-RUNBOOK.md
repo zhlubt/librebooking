@@ -27,6 +27,25 @@
 für 53–56 und `certuser@zhl.local` (Mitglied) an. Test: `cd tests-e2e && npx playwright
 test f40.spec.js`.
 
-## Offen für Stufe 2 (Custom, später)
-Zertifikat-**Ablauf/Gültigkeit** + „Zugang anfragen"-Flow + Auto-Entzug (Cron/Plugin) —
-siehe WORKPACKAGES CM-4 / F40-KONZEPT.
+## Stufe 2 — Zertifikat-Ablauf (umgesetzt, cron-frei)
+Permission-Plugin **`ZhlCertificate`** prüft bei zertifikatspflichtigen Geräten zusätzlich
+zum Gruppen-Gate einen **gültigen (nicht abgelaufenen)** Eintrag in `zhl_certificate`.
+Der Ablauf wird **beim Buchen** erzwungen → **kein Cron nötig**.
+
+- Migration: `docs/zhl/migrations/001_zhl_certificate.sql` (Tabellen `zhl_certificate`,
+  `zhl_certificate_required`).
+- Plugin: `plugins/Permission/ZhlCertificate/ZhlCertificate.php` (Decorator über `PermissionService`).
+- **Core-Edit (markiert `// ZHL:`):** `lib/Config/ConfigKeys.php` — Plugin-Name in die
+  `plugins.permission`-`choices` aufgenommen (5.1.0 validiert Plugin-Namen gegen eine
+  Whitelist; ohne diesen Eintrag wird das Plugin verworfen). Bei Upstream-Merge: hier prüfen.
+- Aktivieren: `config.php` → `'plugins' => ['permission' => 'ZhlCertificate']`.
+- Bewiesen (Playwright `f40-stufe2.spec.js`): `certuser` (gültig) bucht; `certexpired`
+  (gleiche Gruppe, **abgelaufen**) wird gesperrt.
+
+**Betrieb:** Zertifikat ausstellen = Zeile in `zhl_certificate` (user, resource, expires_at).
+Verlängern = `expires_at` setzen. Entziehen = löschen / `expires_at` in Vergangenheit.
+(Admin-UI dafür = optionales Folge-WP; aktuell per SQL/Skript.)
+
+## Offen (Folge-WP)
+„Zugang anfragen"-Flow (PostReservation-Plugin beim Buchen des Einweisungstermins) +
+Admin-UI für Zertifikate.

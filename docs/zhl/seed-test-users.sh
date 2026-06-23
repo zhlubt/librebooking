@@ -49,5 +49,25 @@ q "INSERT IGNORE INTO user_resource_permissions (user_id,resource_id,permission_
    WHERE u.email='certuser@zhl.local';"
 echo "F40-Demo: Gruppe 'Eingewiesen: Gaming-PC' (id $CERTGID) -> 53-56; certuser@zhl.local Mitglied"
 
+# --- F40 Stufe 2: Zertifikat-Lifecycle (Permission-Plugin ZhlCertificate) ---
+# Voraussetzung: docs/zhl/migrations/001_zhl_certificate.sql eingespielt.
+q "INSERT IGNORE INTO zhl_certificate_required (resource_id) VALUES (53),(54),(55),(56);"
+# certuser: GÜLTIGES Zertifikat (1 Jahr); certexpired: in Cert-Gruppe, aber ABGELAUFEN.
+q "INSERT INTO zhl_certificate (user_id,resource_id,granted_at,expires_at)
+   SELECT u.user_id,r.resource_id,NOW(),DATE_ADD(NOW(),INTERVAL 1 YEAR)
+   FROM users u JOIN (SELECT 53 resource_id UNION SELECT 54 UNION SELECT 55 UNION SELECT 56) r
+   WHERE u.email='certuser@zhl.local'
+   ON DUPLICATE KEY UPDATE expires_at=VALUES(expires_at);"
+mk Test CertExpired zhl_certexpired certexpired@zhl.local "$CERTGID"
+q "INSERT IGNORE INTO user_resource_permissions (user_id,resource_id,permission_id,permission_type)
+   SELECT u.user_id,r.resource_id,1,0 FROM users u JOIN resources r ON r.autoassign=1
+   WHERE u.email='certexpired@zhl.local';"
+q "INSERT INTO zhl_certificate (user_id,resource_id,granted_at,expires_at)
+   SELECT u.user_id,r.resource_id,DATE_SUB(NOW(),INTERVAL 1 YEAR),DATE_SUB(NOW(),INTERVAL 1 DAY)
+   FROM users u JOIN (SELECT 53 resource_id UNION SELECT 54 UNION SELECT 55 UNION SELECT 56) r
+   WHERE u.email='certexpired@zhl.local'
+   ON DUPLICATE KEY UPDATE expires_at=VALUES(expires_at);"
+echo "F40 Stufe 2: certuser=gültiges Zertifikat, certexpired=abgelaufenes (in Gruppe)"
+
 echo "--- Test-Logins (Passwort: $PW) ---"
 q "SELECT u.email, COALESCE(g.name,'(regular user)') FROM users u LEFT JOIN user_groups ug ON u.user_id=ug.user_id LEFT JOIN groups g ON ug.group_id=g.group_id WHERE u.email LIKE '%@zhl.local' ORDER BY u.user_id;"

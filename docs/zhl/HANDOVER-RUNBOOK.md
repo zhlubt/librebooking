@@ -107,6 +107,13 @@ QR-Codes auf die falsche Basis-URL.
 pauschaler Admin-Rollen; Schutz gegen doppelte Protokolle je Übergabe/Typ; FKs/Audit/DSGVO für die
 `zhl_handover_*`-Tabellen; Foto-Anhang + Seriennummern (F30 tiefer).
 
+## Phase C — Overdue-Eskalation (GEBAUT 2026-06-23)
+Deploy: Migration `005_zhl_overdue_notice.sql` + `Jobs/zhl_overdue.php`. Läuft über den
+**Cron-Runner** (`Web/zhl-cron.php` enthält `zhl_overdue.php` bereits) — der hält die URL alle
+5 Min warm. Toleranz 24 h, Stufen 1/3/7 Tage. **`ZHL_OVERDUE_LOCK_USER` ist AUS** (im Job-Kopf
+einschaltbar, wenn die Schlussstufe das Konto sperren soll). Voraussetzung: `email.enabled=true`
++ funktionierender SMTP. Verifiziert: `verify-handover-overdue.php` 6/6 + realer Lauf.
+
 ## Offen / vor Prod zu prüfen (ehrlich)
 - **Live-Cross-App-Test**: terminplaner lokal nicht lauffähig → Slot-Liste, Buchung mit Marker,
   Lookup und Sync end-to-end auf einer Test-/Staging-Instanz verifizieren.

@@ -49,6 +49,14 @@ Frontpage/UX** + mehr Konfiguration. Details: [STRATEGY.md](STRATEGY.md).
 - Funde: siehe [ISSUES.md](ISSUES.md) (#1 script.url-Pfad/Redirect, #2 500 bei unautor. Admin-Zugriff).
 
 ## Changelog
+- 2026-06-23: **Übergabe-Modul Phase C gebaut** (Overdue-/Rückgabe-Eskalation, F34). Migration 005
+  (`zhl_overdue_notice`, Unique handover_id+stage). `Jobs/zhl_overdue.php` (CLI/JobCop): überfällige
+  Rückgaben (return, nicht done, Ende+24h überschritten) → mehrstufige Mahn-Mails (Stufen 1/3/7 Tage,
+  zeitbasiert), Empfänger via Token, Versand pro Datensatz abgesichert, optional User-Sperre (Default AUS).
+  In `Web/zhl-cron.php` eingetragen. Verifiziert: `verify-handover-overdue.php` **6/6** + realer Job-Lauf
+  (8 Tage → Stufe 3, Mail+Notice). Damit ist das Übergabe-Modul A+B+C komplett.
+- 2026-06-23: **media.zhl-ubt.de Staging LIVE** (kompletter Stack + Phase A/B deployt); CSS-Fix
+  (`rsync --exclude=vendor` killte versehentlich `Web/assets/vendor`); `.htaccess`-HTTPS-Force-Loop behoben.
 - 2026-06-23: **Übergabe-Modul Phase B gebaut** (QR-Checkliste + Zustand, F10/F30). Migration 004
   (check_item.label + check.overall_condition). `Web/zhl-handover-check.php` (SecurePage, Admin-only):
   Zubehör-Checkliste (ok/fehlt/beschädigt) + ad-hoc + Gesamtzustand + Unterschrift → schreibt

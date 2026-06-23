@@ -43,6 +43,7 @@ $jobs = [
     'sendmissedcheckin.php',
     'sendseriesend.php',
     'autorelease.php',
+    'zhl_overdue.php',   // ZHL Phase C: Overdue-/Rückgabe-Eskalation (F34)
     // 'sessioncleanup.php', 'deleteolddata.php'  -> seltener, separat planen
 ];
 

@@ -127,7 +127,7 @@ Eintrag in `bookings` + iCal-Mail.
   Slot-Wahl (Pickup+Return) über terminplaner_ubt + Rollen (Hilfskraft primär/Team Backup) +
   Rückmeldung in `zhl_booking_handover`. **GEBAUT + live verifiziert.**
 - **B — QR-Checkliste + Zustand** (F10/F30). **GEBAUT (2026-06-23), siehe §8.**
-- **C — Overdue/Eskalation** (F34, braucht Cron-Runner).
+- **C — Overdue/Eskalation** (F34, braucht Cron-Runner). **GEBAUT (2026-06-23), siehe §9.**
 
 ## 6. Entscheidungen (ZHL, 2026-06-23)
 - **F8:** Resource-Custom-Attribute ✅
@@ -204,3 +204,20 @@ Betriebsansicht"-Lücke.
 
 **Offen (Phase B-Rest, optional):** Foto-Anhang zum Zustand; nativen Check-in/out zusätzlich
 auslösen; Seriennummern je Komponente (F30 tiefer).
+
+## 9. Phase C — GEBAUT (2026-06-23): Overdue-/Rückgabe-Eskalation (F34)
+Findet überfällige RÜCKGABEN (`zhl_booking_handover` type='return', noch nicht `done`,
+geplantes Ende + Toleranz überschritten) und eskaliert mehrstufig per E-Mail.
+- Migration `005_zhl_overdue_notice.sql`: protokolliert versandte Eskalationsstufen
+  (Unique `handover_id+stage` → keine Doppel-Mails).
+- **`Jobs/zhl_overdue.php`** (CLI, JobCop): Toleranz 24 h, Stufen bei 1/3/7 Tagen überfällig.
+  **Zeitbasiert** — bei spät entdeckten Fällen wird direkt die passende Stufe gesendet (kein
+  1→2→3-Spam). Empfänger über `zhl_handover_token.user_id`. Mailversand pro Datensatz
+  abgesichert (Fehlschlag blockiert weder Batch noch protokolliert „versandt" → Retry).
+  **Optionales User-Sperren** in der Schlussstufe (`ZHL_OVERDUE_LOCK_USER`, Default AUS).
+- In den Cron-Runner `Web/zhl-cron.php` eingetragen (Container hat keinen Cron).
+- Verifiziert: `verify-handover-overdue.php` **6/6** (Toleranz, done-Ausschluss, Stufen 1/3,
+  Doppel-Schutz) + realer Job-Lauf end-to-end (8 Tage → Stufe 3, Mail, Notice protokolliert).
+
+**Offen (Phase C-Rest, optional):** Eskalations-Mails als Smarty-Template + Übersetzung
+(aktuell Inline-HTML); ZHL-Team-CC; Konfig-UI für Toleranz/Stufen.

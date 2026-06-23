@@ -142,3 +142,33 @@
 .zhl-dash .zhl-bundle-items li.miss .zhl-it-link { color: #991b1b; }
 .zhl-dash .zhl-bundle-hint { font-size: 13px; color: var(--text2); background: var(--bg-soft); border-radius: 8px; padding: 8px 10px; margin: 2px 0 0; }
 .zhl-dash .zhl-bundle-foot { margin-top: auto; }
+
+/* Modus-Navigation (Bundles / Geräte / Buchungen) */
+.zhl-dash .zhl-modenav { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 22px; }
+.zhl-dash .zhl-mode {
+  display: inline-flex; align-items: center; gap: 7px; font-size: 15px; font-weight: 600;
+  color: var(--text2); background: #fff; border: 1px solid var(--border); border-radius: 12px;
+  padding: 10px 18px; text-decoration: none; box-shadow: 0 2px 6px rgba(0,0,0,.05); transition: .12s;
+}
+.zhl-dash .zhl-mode:hover { border-color: #cfe9dd; color: var(--text); transform: translateY(-1px); }
+.zhl-dash .zhl-mode.active { background: var(--grad); color: #fff; border-color: transparent; box-shadow: 0 4px 12px rgba(0,146,96,.25); }
+
+/* Assistent: Schritte, Zurück, Vorhaben-Karten */
+.zhl-dash .zhl-steps { display: flex; gap: 8px; margin: 0 0 8px; }
+.zhl-dash .zhl-step { font-size: 13px; font-weight: 600; color: var(--muted); background: var(--bg-soft); border-radius: 20px; padding: 3px 12px; }
+.zhl-dash .zhl-step.active { color: #fff; background: var(--grad); }
+.zhl-dash .zhl-step.done { color: var(--zg); background: #f0fdf4; }
+.zhl-dash .zhl-back { display: inline-block; margin: 4px 0 14px; font-size: 14px; color: var(--muted); }
+.zhl-dash .zhl-back:hover { color: var(--zg); }
+.zhl-dash .zhl-bundle-detail { max-width: 720px; }
+
+.zhl-dash .zhl-goal-card {
+  display: flex; flex-direction: column; gap: 14px; justify-content: space-between;
+  background: #fff; border: 1px solid var(--border); border-top: 3px solid var(--zg);
+  border-radius: 12px; box-shadow: 0 2px 6px rgba(0,0,0,.06); padding: 16px 18px;
+  text-decoration: none; color: var(--text2); transition: transform .15s, box-shadow .15s;
+}
+.zhl-dash .zhl-goal-card:hover { transform: translateY(-3px); box-shadow: var(--sh-2); }
+.zhl-dash .zhl-goal-card.is-unavail { border-top-color: var(--border); }
+.zhl-dash .zhl-goal-foot { display: flex; align-items: center; justify-content: space-between; }
+.zhl-dash .zhl-goal-go { font-size: 14px; font-weight: 600; color: var(--zg); }

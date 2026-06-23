@@ -1,6 +1,6 @@
 # SPEC-UX-DASHBOARD — Neue Medienausleihe-Oberfläche
 
-> **Status:** Entwurf v0.4 (2026-06-23) · §7/§10/§11 eingearbeitet · **v1 + v2a + v2b gebaut + auf media deployt** (Raster + Tags/Pools + Bundle-Katalog mit Live-Verfügbarkeit, read-only).
+> **Status:** Entwurf v0.4 (2026-06-23) · §7/§10/§11 eingearbeitet · **v1–v3 gebaut + auf media deployt**: Geräte-Raster + Tags/Pools + Bundle-Katalog + Admin-CRUD + Vorhaben-Assistent + **Modus-Nav** (Bundles buchen / Geräte einzeln / Meine Buchungen) + zhl-studio-Theming der nativen Seiten. Read-only-Trichter → native Buchung.
 > **Grundlage:** Mock 3 „Dashboard" (`docs/zhl/mocks/3-dashboard.html`, live `https://media.zhl-ubt.de/Web/mocks/`).
 > **Optik:** zhl-studio Style Guide (UBT-Grün `#009260`), siehe Memory `zhl-studio-design-system`.
 > **Nordstern:** LibreBooking modernisieren — neue, einfachere UX (STRATEGY.md, Säule 3).
@@ -363,6 +363,17 @@ Pflicht/optional, Hinweis, Schwierigkeit) + **Live-Verfügbarkeit je Position** 
 `ZhlBundleService`: „verfügbar = alle Pflicht-Positionen erfüllbar". Buchung weiter über die konkreten
 Einzelgeräte (Trichter). Verifiziert: 9 Bundles, Mengen-Schwellen korrekt.
 
-**Nächste Schritte:** (1) eingeloggt ansehen (`https://media.zhl-ubt.de/Web/zhl-dashboard.php`);
-(2) **v2c: Admin-Pflege-UI** für Bundles (CRUD) + stabile Typ-Referenz statt Freitext (Codex);
-(3) v3: Vorhaben-Dialoge (Assistent) + Einweisungs-Stufen + Sequenz/Räume.
+**Stand v2c + v3 + IA (gebaut + deployt):**
+- **v2c Admin-CRUD** `Web/zhl-bundles-admin.php` (SecurePage, admin-only, POST+CSRF+PRG): Bundles
+  anlegen/ändern/löschen, Sichtbarkeit, Positionen add/remove; Typ-Feld als Datalist aus „Geräte-Typ".
+- **v3 Vorhaben-Assistent** `Web/zhl-assistant.php`: Schritt 1 „Was möchtest du machen?" (Vorhaben-
+  Karten) → Schritt 2 Bundle-Detail mit Live-Verfügbarkeit + Hinweisen (Einweisung etc.).
+- **Informationsarchitektur (Nutzer-Feedback):** **Modus-Nav** oben statt langer Liste — „Bundles
+  buchen" (Assistent) · „Geräte einzeln buchen" (Raster) · „Meine Buchungen" (native `mycalendar.php`).
+  Bundles aus dem Geräte-Raster entfernt. Profil/Benachrichtigungen/Kalender bleiben native Leiste.
+- **Theming** `Web/css/zhl-theme.css` (global via `css.extension.file`): zhl-studio-Look für alle
+  nativen Seiten (Font, BG, Navbar, Cards, Grün-Gradient-Buttons, Inputs, Alerts, Login) — rein CSS.
+
+**Nächste Schritte:** (1) eingeloggt visuell abnehmen; (2) **v3b**: Einweisungs-Stufen erzwingen
+(zwingend/empfehlenswert/Beratung), Räume (Seminarraum), Sequenz (Video→Schnitt), echte
+Vorhaben-Dialoge mit Verzweigung (Personenzahl/Folien etc.); (3) stabile Typ-Referenz statt Freitext.

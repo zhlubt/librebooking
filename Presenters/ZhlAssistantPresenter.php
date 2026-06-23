@@ -12,17 +12,15 @@ require_once(ROOT_DIR . 'lib/Application/Zhl/ZhlAvailabilityService.php');
 require_once(ROOT_DIR . 'lib/Application/Zhl/ZhlBundleService.php');
 
 /**
- * Presenter der ZHL-Dashboard-Startseite (verfügbarkeit-first Raster).
- * Read-only: liest validierte GET-Parameter, baut das Raster über den ZHL-Verfügbarkeits-
- * Service und reicht ein View-Model an die Page. Buchen läuft danach über die native
- * Reservierungsseite (reservation.php).
+ * Vorhaben-Assistent (Dashboard v3, v1). Geführter Einstieg: „Was hast du vor?" → ein Bundle-Vorschlag
+ * mit Live-Verfügbarkeit + den wichtigen Hinweisen (z. B. Einweisung). Read-only; Buchung läuft danach
+ * über die Geräteliste (Trichter → native Buchung). Reuse von ZhlAvailabilityService/ZhlBundleService.
  */
-class ZhlDashboardPresenter
+class ZhlAssistantPresenter
 {
-    /** @var IZhlDashboardPage */
     private $page;
 
-    public function __construct(IZhlDashboardPage $page)
+    public function __construct($page)
     {
         $this->page = $page;
     }
@@ -30,12 +28,9 @@ class ZhlDashboardPresenter
     public function PageLoad(UserSession $user)
     {
         $tz = $user->Timezone;
-
         $startStr = $this->readDate('start', $tz);
         $days = $this->readInt('days', 7, 1, 31);
-        $scheduleId = $this->readInt('schedule', 0, 0, PHP_INT_MAX);
-        $search = trim((string)$this->readRaw('q'));
-
+        $bundleId = $this->readInt('bundle', 0, 0, PHP_INT_MAX);
         $start = Date::Parse($startStr, $tz);
 
         $db = ServiceLocator::GetDatabase();
@@ -48,51 +43,36 @@ class ZhlDashboardPresenter
             new UserRepository(),
             new AccessoryRepository()
         );
-        $service = new ZhlAvailabilityService(
-            $resourceService,
-            new ResourceAvailability(new ReservationViewRepository()),
-            $db,
-            $typeAttributeId
-        );
-        $grid = $service->BuildGrid($user, $start, $days, $scheduleId, $search);
+        $avail = new ZhlAvailabilityService($resourceService, new ResourceAvailability(new ReservationViewRepository()), $db, $typeAttributeId);
+        $pools = $avail->BuildGrid($user, $start, $days, 0, '')['pools'];
+        $typeFreeMap = [];
+        foreach ($pools as $pool) {
+            $typeFreeMap[$pool['type']] = $pool['free'];
+        }
 
-        // Bundles leben jetzt im Assistenten („Bundles buchen"), nicht mehr im Geräte-Raster.
-
-        // Kategorien = Schedules, nur solche mit sichtbaren Geräten.
-        $schedules = (new ScheduleRepository())->GetAll();
-        $categories = [];
-        foreach ($schedules as $s) {
-            $sid = (int)$s->GetId();
-            $count = $grid['categoryCounts'][$sid] ?? 0;
-            if ($count === 0) {
-                continue;
+        $bundles = (new ZhlBundleService($db))->GetBundles($typeFreeMap);
+        $selected = null;
+        foreach ($bundles as $b) {
+            if ($b->id === $bundleId) {
+                $selected = $b;
+                break;
             }
-            $categories[] = ['id' => $sid, 'name' => (string)$s->GetName(), 'count' => $count];
         }
 
         $end = $start->AddDays($days);
-        $this->page->BindDashboard([
-            'categories' => $categories,
-            'rows' => $grid['rows'],
-            'pools' => $grid['pools'],
-            'activeSchedule' => $scheduleId,
-            'search' => $search,
+        $this->page->BindAssistant([
+            'bundles' => $bundles,
+            'selected' => $selected,
             'startInput' => $start->Format('Y-m-d'),
             'days' => $days,
-            'isAdmin' => ($user->IsAdmin || $user->IsResourceAdmin || $user->IsScheduleAdmin || $user->IsGroupAdmin),
-            'rangeLabel' => $start->ToTimezone($tz)->Format('d.m.Y') . ' – '
-                . $end->AddDays(-1)->ToTimezone($tz)->Format('d.m.Y'),
-            'totalVisible' => $grid['totalVisible'],
+            'rangeLabel' => $start->ToTimezone($tz)->Format('d.m.Y') . ' – ' . $end->AddDays(-1)->ToTimezone($tz)->Format('d.m.Y'),
         ]);
     }
 
     private function lookupTypeAttributeId($db)
     {
-        $cmd = new AdHocCommand(
-            "SELECT custom_attribute_id FROM custom_attributes " .
-            "WHERE display_label = @label AND attribute_category = 4 LIMIT 1"
-        );
-        $cmd->AddParameter(new Parameter('@label', 'Geräte-Typ'));
+        $cmd = new AdHocCommand("SELECT custom_attribute_id FROM custom_attributes WHERE display_label = @l AND attribute_category = 4 LIMIT 1");
+        $cmd->AddParameter(new Parameter('@l', 'Geräte-Typ'));
         $reader = $db->Query($cmd);
         $row = $reader->GetRow();
         $reader->Free();
@@ -110,14 +90,7 @@ class ZhlDashboardPresenter
         if ($v === '' || !is_numeric($v)) {
             return $default;
         }
-        $n = (int)$v;
-        if ($n < $min) {
-            $n = $min;
-        }
-        if ($n > $max) {
-            $n = $max;
-        }
-        return $n;
+        return max($min, min($max, (int)$v));
     }
 
     private function readDate($key, $tz)

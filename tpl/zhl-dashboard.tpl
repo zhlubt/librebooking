@@ -6,11 +6,17 @@
 	<div class="zhl-dash-head">
 		<div>
 			<div class="zhl-uplabel">Medienausleihe ZHL</div>
-			<h1 class="zhl-h1">Was möchtest du ausleihen?</h1>
-			<p class="zhl-sub">Wähle eine Kategorie und einen Zeitraum — du siehst sofort, welche Geräte frei sind. <span class="zhl-muted">(Prototyp · {$TotalVisible} Geräte für dich sichtbar)</span></p>
+			<h1 class="zhl-h1">Geräte einzeln buchen</h1>
+			<p class="zhl-sub">Wähle eine Kategorie und einen Zeitraum — du siehst sofort, welche Geräte frei sind. <span class="zhl-muted">({$TotalVisible} Geräte für dich sichtbar)</span></p>
 		</div>
 		{if $IsAdmin}<div><a class="zhl-btn zhl-btn-sm" href="{$Path}zhl-bundles-admin.php">⚙ Bundles verwalten</a></div>{/if}
 	</div>
+
+	<nav class="zhl-modenav">
+		<a class="zhl-mode" href="{$Path}zhl-assistant.php">🎯 Bundles buchen</a>
+		<a class="zhl-mode active" href="{$Path}zhl-dashboard.php">🎛 Geräte einzeln buchen</a>
+		<a class="zhl-mode" href="{$Path}mycalendar.php">📅 Meine Buchungen</a>
+	</nav>
 
 	<form class="zhl-controls" method="get" action="{$Path}zhl-dashboard.php">
 		<input type="hidden" name="schedule" value="{$ActiveSchedule}">
@@ -52,48 +58,8 @@
 		</aside>
 
 		<main class="zhl-main">
-			{if $Bundles}
-				<section class="zhl-bundles-sec">
-					<div class="zhl-results-head">
-						<h2 class="zhl-h2">Vorhaben &amp; Bundles</h2>
-						<span class="zhl-muted">Sets für dein Ziel — Verfügbarkeit im gewählten Zeitraum</span>
-					</div>
-					<div class="zhl-bundle-grid">
-						{foreach from=$Bundles item=b}
-							<div class="zhl-bundle-card {if !$b->available}is-unavail{/if}">
-								<div class="zhl-bundle-top">
-									<div class="zhl-card-titles">
-										{if $b->useCase}<div class="zhl-eyebrow">{$b->useCase|escape}</div>{/if}
-										<h3 class="zhl-card-title">{$b->name|escape}</h3>
-									</div>
-									<span class="zhl-diff {$b->difficulty}">{if $b->difficulty == 'einfach'}Einfach{elseif $b->difficulty == 'fortgeschritten'}Fortgeschritten{else}Profi{/if}</span>
-								</div>
-								<ul class="zhl-bundle-items">
-									{foreach from=$b->items item=it}
-										<li class="{if $it->required && !$it->ok}miss{/if}">
-											<a class="zhl-it-link" href="{$Path}zhl-dashboard.php?q={$it->type|escape:'url'}&amp;start={$StartInput}&amp;days={$Days}">{$it->quantity}× {$it->type|escape}</a>
-											{if !$it->required}<span class="zhl-opt">optional</span>{/if}
-											{if $it->note}<span class="zhl-it-note">{$it->note|escape}</span>{/if}
-											<span class="zhl-it-free {if $it->required && !$it->ok}bad{/if}">{$it->free} frei</span>
-										</li>
-									{/foreach}
-								</ul>
-								{if $b->hint}<p class="zhl-bundle-hint">💡 {$b->hint|escape}</p>{/if}
-								<div class="zhl-bundle-foot">
-									{if $b->available}
-										<span class="zhl-badge free">verfügbar im Zeitraum</span>
-									{else}
-										<span class="zhl-badge full">nicht komplett frei</span>
-									{/if}
-								</div>
-							</div>
-						{/foreach}
-					</div>
-				</section>
-			{/if}
-
 			<div class="zhl-results-head">
-				<h2 class="zhl-h2">Alle Geräte</h2>
+				<h2 class="zhl-h2">Geräte</h2>
 				<span class="zhl-muted">{$RangeLabel}</span>
 			</div>
 
@@ -148,7 +114,7 @@
 				{/foreach}
 			</div>
 
-			<p class="zhl-note">Prototyp (v1): zeigt Verfügbarkeit als <strong>Prognose</strong>; die verbindliche Prüfung erfolgt beim Buchen. Bundles, Vorhaben-Assistent und Laien-Tags folgen in v2/v3.</p>
+			<p class="zhl-note">Prototyp: Verfügbarkeit als <strong>Prognose</strong>; die verbindliche Prüfung erfolgt beim Buchen.</p>
 		</main>
 	</div>
 </div>

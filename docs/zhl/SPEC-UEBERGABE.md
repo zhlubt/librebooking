@@ -51,42 +51,57 @@ Jobs in `Jobs/zhl_*`, eigene Migration in `docs/zhl/migrations/`.
   nicht auf eine Übergabe-Checkliste → wir erzeugen **eigene ZHL-QRs/URLs** auf
   `Web/zhl-handover-check.php` (eigene Auth/CSRF/Permission), statt den Core-Router zu patchen.
 
-### 4.1 Datenmodell (Codex-überarbeitet)
+### 4.1 Datenmodell (mit terminplaner-Anbindung)
+> **Personal-Slots werden NICHT neu modelliert** — die liefert `terminplaner_ubt`
+> (Google-iCal je Team-Mitglied, siehe §4.2). LibreBooking-Seite speichert nur die
+> Verknüpfung zur dort gewählten Übergabe + das Protokoll.
 ```
-zhl_handover_slot      -- vom Personal freigegebene Übergabe-Fenster
-  id, staff_user_id, scope ENUM('resource','resource_group','schedule'), scope_id,
-  type ENUM('pickup','return'), start_datetime DATETIME, end_datetime DATETIME,
-  timezone, capacity INT, status ENUM('open','full','cancelled')
-  -- UTC-Konvention wie LB; Scope eindeutig (nicht schedule_id|resource_id?)
-
 zhl_booking_handover   -- Übergabe je RESSOURCE/INSTANZ, nicht nur Reservierung
   id, series_id, reservation_instance_id, resource_id, reference_number,
-  type ENUM('pickup','return'), slot_id FK zhl_handover_slot,
-  status ENUM('requested','confirmed','done','deferred'), created_at, updated_at,
-  UNIQUE(reservation_instance_id, resource_id, type)   -- verhindert Doppelbelegung
+  type ENUM('pickup','return'),
+  terminplaner_booking_id VARCHAR(20),   -- Buchung in terminplaner_ubt.bookings.id
+  staff_member_id INT,                   -- terminplaner team_members.id (wer übergibt)
+  staff_role ENUM('primary','backup'),   -- Hilfskraft=primary, ZHL-Team=backup
+  scheduled_start_utc DATETIME, scheduled_end_utc DATETIME,
+  status ENUM('requested','confirmed','done'), created_at, updated_at,
+  UNIQUE(reservation_instance_id, resource_id, type)   -- gegen Doppelbelegung
 
-zhl_handover_check     -- Kopf der QR-Verifikation
-  id, series_id, reservation_instance_id, resource_id, slot_id,
-  type, checked_by_user_id, condition_note TEXT, signature_name, created_at
-zhl_handover_check_item -- NORMALISIERT statt accessories_json (Audit/Reporting)
+zhl_handover_check     -- Kopf der QR-Verifikation (Aus-/Rückgabe)
+  id, series_id, reservation_instance_id, resource_id, type,
+  checked_by_user_id, condition_note TEXT, signature_name, created_at
+zhl_handover_check_item -- NORMALISIERT statt JSON (Audit/Reporting)
   id, check_id FK, accessory_id, state ENUM('ok','missing','damaged'), note
 
--- F8 (Übergabe nötig?): bevorzugt als Resource-Custom-Attribute (nativ, upgrade-sicher);
--- eigene Tabelle nur bei komplexeren Regeln.
+-- F8 (Übergabe nötig?): als Resource-Custom-Attribute (ENTSCHIEDEN), nativ/upgrade-sicher.
 ```
-> **Codex-Korrekturen:** Übergabe ist pro Ressource/Instanz (Serien + Multi-Resource!),
-> nicht pro `reference_number`. `start/end_datetime` + UTC statt `date/start_time`.
-> Checklisten-Items **normalisiert** (nicht JSON) für „was fehlt/beschädigt"-Auswertung.
-> Slot-Kapazität braucht **Transaktion + Unique-Constraint** gegen Races.
+> **Codex-Korrekturen drin:** pro Ressource/Instanz (Serien + Multi-Resource), UTC-Datetimes,
+> normalisierte Checklisten-Items, Unique-Constraint + Transaktion gegen Races (ENTSCHIEDEN).
 
-### 4.2 Personal-Verfügbarkeit (F16/F17)
-- Personal pflegt Slots in `zhl_handover_slot` (eigene Admin-Page `Web/zhl-handover-admin.php`;
-  Zugriff: eigene Staff-Gruppe).
-- **Slot-Auswahl NICHT im nativen Buchungsdialog** (das wäre Core/Template-Edit, Codex).
-  Stattdessen **externe ZHL-Seite** direkt nach der Reservierung (`Web/zhl-pickup.php`):
-  User wählt Pickup-Slot (+ Return-Slot oder „später" → Reminder). Ein
-  **PreReservation-Plugin** erzwingt für übergabepflichtige Geräte, dass ein Slot gewählt
-  wurde (blockt sonst), und prüft Kapazität (Transaktion).
+### 4.2 Personal-Verfügbarkeit über terminplaner_ubt (F16/F17)
+**Wir bauen keine neue Slot-Engine — wir nutzen die bestehende App
+`~/Documents/vsc/vscode/terminplaner_ubt`.** Dort gibt jedes ZHL-Team-Mitglied seine
+freien Übergabe-Slots über einen **Google-Kalender (iCal-Feed, `team_members.ical_url`)**
+an (Events mit Prefix `FREI`; `BÜRO/NURBÜRO` = vor-Ort-Filter). Buchung erzeugt einen
+Eintrag in `bookings` + iCal-Mail.
+
+**Rollen (vom ZHL gefordert):**
+- **Studentische Hilfskraft** = *primär* für Medienübergabe → ihre Slots werden zuerst angeboten.
+- **ZHL-Team** = *Backup* (kann vor Ort einspringen) → nur wenn keine Hilfskraft-Slots passen.
+
+**Nötige Erweiterung in terminplaner_ubt** (kleines Feature dort, kein LibreBooking-Core):
+- `team_members.handover_role ENUM('primary','backup')` (oder per `meeting_type`), plus
+  einen Meeting-Type „Medienübergabe".
+- Slot-Auswahl bietet **primary** zuerst, **backup** nur als Alternative.
+
+**Anbindung LibreBooking → terminplaner:**
+- Übergabepflichtige Geräte: Resource-Custom-Attribute `handover_required` (F8, entschieden).
+- **Slot-Auswahl als externe ZHL-Seite** nach der Reservierung (kein Core/Template-Edit):
+  Nutzer wird zu terminplaner geleitet (Kontext: reservation_instance + resource), wählt
+  **Pickup- UND Return-Slot** (Return sofort wählen — entschieden, kein „später").
+- terminplaner meldet die Buchung via API (`api/notify_booking.php`) zurück → Eintrag in
+  `zhl_booking_handover` (mit `terminplaner_booking_id`, `staff_member_id`, `staff_role`).
+- **PreReservation-Plugin** erzwingt: bei `handover_required` muss die Übergabe terminiert
+  sein, sonst blockt es das Speichern; Kapazität/Race über Unique-Constraint + Transaktion.
 
 ### 4.3 QR-Checkliste (F10/F30)
 - **Eigene ZHL-QRs/URLs** auf `Web/zhl-handover-check.php` (nicht der native QR-Router, der
@@ -108,20 +123,33 @@ zhl_handover_check_item -- NORMALISIERT statt accessories_json (Audit/Reporting)
   Personal benachrichtigen, Übergabeprotokoll verknüpfen.
 
 ## 5. Phasen
-- **A — Slot-Auswahl** ersetzt Freitext-Attribute (F16/F17/F8). Größter Nutzen, mittlerer Aufwand.
+- **A — terminplaner-Anbindung** ersetzt die Freitext-Attribute (F16/F17/F8): Übergabe-
+  Slot-Wahl (Pickup+Return) über terminplaner_ubt + Rollen (Hilfskraft primär/Team Backup) +
+  Rückmeldung in `zhl_booking_handover`. Größter Nutzen.
+  Teil-Tasks: (a) terminplaner-Erweiterung `handover_role` + Meeting-Type „Medienübergabe";
+  (b) ZHL-Slot-Auswahlseite + PreReservation-Plugin; (c) Migration der alten Attribute.
 - **B — QR-Checkliste + Zustand** (F10/F30).
-- **C — Overdue/Eskalation** (F34, abhängig vom Cron-Runner).
+- **C — Overdue/Eskalation** (F34, braucht Cron-Runner).
 
-## 6. Offene Entscheidungen (für ZHL)
-- F8 via Resource-Custom-Attribute (bevorzugt) **oder** eigene Tabelle?
-- Slots pro **Personal** / **Ressourcengruppe** / **Schedule**? Kapazität je Slot?
-- Return-Slot sofort wählen oder „später" (wie heute deferred)?
-- **Welche Gruppen** dürfen Slots pflegen / Checklisten abschließen / Eskalationen sehen?
-- **Migrationsplan** für laufende Buchungen + die alten Pflicht-Attribute (Haftpflicht,
-  3 Terminvorschläge) → schrittweise durch Slot-Wahl ersetzen.
-- **Race-Conditions** bei Slot-Kapazität: Unique-Constraint + Transaktion (festgelegt).
-- Cron-Runner für Reminder/Overdue (Hoster) — Blocker für Phase C.
+## 6. Entscheidungen (ZHL, 2026-06-23)
+- **F8:** Resource-Custom-Attribute ✅
+- **Slot-Engine:** terminplaner_ubt (Google-iCal) ✅ — *die frühere „Slots pro Personal/Gruppe/
+  Schedule + Kapazität"-Frage entfällt damit* (Erklärung unten).
+- **Return-Slot:** sofort mitwählen ✅ (kein „später/deferred")
+- **Rollen:** Hilfskraft = primär, ZHL-Team = Backup ✅
+- **Zugriff** (Slots/Checklisten/Eskalationen): alle Admins = ganzes ZHL-Team, **nicht** User ✅
+- **Migration:** alte Pflicht-Attribute (Haftpflicht, 3 Terminvorschläge) schrittweise durch
+  Slot-Wahl ersetzen ✅
+- **Race-Conditions:** Unique-Constraint + Transaktion ✅
+- **Cron-Runner:** einrichten ✅ (eigener Task, Voraussetzung für Phase C/Reminder)
 
-> Diese Spec wurde durch das **Codex-Gate** geprüft (`codex-findings.md`); die Befunde
-> (PreReservation-Hook, eigene QR-Seite, Instanz-/Ressourcenbezug, normalisierte
-> Checklisten, ehrliche Core-Edit-Abgrenzung) sind eingearbeitet.
+### Erklärung „Slots pro Personal/Gruppe/Schedule + Kapazität"
+Die ursprüngliche Frage war, *woran* ein Übergabe-Slot hängt: an einer **Person** (dieser
+Mitarbeiter ist Di 14–15 Uhr verfügbar), an einer **Ressourcengruppe** (Slot gilt für „alle
+Kameras") oder an einem **Schedule**; und ob ein Slot **mehrere** Übergaben gleichzeitig
+fasst (Kapazität). **Mit terminplaner_ubt ist das beantwortet:** Slots hängen an der
+**Person** (deren Google-Kalender), und **ein Slot = ein Termin** (Kapazität 1, der Kalender
+verhindert Doppelbelegung). Kein eigenes Kapazitätsmodell nötig.
+
+> Codex-Gate (`codex-findings.md`) eingearbeitet: PreReservation-Hook, eigene QR-Seite,
+> Instanz-/Ressourcenbezug, normalisierte Checklisten, ehrliche Core-Edit-Abgrenzung.

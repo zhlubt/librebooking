@@ -1,6 +1,6 @@
 # SPEC-UX-DASHBOARD — Neue Medienausleihe-Oberfläche
 
-> **Status:** Entwurf v0.3 (2026-06-23) · §7-Entscheidungen + Code-Recherche (§10) eingearbeitet · Codex-Gate ausstehend · noch nicht gebaut.
+> **Status:** Entwurf v0.4 (2026-06-23) · §7-Entscheidungen + Code-Recherche (§10) + Codex-Gate (§11) eingearbeitet · noch nicht gebaut.
 > **Grundlage:** Mock 3 „Dashboard" (`docs/zhl/mocks/3-dashboard.html`, live `https://media.zhl-ubt.de/Web/mocks/`).
 > **Optik:** zhl-studio Style Guide (UBT-Grün `#009260`), siehe Memory `zhl-studio-design-system`.
 > **Nordstern:** LibreBooking modernisieren — neue, einfachere UX (STRATEGY.md, Säule 3).
@@ -245,23 +245,31 @@ Vorschlag zur Schneidung (Details nach Codex):
 - Einweisungs-Slots: terminplaner + `zhl_booking_handover` — **vorhanden** (Übergabe-Modul).
 
 ## 10. Technische Umsetzung — nativ vs. custom (am 5.1.0-Code verifiziert 2026-06-23)
-Vier Recherche-Agenten haben die Spec-Annahmen gegen den echten LibreBooking-Code geprüft. Ergebnis:
-**das meiste steht nativ bereit**; echter Custom-Code ist eine dünne Orchestrierungs-/Pflege-Schicht.
+Vier Recherche-Agenten + ein Codex-Gate (§11) haben die Spec-Annahmen gegen den echten Code geprüft.
+Ergebnis: **für Lesen/Schreiben gibt es native Bausteine** — aber die Dashboard-Orchestrierung, die
+zusammenhängenden Alternativ-Fenster, Pool-Zuweisung, Bundles, Dialoge und Einweisungs-Stufen sind
+**eigenständige Custom-Domänenlogik** (nicht „nur dünn"). Die native **Save-Validierung bleibt stets
+letzte Instanz**; das Dashboard zeigt eine **Prognose**.
 
 ### 10.1 Oberfläche / Seite
 - Neue Seite nach **MVP-Muster (SecurePage)**: `Web/zhl-dashboard.php` + `Pages/ZhlDashboardPage.php` +
   `Presenters/ZhlDashboardPresenter.php` + `tpl/zhl-dashboard.tpl` (Vorbild `Web/dashboard.php`,
   `Pages/DashboardPage.php`). pageDepth 0; `globalheader.tpl` inkludieren → Theme (`zhl-theme.css` via
   `css.extension.file`) + Menü automatisch. **Nicht** `zhl-welcome.php` als Vorlage (bewusst kein MVP).
-- **Als Startseite**: eigene Page-ID in `Pages.php` (ID-Map) + `ConfigKeys::DEFAULT_HOMEPAGE`-choices,
-  `default.homepage` setzen, Admin „auf alle anwenden" (`UPDATE users.homepageid`). Native Seiten
-  bleiben erreichbar. (Einfachere Alternative: bestehende `dashboard.php`/ID 1 überschreiben.)
+- **Als Startseite (gestuft, Codex):** **zuerst** separate SecurePage + Menü-Link (kein Core-Edit, sofort
+  testbar). **Dann** fürs Login-Landing ein **isolierter, `// ZHL:`-markierter Core-Patch** (`Pages.php`
+  ID-Map + `ConfigKeys::DEFAULT_HOMEPAGE`-choices, `default.homepage`) — als Upgrade-Patch dokumentiert,
+  **ohne** das native Dashboard zu überschreiben. Native Seiten bleiben erreichbar.
 - Eigenes CSS/JS: `Web/css/zhl-dashboard.css` + `Web/scripts/zhl-dashboard.js` via `{cssfile}/{jsfile}`.
 
 ### 10.2 Lesen (verfügbarkeit-first Raster) — NATIV
 - Belegung je Ressource/Zeitraum: `ResourceAvailability::GetItemsBetween()` /
-  `ReservationService::Search()` (mergen Reservierungen **+ Blackouts**). „Buchbar?":
-  `ReservationConflictResult::AllowReservation()`.
+  `ReservationService::Search()` (mergen Reservierungen **+ Blackouts**) — das ist eine **Belegungsliste,
+  kein Buchbarkeits-Gate**. `ReservationConflictResult::AllowReservation()` prüft nur
+  Konflikte/Blackouts/MaxConcurrent, **nicht** Rechte/Vorlauf/Quoten/Schedule (Codex). „Wirklich
+  verfügbar" = ein **eigener ZHL-Verfügbarkeits-Service** (§11.1), der Rechte + F40 + Status +
+  Schedule-Slots + Buffer + Vorlauf + Quoten + MaxConcurrent zusammenführt; Anzeige = Prognose, der
+  native Save bleibt maßgeblich.
 - Multi-Ressource availability-first inkl. freier Fenster: `SearchAvailabilityPresenter::SearchAvailability()`
   + `PotentialSlot` → `AvailableOpeningView[]`.
 - Filter: Kategorien = `resource_groups`; Zähl-Typ/Tags = `ScheduleResourceFilter`/`AttributeFilter`.
@@ -274,21 +282,29 @@ Vier Recherche-Agenten haben die Spec-Annahmen gegen den echten LibreBooking-Cod
   Validierungs-/Konflikt-Gate (Verfügbarkeit **+ Vorlauf** automatisch) → kein Doppelbuchungs-Risiko.
 
 ### 10.4 Der eigentliche Custom-Mehrwert (dünne Schicht)
-- **Teilverfügbarkeit + Alternative (US-13):** `SearchAvailabilityPresenter::AllDaysAreOpen()` kennt die
-  „N von M Tagen frei"-Logik schon, verwirft aber bei einem fehlenden Tag hart. ZHL-Variante: dieselben
-  Bausteine, aber **Liste der freien Tage zurückgeben** statt Boolean → „nur 12 von 14 — kürzer?".
+- **Teilverfügbarkeit + Alternative (US-13):** **neue eigene Intervall-Logik** — *nicht* durch Anpassen
+  von `AllDaysAreOpen()` (liefert nur Boolean, ist auf Wiederhol-Termine gemünzt, Start-Vergleich sogar
+  auskommentiert — Codex). Eine Reservierung ist ein **durchgehender** Zeitraum; einzelne freie Tage sind
+  keine gültige Alternative. ZHL berechnet aus der Roh-Belegung (`ResourceAvailability::GetItemsBetween`)
+  **zusammenhängende freie Fenster/Präfixe** und schlägt konkrete alternative **Start/Ende** vor
+  („14 Tage gehen nicht — aber durchgehend Mo–Fr (5 Tage), oder Start 2 Tage später").
 - **Pool-Zählung (US-12/14):** `COUNT` der freien Einzel-Ressourcen mit gleichem Zähl-Typ im Zeitraum.
 - **Vorhaben-Dialoge + Bundles (US-8/9/20/21):** eigene Logik + Pflege-UI (s. 10.5/10.6).
 
 ### 10.5 Daten — was nativ, was neu
 - **Nativ, keine neuen Tabellen:** Kategorie → `resource_groups` (hierarchisch, N:M); Zähl-Typ →
-  Custom-Attribut (Kategorie RESOURCE, Typ SELECT_LIST, **`is_required`** für saubere Zählung);
-  Laien-Tags → Text-Custom-Attribut (LIKE-Suche); Vorlauf → `resources.min_notice_time_add`
-  (Admin-UI „Manage Resources").
+  Custom-Attribut (Kategorie RESOURCE, Typ SELECT_LIST, **`is_required`** für saubere Zählung — aber
+  **interne Attribut-/Ressourcen-ID referenzieren, nie den umbenennbaren Anzeigetext**, Codex; SELECT_LIST
+  hat keine FK-Integrität); Laien-Tags → Text-Custom-Attribut (LIKE-Suche); Vorlauf →
+  `resources.min_notice_time_add` (Admin-UI „Manage Resources"). **Pool stets aus konkreten buchbaren
+  Ressourcen-IDs** bilden (Rechte/Status/Schedule/Blackouts/Buffer je ID).
 - **Neu (Custom-Tabellen + Admin-Pflege-UI, §7.3/7.4):** Bundles (`zhl_bundle`, `zhl_bundle_item` mit
   Zähl-Typ + Menge + optional/Pflicht), Vorhaben-Dialogpfade (datengetrieben, `zhl_dialog_*`),
-  Einweisungs-Stufe je Gerät (Erweiterung `ZhlCertificate`/F40: Level zwingend/empfehlenswert/Beratung;
-  Zuordnung durch Admin, unbegrenzt gültig).
+  Einweisungs-Stufen je Gerät — **neues eigenes Stufenmodell** (NICHT bloße F40-Erweiterung: `ZhlCertificate`
+  ist selbst Custom auf der nativen Permission-Schnittstelle und kennt nur „Zertifikat erforderlich", keine
+  Stufen/Beratung/Termin — Codex). Eigene Semantik: ① zwingend → hartes Gate; ② empfehlenswert → **nie ins
+  Permission-Gate**, nur Hinweis; ③ Experten-Beratung „für danach" (Termin, optional/zwingend). Mit
+  FK/Widerruf/Aussteller/Audit; Zuordnung Admin, unbegrenzt gültig.
 - **Räume:** neue native Ressourcen (Seminarraum anlegen).
 
 ### 10.6 Gotchas (aus der Code-Recherche — unbedingt beachten)
@@ -302,7 +318,29 @@ Vier Recherche-Agenten haben die Spec-Annahmen gegen den echten LibreBooking-Cod
 - Beim Deploy `config.php` **nie aus dist** überschreiben (`css.extension.file`); nach `.tpl`-Änderung
   `tpl_c/` leeren; Page-IDs in `Pages.php` hartcodiert; bei Config-Key-Änderung `composer config-dist:generate`.
 
+## 11. Codex-Gate (2026-06-23) — Befunde eingearbeitet
+Voller Bericht: `docs/zhl/codex-findings.md`. Codex bestätigte die nativen Lese-/Schreib-Bausteine,
+korrigierte aber drei zu optimistische Stellen (oben bereits eingearbeitet):
+- **US-13 ≠ `AllDaysAreOpen`** → eigene **zusammenhängende-Fenster**-Logik (einzelne freie Tage sind keine
+  gültige Alternative; Multi-Ressource-Reservierungen erzwingen denselben Zeitraum).
+- **„buchbar" ≠ `AllowReservation()`** → Dashboard = Prognose; vollständige **Save-Validierung** bleibt
+  letzte Instanz (Race Anzeige↔Save einplanen).
+- **F40/Einweisung = Custom**, 3-Stufen-Modell neu; Stufe ② nie ins harte Gate.
+
+**Vor dem Bau zu klären / zu ergänzen (Codex „Fehlt"):**
+1. **§11.1 — Verbindliche Definition „verfügbar"**: ein einziger **ZHL-Verfügbarkeits-Service** als
+   Wahrheitsquelle fürs Raster (Rechte + F40 + Status + Schedule-Slots + Buffer + Vorlauf + Quoten +
+   MaxConcurrent), gespeist aus den nativen Bausteinen.
+2. **Stabile Referenzen**: Bundle-Items/Dialogknoten/Pool an interne IDs binden, nicht an SELECT_LIST-Texte.
+3. **Pool-Auswahlregeln**: bevorzugte Gerätenummern, defekte/deaktivierte Geräte, mehrere Schedules.
+4. **Bundle-Versionierung**: Historie reproduzierbar; Änderungen brechen Altbuchungen nicht.
+5. **Sequenz-Buchungen** (zwei native Reservierungen) sind **nicht atomar** → Rollback-/Hinweis-Konzept.
+6. **F40-Schema härten**: FKs auf users/resources, Widerruf, Aussteller, Begründung, Audit.
+7. **Einweisung pro physischem Gerät vs. pro Gerätetyp** fachlich entscheiden.
+8. **Core-Patches** (Homepage-ID, Config-Choices, Plugin-Whitelist) klein, `// ZHL:`-markiert,
+   automatisiert wiederanwendbar (Upgrade-Sicherheit).
+
 ---
-**Nächste Schritte:** (1) **Codex-Gate** über diesen Entwurf (`docs/zhl/codex-review.sh`, Fokus
-SPEC-UX-DASHBOARD); (2) Findings einarbeiten; (3) **v1-Prototyp** lokal: `Web/zhl-dashboard.php`
-(verfügbarkeit-first Raster, datengebunden) auf media — Bundles/Dialoge in v2/v3.
+**Nächste Schritte:** (1) §11-Punkte 1+2 festklopfen (Verfügbarkeits-Service + stabile IDs); (2)
+**v1-Prototyp** `Web/zhl-dashboard.php` als **separate SecurePage** (verfügbarkeit-first Raster über den
+ZHL-Verfügbarkeits-Service), noch **ohne** Homepage-Core-Patch; (3) v2 Bundles/Pool, v3 Dialoge/Einweisung.

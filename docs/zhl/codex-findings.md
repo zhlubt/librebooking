@@ -1,54 +1,58 @@
 | Feature/Plan | Befund | Beleg (Pfad) | Empfehlung |
 |---|---|---|---|
-| F1 Registrierung/Profile ✅🟦 | Größtenteils korrekt: Domain-Restrict und Mail-Aktivierung sind Config; ToS existiert, aber User-Accept-Zeitpunkt bleibt nicht als echtes Profil-Feature belegt. | `lib/Config/ConfigKeys.php:1012`, `:1414`; `database_schema/upgrades/2.2/schema.sql`; `database_schema/upgrades/2.7/schema.sql` | Status eher `✅🟦 + kleine Custom-Lücke` lassen. |
-| F2 Rollen/Rechte ✅ | Korrekt nativ. Admin-Rollen werden als Session-Rollen genutzt. | `Pages/Page.php`; `Pages/SecurePage.php` | Passt. |
-| F3 User-Verwaltung ✅ | Korrekt nativ. | `Pages/Admin/ManageUsersPage.php`; `Presenters/Admin/ManageUsersPresenter.php` | Passt. |
-| F4 Item/Inventar-CRUD ✅ | Korrekt nativ als Ressourcenverwaltung. | `Pages/Admin/ManageResourcesPage.php`; `Presenters/Admin/ManageResourcesPresenter.php` | Passt. |
-| F5 Custom-Attribute ✅ | Korrekt nativ für mehrere Kategorien. | `Domain/CustomAttribute.php`; `Pages/Admin/ManageAttributesPage.php` | Passt; Magic-Number-Kommentare in ZHL-Code später durch Konstanten ersetzen. |
-| F7 Status/Verfügbarkeit ✅ | Korrekt nativ: Ressourcenstatus, Blackouts, Availability-Service. | `WebServices/ResourcesWebService.php`; `lib/Application/Reservation/ResourceAvailability.php` | Passt. |
-| F10 QR-Verifikation ✅🔧 | Zu optimistisch, wenn „Verifikation“ mehr als QR-Routing meint. QR + Check-in/out nativ, Checkliste/Zustand Custom. | `Pages/ResourceQRRouterPage.php`; `Pages/Ajax/ReservationCheckinPage.php`; `Presenters/Admin/ManageResourcesPresenter.php` | Als `🟨🔧` formulieren: QR nativ, ZHL-Verifikation Custom. |
-| F11 Multi-Item-Buchung ✅ | Korrekt nativ über Additional Resources. | `Domain/ReservationSeries.php:136`, `:161`; `lib/Application/Reservation/ReservationComponentBinder.php` | Passt. |
-| F12 Buchungs-Dashboard ✅ | Korrekt nativ. | `Pages/DashboardPage.php`; `Presenters/DashboardPresenter.php` | Passt. |
-| F13 Kalenderübersicht ✅ | Korrekt nativ. | `Pages/SchedulePage.php`; `Pages/ViewCalendarPage.php`; `Presenters/Schedule/SchedulePageBuilder.php` | Passt. |
-| F14 Approval-Workflow ✅ | Korrekt nativ pro Ressource. | `lib/Application/Reservation/Validation/RequiresApprovalRule.php`; `database_schema/create-schema.sql:197` | Passt. |
-| F15 Vorlaufzeiten ✅ | Korrekt nativ pro Ressource. | `lib/Application/Reservation/Validation/ResourceMinimumNoticeRuleAdd.php`; `ResourceMaximumNoticeRule.php` | Passt. |
-| F18 Blackout-Daten ✅ | Korrekt nativ. | `Pages/Admin/ManageBlackoutsPage.php`; `lib/Application/Reservation/ManageBlackoutsService.php` | Passt. |
-| F20 iCal-Feed ✅🟦 | Korrekt, aber aktivierungs-/Key-abhängig. | `Pages/Export/CalendarSubscriptionPage.php`; `lib/Application/Schedule/CalendarSubscriptionUrl.php`; `ConfigKeys.php:1085` | Als Config-Risiko im Betrieb führen. |
-| F21 E-Mail-Benachrichtigungen ✅ | Korrekt nativ. | `lib/Application/Reservation/Notification/PostReservationFactory.php`; `lib/Email/Messages/ReservationEmailMessage.php` | Passt. |
-| F22 Mailtemplates DE/per Item ✅🟦/🔧 | Korrekt differenziert: Sprache/custom tpl nativ, per Resource nicht nativ. | `lib/Common/SmartyPage.php:89`; `Presenters/Admin/ManageEmailTemplatesPresenter.php:99` | Nicht als pauschal nativ lesen. |
-| F26 Mehrsprachigkeit ✅🟦 | Korrekt, `de_de` vorhanden; lokal in `config.php` bereits gesetzt, dist bleibt `en_us`. | `lang/de_de`; `config/config.php:47`; `config/config.dist.php:47` | Produktions-Config explizit dokumentieren. |
-| F28 REST-API ✅🟦 | Korrekt nativ, default aus. | `Web/Services/index.php`; `WebServices/`; `lib/Config/ConfigKeys.php:1793` | API nur gezielt aktivieren, Keys/Rollen prüfen. |
-| F29 Analytics/Reports ✅ | „Reports“ korrekt, „Analytics“ zu weit. Kein Produkt-/Nutzungsanalytics außer Reporting/Google-Tracking-Config. | `Pages/Reports/GenerateReportPage.php`; `lib/Application/Reporting/`; `ConfigKeys.php:926` | Feature in `Reports` und `Analytics` trennen. |
-| F31 Max. Buchungsdauer ✅ | Korrekt nativ. | `lib/Application/Reservation/Validation/ResourceMaximumDurationRule.php`; `Domain/BookableResource.php` | Passt. |
-| F32 User-Buchungslimits ✅ | Korrekt nativ über Quotas. | `Pages/Admin/ManageQuotasPage.php`; `Presenters/Admin/ManageQuotasPresenter.php`; `Domain/Quota.php` | Passt. |
-| F33 Storno-Fristen ✅ | Korrekt nur als Mindestfrist-Regeln, kein eigener Storno-Workflow. | `ResourceMinimumNoticeRuleDelete.php`; `PreReservationFactory.php` | In FEATURES weiter einschränken: Frist ja, Workflow nein. |
-| F36 Waitlist 🟦 | Korrekt nativ per Config, nicht nativ aktiv. | `lib/Config/ConfigKeys.php:755`; `Pages/Ajax/ReservationWaitlistPage.php` | Config-Quick-Win. |
-| F39 Mobile-Responsive ✅ | Plausibel nativ über Bootstrap/MobileDetect. | `Pages/Page.php`; Bootstrap-Templates | Nur durch Viewport-Test final belegen. |
-| F40 Einweisungs-/Berechtigungspflicht ✅✅ | Nicht nativ. Umgesetzt als ZHL-Custom-Permission-Plugin plus Core-Whitelist-Edit. | `plugins/Permission/ZhlCertificate/ZhlCertificate.php`; `lib/Config/ConfigKeys.php:1724` | In FEATURES als `🔧 umgesetzt`, nicht `✅ nativ`, markieren. |
-| STRATEGY „Großteil nativ“ | Im Kern richtig, aber §2/§4 unterschätzt Custom-Lücken: Audit, DSGVO, Overdue, Handover-Checkliste/Zustand sind nicht klein. | `docs/zhl/FEATURES.md`; fehlende native Tabellen/Services in `database_schema/` | Strategie abschwächen: „viele Bausteine nativ“, Custom-Modul bleibt Hauptarbeit. |
-| STRATEGY „keine Breaking-DB-Changes“ | Zu sicher formuliert. Repo-Upgrades reichen bis 4.0, aber Live-DB 4.0→5.1 muss rehearsed werden. | `database_schema/upgrades/`; `docs/zhl/UPGRADE-RUNBOOK.md` | „Keine erwarteten Schema-Upgrades nach 4.0, trotzdem Rehearsal zwingend“ schreiben. |
-| Handover Select SecurePage | Login-Bindung korrekt; pageDepth/Redirect für `/Web` passt. | `Web/zhl-handover-select.php:27-33`; `Pages/SecurePage.php:7-22` | Passt. |
-| Handover Sync POST+CSRF | Korrekt: Sync nur POST und `EnforceCSRFCheck`; Formular trägt Token. | `Web/zhl-handover-select.php:59-63`, `:156-158`; `Pages/Page.php:262-270` | Passt. |
-| Handover Token-Ownership UI | Im Normalfall korrekt: fremder Owner → 403, Claim überschreibt nie Owner. Race-Rest: paralleler Erst-Claim ignoriert `false`-Rückgabe und kann einmal Status rendern. | `Web/zhl-handover-select.php:46-56`; `Web/zhl-handover-lib.php:169-181`; `003_zhl_handover_token.sql:7` | Rückgabe von `zhl_handover_claim_token()` prüfen und bei `false` sofort 403. |
-| Handover PreReservation owner==series user | Grundlogik stimmt, aber owner `null` ist bewusst erlaubt und damit umgehbar, wenn `zhl_booking_handover` ohne Token-Owner befüllt wird. | `ZhlHandoverValidation.php:73-79`; `Web/zhl-handover-notify.php`; `zhl_handover_sync()` | Owner zwingend verlangen: `ownerId === (int)$series->UserId()`, sonst blocken. |
-| Handover PreReservation Add/Update | Interface und Einbindung korrekt, greift vor Persistenz für Add/Update. | `plugins/PreReservation/ZhlHandover/ZhlHandover.php:27-39`; `PluginManager.php:112-124` | Passt, sobald Config aktiv ist. |
-| Handover PostReservation | Interface korrekt; Add/Update/Approve dekoriert; Linkdaten aus `CurrentInstance()`, `ReferenceNumber()`, `ReservationId()`, `SeriesId()` sind passend. | `ZhlHandoverLink.php:15-54`; `ZhlHandoverLinkNotification.php:19-66`; `PostReservationFactory.php:3-40` | Custom-Fehler möglichst `Throwable` fangen; sonst ok. |
-| Handover PostReservation Aktivierung | Code/Whitelist vorhanden, aber lokale `config.php` aktiviert Pre/PostReservation aktuell nicht. | `ConfigKeys.php:1749-1772`; `config/config.php:731-736` | Deploy-Runbook muss `plugins.prereservation='ZhlHandover'` und `plugins.postreservation='ZhlHandoverLink'` setzen. |
-| Handover Migration 002/003 | ZHL-eigene Tabellen ok; aber keine FK von `zhl_booking_handover` zu `zhl_handover_token`, keine FK zu `users`, keine Token-Expiry. | `002_zhl_handover.sql:11-34`; `003_zhl_handover_token.sql:7-12` | FK/Ownership-Invariant oder App-Check härten; Cleanup/Expiry planen. |
-| Config-Artefakte | `ConfigKeys.php` enthält ZHL-Choices, `config.dist.php`-Kommentare/Options nicht regeneriert. | `ConfigKeys.php:1753-1771`; `config/config.dist.php:731-736` | `composer config-dist:generate`/Check vor PR, sonst Admin-Config irreführend. |
+| F1 Registrierung/Profile | Größtenteils korrekt: Domain-Restrict, Aktivierung, ToS existieren; ToS-Accept pro User bleibt Custom. | `config/config.dist.php`, `Presenters/RegistrationPresenter.php`, `database_schema/upgrades/2.2/schema.sql`, `database_schema/upgrades/2.7/schema.sql` | Als `✅🟦 + Mini-Custom` führen, nicht rein nativ. |
+| F2 Rollen/Rechte | Korrekt nativ. Admin-/Resource-/Schedule-/Group-Admin sind echte Session/Rollenflags. | `lib/Server/UserSession.php`, `Domain/User.php`, `Pages/SecurePage.php` | OK. |
+| F3 User-Verwaltung | Korrekt nativ. | `Web/admin/manage_users.php`, `Presenters/Admin/ManageUsersPresenter.php` | OK. |
+| F4 Item/Inventar-CRUD | Zu optimistisch formuliert: Ressourcen-CRUD ja, echtes Inventar/Stock/Seriengeräte nein. | `Web/admin/manage_resources.php`, `Presenters/Admin/ManageResourcesPresenter.php`, `Domain/BookableResource.php` | In “Ressourcen-CRUD nativ; Inventarlogik Custom” präzisieren. |
+| F5 Custom-Attribute | Korrekt nativ für User/Resource/ResourceType/Reservation. | `Domain/CustomAttribute.php`, `Presenters/Admin/ManageAttributesPresenter.php`, `database_schema/upgrades/2.2/schema.sql` | OK. |
+| F7 Status/Verfügbarkeit | Korrekt: Resource-Status und Blackouts vorhanden. | `database_schema/upgrades/2.5/schema.sql`, `Web/admin/manage_blackouts.php`, `Domain/Blackout.php` | OK. |
+| F10 QR-Verifikation | “QR nativ” stimmt nur als Resource-QR-Baustein; ZHL-Verifikationscheckliste/Zustand ist Custom. | `Presenters/Admin/ManageResourcesPresenter.php`, `Pages/ResourceQRRouterPage.php`, `Pages/Ajax/ReservationCheckinPage.php` | Nicht als nativ für ZHL-Ziel verkaufen; `✅ Baustein + 🔧 Checkliste`. |
+| F11 Multi-Item-Buchung | Korrekt: zusätzliche Ressourcen je Reservierung existieren. | `Domain/ReservationSeries.php`, `Domain/ReservationResourceView.php` | OK. |
+| F12 Buchungs-Dashboard | Korrekt nativ. | `Presenters/DashboardPresenter.php`, `Presenters/Dashboard/*` | OK. |
+| F13 Kalenderübersicht | Korrekt nativ. | `Pages/SchedulePage.php`, `Presenters/Schedule/SchedulePresenter.php` | OK. |
+| F14 Approval-Workflow | Korrekt nativ pro Ressource. | `Domain/BookableResource.php`, `lib/Application/Reservation/Validation/RequiresApprovalRule.php` | OK. |
+| F15 Vorlaufzeiten | Korrekt nativ für Add/Update/Delete/Max Notice je Ressource. | `Domain/BookableResource.php`, `Presenters/Admin/ManageResourcesPresenter.php` | OK. |
+| F18 Blackout-Daten | Korrekt nativ. | `Web/admin/manage_blackouts.php`, `Presenters/Admin/ManageBlackoutsPresenter.php`, `Domain/Blackout.php` | OK. |
+| F20 iCal-Feed | Korrekt, aber Konfig-/Key-abhängig. | `Pages/Export/AtomSubscriptionPage.php`, `Pages/Export/CalendarExportDisplay.php`, `config/config.dist.php` | `✅🟦` passt. |
+| F21 E-Mail-Benachrichtigungen | Korrekt nativ für Standard-Reservation-Events. | `lib/Email/Messages/*Reservation*.php`, `lib/Application/Reservation/Notification/*` | OK; ZHL-Sondermails separat Custom. |
+| F22 Mailtemplates DE/per-Item | Sprache/Custom-Templates nativ; per Resource/Item nicht nativ. | `lib/Common/SmartyPage.php`, `lang/de_de/*.tpl` | Status `✅🟦/🔧` passt. |
+| F26 Mehrsprachigkeit | Korrekt per Config; `config.dist` bleibt `en_us`, lokale `config.php` ist ZHL-spezifisch. | `config/config.dist.php`, `config/config.php`, `lang/de_de.php` | OK, nicht in Upstream-Default ändern. |
+| F28 REST-API | Korrekt nativ, per Config aktivierbar. | `Web/Services/index.php`, `WebServices/*`, `config/config.dist.php` | OK; API-Aktivierung als Sicherheitsentscheidung behandeln. |
+| F29 Analytics/Reports | Reports nativ; Analytics nur Google-Tracking-Key, keine ZHL-Fachanalytics. | `Pages/Reports/*`, `Presenters/Reports/*`, `config/config.dist.php` | In “Reports nativ; Analytics begrenzt” ändern. |
+| F31 Max. Buchungsdauer | Korrekt nativ je Ressource. | `Domain/BookableResource.php`, `Presenters/Admin/ManageResourcesPresenter.php` | OK. |
+| F32 User-Buchungslimits | Korrekt nativ über Quotas. | `Web/admin/manage_quotas.php`, `Presenters/Admin/ManageQuotasPresenter.php`, `Domain/Quota.php` | OK. |
+| F33 Storno-Fristen | Zu optimistisch: Fristen ja, aber kein echter Storno-Workflow. | `Domain/BookableResource.php`, `Presenters/Admin/ManageResourcesPresenter.php` | Als `🟨` statt `✅` führen, wenn Workflow gemeint ist. |
+| F39 Mobile-Responsive | Plausibel nativ durch Bootstrap 5, aber kein Beleg für ZHL-UX getestet. | `tpl/`, `Web/assets/vendor/bootstrap/5.3.3/` | `✅` nur für Basis-Responsiveness; mobile Handover testen. |
+| F40 Einweisungs-/Berechtigungspflicht | Falsch als nativ interpretierbar: Umsetzung ist Custom-Plugin plus Config-Key-Choice-Core-Edit. | `plugins/Permission/ZhlCertificate/ZhlCertificate.php`, `config/config.dist.php`, `lib/Config/ConfigKeys.php` | Status auf `🔧 umgesetzt` ändern; Core-Edit vermeiden, wenn Plugin-Name auch ohne Choice ladbar ist. |
+| STRATEGY: “Großteil nativ” | Inhaltlich zu pauschal. Viele Features sind native Bausteine, aber ZHL-Zielverhalten bleibt Custom: Übergabe, Audit, DSGVO, Suche, Overdue. | `docs/zhl/FEATURES.md`, Codebelege oben | Strategie auf “native Basis + gezielte Custom-Module” schärfen. |
+| STRATEGY: DB-Änderungen unter `database_schema/upgrades/` | Wird aktuell nicht eingehalten: ZHL-Migrationen liegen unter `docs/zhl/migrations/`. | `docs/zhl/migrations/*.sql` | Entweder bewusst als ZHL-Runbook-Migration dokumentieren oder nach `database_schema/upgrades/` mit Versionsschema überführen. |
+| STRATEGY: Config/Plugin statt Core | Teilweise verletzt: `config.dist.php` und `ConfigKeys.php` wurden für ZHL-Plugin-Choices angepasst. | `config/config.dist.php`, `lib/Config/ConfigKeys.php` | Prüfen, ob Plugin-Loading ohne UI-Choice reicht; sonst Core-Edit bewusst markieren und klein halten. |
+| Übergabe Check: Auth | `SecurePage` erzwingt Login. Staff-Check erlaubt App-, Resource-, Schedule- und Group-Admins. Das ist “ZHL-Team”, aber nicht strikt Application-Admin-only. | `Web/zhl-handover-check.php`, `Pages/SecurePage.php`, `lib/Server/UserSession.php` | Wenn nur ZHL-Betrieb darf: eigene Gruppe/Permission oder `IsAdmin` plus explizite ZHL-Gruppe, nicht alle Adminrollen pauschal. |
+| Übergabe Check: CSRF | POST-Speichern ist CSRF-geschützt. | `Web/zhl-handover-check.php`, `Pages/Page.php` | OK. |
+| Übergabe Check: SQL-Injection | Vorbereitete Statements; Query-Parameter werden eingeschränkt/gecastet. | `Web/zhl-handover-check.php`, `Web/zhl-handover-lib.php` | OK. |
+| Übergabe Check: Transaktion/Items | Insert Check + strukturierte Accessories + Ad-hoc-Items in einer Transaktion. Edge “keine Accessories” wird über Ad-hoc-Zeile abgefangen. | `Web/zhl-handover-check.php` | OK; zusätzlich mindestens ein Item oder Gesamtzustand serverseitig erzwingen, falls fachlich nötig. |
+| Übergabe Check: `done` markieren | Funktioniert, aber Update ist breit: `WHERE type = ? AND (reference_number = ? OR handover_token = ?)`. Bei nicht eindeutigem `reference_number` können mehrere Zeilen gleichen Typs erledigt werden. | `Web/zhl-handover-check.php`, `docs/zhl/migrations/002_zhl_handover.sql` | Primär per `handover_token + type` oder `id` updaten; `reference_number` nur fallback mit `resource_id`/Limit. |
+| Übergabe Check: Kontextlos | Speichern ohne `ref`, `token` und `resource` ist möglich; erzeugt ein kaum zuordenbares Protokoll und zeigt trotzdem Erfolg. | `Web/zhl-handover-check.php` | Server-seitig mindestens `token/ref` oder `resource_id` verlangen. |
+| Übergabe QR | BaconQrCode-Nutzung ist korrekt für v3.1.1; `Content-Type: image/png` und `no-store` gesetzt. | `Web/zhl-handover-qr.php`, `composer.json`, `composer.lock` | OK; vor Ausgabe keine Notices/Whitespace riskieren. |
+| Übergabe QR: Auth | Nur eingeloggte Adminrollen. Kein CSRF nötig für GET-Bild. | `Web/zhl-handover-qr.php`, `Pages/SecurePage.php` | Gleiche Rollenfrage wie oben klären. |
+| Übergabe QR: URL-Basis | `GetScriptUrl()` ist LibreBooking-Standard. Wenn `script.url` leer/falsch ist, QR zeigt falsch. | `Web/zhl-handover-qr.php`, `config/config.dist.php`, `lib/Config/Configuration.php` | Deployment-Check für `script.url` ins Runbook. |
+| Übergabe Admin: Query | `zhl_handover_list()` ist vorbereitet und Status-Filter allowlisted. | `Web/zhl-handover-admin.php`, `Web/zhl-handover-lib.php` | OK. |
+| Übergabe Admin: XSS | Tabellenwerte werden escaped; Badge/Icons sind feste Strings. | `Web/zhl-handover-admin.php` | OK. |
+| Übergabe Migration 004 | Technisch passend zu 002, aber nicht idempotent: wiederholtes Ausführen von `ALTER TABLE ADD COLUMN` bricht. | `docs/zhl/migrations/004_zhl_handover_check_ext.sql` | Mit `ADD COLUMN IF NOT EXISTS` oder Runbook “einmalig” absichern. |
+| Accessory-Schema | Join ist korrekt: `resource_accessories.resource_id/accessory_id` zu `accessories.accessory_id`; Typen passen grob. | `database_schema/upgrades/2.6/schema.sql`, `database_schema/create-schema.sql`, `Web/zhl-handover-lib.php` | OK; Quantity wird aktuell nur geladen, nicht im Protokoll ausgewertet. |
 
 **Fehlt**
 
-- PHPUnit-Tests für `ZhlHandoverValidation` und `ZhlHandoverLinkNotification`; `verify-handover-sql.php` ersetzt keine Plugin-Tests.
-- Admin-/Betriebsansicht für offene, bestätigte, verknüpfte und erledigte Übergaben.
-- Handover-Token-Expiry/Cleanup und klare Invalidierung nach Reservierungsabbruch.
-- DSGVO-Export/Anonymisierung, systemweites Audit-Log, Overdue-Rückgabe-Eskalation bleiben echte Custom-Themen.
-- Klare Trennung in FEATURES zwischen „nativ vorhanden“, „per Config nutzbar“, „ZHL-Custom bereits umgesetzt“.
+- Handover-Protokolle haben keine Foreign Keys zu `resources`, `users`, `reservation_series`/Instanz; für Upgrade/Reporting/Audit wäre das robuster.
+- Kein eigenes Rollenmodell “ZHL-Team”; pauschale Adminrollen können zu breit sein.
+- Kein serverseitiger Pflichtkontext für Check-Protokolle.
+- Kein Schutz gegen doppelte Protokolle pro Übergabe/Typ; aktuell können mehrere Checks erzeugt werden.
+- Keine echte DSGVO-/Audit-/Anonymisierungsstrategie trotz Custom-Tabellen mit Namen/Notizen.
 
 **Risiken**
 
-- Größte Phase-A-Lücke: ownerlose bestätigte Tokens werden im PreReservation-Gate akzeptiert.
-- Handover bleibt wirkungslos, solange Pre/PostReservation-Plugins nicht in Produktiv-Config aktiviert sind.
-- Core-Whitelist-Edits in `ConfigKeys.php` sind klein, aber Upstream-Merge-Konfliktpunkte.
-- `zhl_handover_config()` fällt auf `.example.php` zurück; in Prod besser hart fehlschlagen.
-- Multi-Resource/Instanz-Semantik ist bewusst pro Token/Reservierung vereinfacht; für Phase B muss das Datenmodell nachgeschärft werden.
+- `config.dist.php`/`ConfigKeys.php` für ZHL-Plugin-Choices sind unnötige Upstream-Konfliktpunkte, wenn reines Config-Loading reicht.
+- ZHL-Migrationen außerhalb `database_schema/upgrades/` laufen am LibreBooking-Upgradeprozess vorbei.
+- `done`-Update per `reference_number OR token` ist fachlich riskant bei Mehrfach-/Alt-Datensätzen.
+- QR hängt an korrektem `script.url`; falsche Prod-Config erzeugt dauerhaft falsche Codes.
+- Phase-B-Code ist eigenständig und upgrade-sicher platziert, nutzt aber raw PDO neben LibreBookings DB-Abstraktion; das ist pragmatisch, aber Test-/Transaktionsverhalten bleibt separat abzusichern.

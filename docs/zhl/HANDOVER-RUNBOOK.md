@@ -94,6 +94,19 @@ Interface korrekt, Linkdaten passend. **Sofort gehärtet:** (a) Assistent prüft
   E2E; echte Plugin-Unit-Tests fehlen).
 - **Admin-/Betriebsansicht** offener/bestätigter/verknüpfter Übergaben (sonst nur in der DB sichtbar).
 
+## Phase B — Checkliste/QR (GEBAUT 2026-06-23)
+Deploy: `Web/zhl-handover-{check,qr,admin}.php` + Migration `004_zhl_handover_check_ext.sql`
+(idempotent, `ADD COLUMN IF NOT EXISTS`). Nur fürs ZHL-Team (Admin-Rollen). Einstieg über
+`zhl-handover-admin.php` (Übersicht) → Protokoll/QR. Codex-bestätigt: CSRF, Prepared Statements,
+Transaktion, BaconQrCode, XSS-Escaping OK. **Eingearbeitet:** Migration idempotent; `done`-Update
+eindeutig (Token+Typ, sonst Referenz+Ressource); serverseitige Kontext-Pflicht (kein
+zuordnungsloses Protokoll). **Deploy-Check:** `script.url` muss korrekt sein, sonst zeigen die
+QR-Codes auf die falsche Basis-URL.
+
+**Phase-B-Folgepunkte (Codex, offen):** dediziertes „ZHL-Team"-Gruppen-/Permission-Modell statt
+pauschaler Admin-Rollen; Schutz gegen doppelte Protokolle je Übergabe/Typ; FKs/Audit/DSGVO für die
+`zhl_handover_*`-Tabellen; Foto-Anhang + Seriennummern (F30 tiefer).
+
 ## Offen / vor Prod zu prüfen (ehrlich)
 - **Live-Cross-App-Test**: terminplaner lokal nicht lauffähig → Slot-Liste, Buchung mit Marker,
   Lookup und Sync end-to-end auf einer Test-/Staging-Instanz verifizieren.

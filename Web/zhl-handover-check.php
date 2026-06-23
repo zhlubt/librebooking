@@ -71,6 +71,12 @@ class ZhlHandoverCheckPage extends SecurePage
         $error = '';
         if ($this->IsPost() && $this->GetForm('action') === 'save') {
             $this->EnforceCSRFCheck();
+            // Kontext-Pflicht (Codex): kein zuordnungsloses Protokoll zulassen.
+            if ($token === '' && $ref === '' && $resourceId === 0) {
+                $this->Render($session, $ref, $token, $type, $resourceId, $resourceName, $accessories, false,
+                    'Kein Übergabe-Kontext (Vorgang oder Gerät) erkannt — Protokoll nicht gespeichert.');
+                return;
+            }
             try {
                 $this->Save($pdo, (int)$session->UserId, $ref, $token, $type, $resourceId, $accessories);
                 $saved = true;
@@ -149,13 +155,27 @@ class ZhlHandoverCheckPage extends SecurePage
                 $itemStmt->execute([$checkId, null, $label, $state, $note !== '' ? $note : null]);
             }
 
-            // Übergabe als erledigt markieren (token- oder referenz-gebunden).
-            if ($ref !== '' || $token !== '') {
+            // Übergabe als erledigt markieren — möglichst eindeutig (Codex):
+            // Token ist via uq_token_type eindeutig je Typ → bevorzugt. Sonst Referenz
+            // PLUS Ressource, um nicht versehentlich mehrere Zeilen zu treffen.
+            if ($token !== '') {
                 $upd = $pdo->prepare(
                     "UPDATE zhl_booking_handover SET status = 'done', updated_at = ?
-                     WHERE type = ? AND (reference_number = ? OR handover_token = ?)"
+                     WHERE handover_token = ? AND type = ?"
                 );
-                $upd->execute([$now, $type, $ref, $token]);
+                $upd->execute([$now, $token, $type]);
+            } elseif ($ref !== '' && $resourceId) {
+                $upd = $pdo->prepare(
+                    "UPDATE zhl_booking_handover SET status = 'done', updated_at = ?
+                     WHERE reference_number = ? AND type = ? AND resource_id = ?"
+                );
+                $upd->execute([$now, $ref, $type, $resourceId]);
+            } elseif ($ref !== '') {
+                $upd = $pdo->prepare(
+                    "UPDATE zhl_booking_handover SET status = 'done', updated_at = ?
+                     WHERE reference_number = ? AND type = ?"
+                );
+                $upd->execute([$now, $ref, $type]);
             }
 
             $pdo->commit();

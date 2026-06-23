@@ -37,10 +37,9 @@ Frontpage/UX** + mehr Konfiguration. Details: [STRATEGY.md](STRATEGY.md).
 ## Offene Entscheidungen
 - Umfang UX-Vereinfachung (welche Ansichten für Standard-User verstecken?).
 - Wartungsfenster fürs Produktiv-Upgrade (UP-1 **vor** produktiver Config/UX).
-- **Cron fehlt (verifiziert!):** Im App-Container läuft **kein Cron** (kein cron-Binary,
-  keine LB-Job-Crontab). `sendreminders/sendwaitlist/sendmissedcheckin` werden aktuell
-  **nicht ausgeführt** → Reminder/Waitlist (QW-3/QW-4) brauchen erst einen **Job-Runner**
-  (Host-Cron, Sidecar-Container oder Web-Cron per URL). **Klärung mit Hoster nötig.**
+- **Cron-Runner gebaut** (`Web/zhl-cron.php`, lokal verifiziert): token-geschützter Web-Endpunkt
+  führt die LB-Jobs aus. **Offen:** (a) wo der externe Scheduler läuft (Gaming-PC/Mac/Dienst),
+  (b) Deploy-Zeitpunkt auf Live. Siehe [CRON-RUNBOOK.md](CRON-RUNBOOK.md).
 - F40-Betriebsprozess: Wer trägt Zertifikats-Gruppen ein/entzieht; Umgang mit bestehenden
   Buchungen bei Entzug/Ablauf (Gate wirkt nicht rückwirkend).
 

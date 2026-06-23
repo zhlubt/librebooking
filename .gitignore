@@ -92,3 +92,6 @@ docs/zhl/CREDENTIALS-LOCAL.md
 !/plugins/PostReservation/ZhlHandoverLink/*
 /config/zhl-cron.php
 /config/zhl-handover.php
+
+# ZHL: Zugangsdaten-Scratchpad (statt .env, das LB als Dotenv lädt)
+/.zhl-credentials

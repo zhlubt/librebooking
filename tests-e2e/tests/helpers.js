@@ -35,9 +35,23 @@ async function logout(page) {
 // Versucht eine Buchung und gibt die Antwort von reservation_save.php zurück.
 // Das Permission-Gate (F40) schlägt hier zu: nicht-berechtigte User bekommen
 // eine "permission"-Fehlermeldung, berechtigte kommen daran vorbei.
+// Setzt Beginn/Ende auf ein Datum in der Zukunft (flatpickr), damit der Slot nie
+// "in der Vergangenheit" liegt — sonst sind die Buchungstests von der Tageszeit abhängig.
+async function setFutureDate(page, daysAhead = 3) {
+  await page.evaluate((d) => {
+    const target = new Date();
+    target.setDate(target.getDate() + d);
+    for (const id of ['BeginDate', 'EndDate']) {
+      const el = document.getElementById(id);
+      if (el && el._flatpickr) el._flatpickr.setDate(target, true);
+    }
+  }, daysAhead);
+}
+
 async function attemptBooking(page, rid, sid) {
   await page.goto(`reservation.php?rid=${rid}&sid=${sid}`, { waitUntil: 'domcontentloaded' });
   await page.fill('#reservationTitle', 'E2E F40');
+  await setFutureDate(page);
   if (await page.locator('#BeginPeriod option').count() > 1) {
     await page.selectOption('#BeginPeriod', { index: 1 }).catch(() => {});
     await page.selectOption('#EndPeriod', { index: 2 }).catch(() => {});
@@ -58,6 +72,7 @@ async function completeBooking(page, rid, sid) {
   await page.goto(`reservation.php?rid=${rid}&sid=${sid}`, { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(1200); // Custom-Attribute laden per JS nach
   await page.fill('#reservationTitle', 'E2E Vollbuchung');
+  await setFutureDate(page);
   if (await page.locator('#BeginPeriod option').count() > 1) {
     await page.selectOption('#BeginPeriod', { index: 1 }).catch(() => {});
     await page.selectOption('#EndPeriod', { index: 2 }).catch(() => {});

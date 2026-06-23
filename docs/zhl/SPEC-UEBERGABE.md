@@ -125,10 +125,8 @@ Eintrag in `bookings` + iCal-Mail.
 ## 5. Phasen
 - **A — terminplaner-Anbindung** ersetzt die Freitext-Attribute (F16/F17/F8): Übergabe-
   Slot-Wahl (Pickup+Return) über terminplaner_ubt + Rollen (Hilfskraft primär/Team Backup) +
-  Rückmeldung in `zhl_booking_handover`. Größter Nutzen.
-  Teil-Tasks: (a) terminplaner-Erweiterung `handover_role` + Meeting-Type „Medienübergabe";
-  (b) ZHL-Slot-Auswahlseite + PreReservation-Plugin; (c) Migration der alten Attribute.
-- **B — QR-Checkliste + Zustand** (F10/F30).
+  Rückmeldung in `zhl_booking_handover`. **GEBAUT + live verifiziert.**
+- **B — QR-Checkliste + Zustand** (F10/F30). **GEBAUT (2026-06-23), siehe §8.**
 - **C — Overdue/Eskalation** (F34, braucht Cron-Runner).
 
 ## 6. Entscheidungen (ZHL, 2026-06-23)
@@ -185,3 +183,24 @@ produktiver Buchungs-Schreibpfad bleibt unverändert (CLAUDE.md-Disziplin: Prod 
 
 **Offen vor Prod:** Live-Cross-App-Test (terminplaner lokal nicht lauffähig); lokale Vendor-Assets
 für die Assistent-Seite statt CDN (Minor).
+
+## 8. Phase B — GEBAUT (2026-06-23): QR-Checkliste + Zustand (F10/F30)
+QR-verifizierte Aus-/Rückgabe mit Zubehör-Checkliste + Zustandserfassung. **Nur fürs ZHL-Team**
+(Admin-Rollen), nicht für User (Entscheidung §6). Schließt zugleich Codex' „keine Admin-/
+Betriebsansicht"-Lücke.
+- Migration `migrations/004_zhl_handover_check_ext.sql`: `zhl_handover_check_item.label`
+  (Snapshot/ad-hoc) + `zhl_handover_check.overall_condition`.
+- **`Web/zhl-handover-check.php`** (SecurePage, Admin-only): lädt das Ressourcen-Zubehör
+  (`resource_accessories ⋈ accessories`) als Checkliste (ok/fehlt/beschädigt + Notiz), erlaubt
+  ad-hoc-Positionen, erfasst Gesamtzustand + Zustandsnotiz + Unterschrift; schreibt
+  `zhl_handover_check` (+ `_item`) in einer Transaktion und setzt die Übergabe auf `done`.
+  **Eigene Seite, NICHT** der native QR-Router (der auf die Reservierung zeigt).
+- **`Web/zhl-handover-qr.php`** (Admin-only): erzeugt ZHL-eigenen QR (BaconQrCode `GDLibRenderer`)
+  → zeigt auf die Checkliste, nicht auf die Reservierung.
+- **`Web/zhl-handover-admin.php`** (Admin-only): Betriebsübersicht offener/terminierter/erledigter
+  Übergaben mit Links zu Checkliste + QR (Status-Filter).
+- Lokale Vendor-Assets (kein CDN). E2E `tests-e2e/handover-check.spec.js` **4/4** (User→403,
+  Render+Zubehör, Absenden→`done`, QR→PNG); Fixtures `seed-phase-b.sql`. **Suite 28/28.**
+
+**Offen (Phase B-Rest, optional):** Foto-Anhang zum Zustand; nativen Check-in/out zusätzlich
+auslösen; Seriennummern je Komponente (F30 tiefer).

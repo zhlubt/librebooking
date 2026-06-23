@@ -49,6 +49,13 @@ Frontpage/UX** + mehr Konfiguration. Details: [STRATEGY.md](STRATEGY.md).
 - Funde: siehe [ISSUES.md](ISSUES.md) (#1 script.url-Pfad/Redirect, #2 500 bei unautor. Admin-Zugriff).
 
 ## Changelog
+- 2026-06-23: **Übergabe-Modul Phase B gebaut** (QR-Checkliste + Zustand, F10/F30). Migration 004
+  (check_item.label + check.overall_condition). `Web/zhl-handover-check.php` (SecurePage, Admin-only):
+  Zubehör-Checkliste (ok/fehlt/beschädigt) + ad-hoc + Gesamtzustand + Unterschrift → schreibt
+  `zhl_handover_check(_item)`, setzt Übergabe `done`. `Web/zhl-handover-qr.php` (BaconQrCode → Checkliste,
+  NICHT Reservierung). `Web/zhl-handover-admin.php` (Betriebsübersicht, schließt Codex-Lücke).
+  E2E `handover-check.spec.js` **4/4**, Fixtures `seed-phase-b.sql`. **Suite 28/28** — dabei Buchungstests
+  robust gemacht (helpers `setFutureDate` via flatpickr → keine Tageszeit-Abhängigkeit mehr).
 - 2026-06-23: **Übergabe-Modul Phase A-Rest** (Auth + Verknüpfung). **Auth-Bindung** (Codex #1):
   `zhl-handover-select.php` jetzt `SecurePage` (Login-Redirect), Token an User gebunden
   (`zhl_handover_token`, Migration 003), fremde Token → 403, Sync nur POST+CSRF; Gate prüft

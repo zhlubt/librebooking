@@ -181,6 +181,38 @@ function zhl_handover_claim_token(string $token, int $userId, ?string $ref): boo
     return zhl_handover_token_owner($token) === $userId;
 }
 
+/** Strukturiertes Zubehör einer Ressource (resource_accessories ⋈ accessories). */
+function zhl_handover_resource_accessories(int $resourceId): array
+{
+    $stmt = zhl_handover_db()->prepare(
+        'SELECT a.accessory_id, a.accessory_name, ra.minimum_quantity, ra.maximum_quantity
+         FROM resource_accessories ra JOIN accessories a ON a.accessory_id = ra.accessory_id
+         WHERE ra.resource_id = ? ORDER BY a.accessory_name'
+    );
+    $stmt->execute([$resourceId]);
+    return $stmt->fetchAll();
+}
+
+/** Übergabe-Datensätze für die Admin-Übersicht (optional gefiltert nach Status). */
+function zhl_handover_list(?string $status = null): array
+{
+    $sql = "SELECT h.*, r.name AS resource_name,
+                   EXISTS(SELECT 1 FROM zhl_handover_check c
+                          WHERE c.type = h.type
+                            AND (c.reference_number = h.reference_number OR c.handover_token = h.handover_token)) AS has_check
+            FROM zhl_booking_handover h
+            LEFT JOIN resources r ON r.resource_id = h.resource_id";
+    $params = [];
+    if ($status !== null && in_array($status, ['requested', 'confirmed', 'done'], true)) {
+        $sql .= ' WHERE h.status = ?';
+        $params[] = $status;
+    }
+    $sql .= ' ORDER BY h.updated_at DESC, h.id DESC LIMIT 200';
+    $stmt = zhl_handover_db()->prepare($sql);
+    $stmt->execute($params);
+    return $stmt->fetchAll();
+}
+
 /** Aktueller Bestätigungsstatus eines Tokens aus der DB (ohne terminplaner-Aufruf). */
 function zhl_handover_status(string $token): array
 {

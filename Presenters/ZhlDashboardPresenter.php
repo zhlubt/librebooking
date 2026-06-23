@@ -9,6 +9,7 @@ require_once(ROOT_DIR . 'lib/Application/Schedule/namespace.php');
 require_once(ROOT_DIR . 'lib/Application/Attributes/namespace.php');
 require_once(ROOT_DIR . 'lib/Application/Reservation/namespace.php');
 require_once(ROOT_DIR . 'lib/Application/Zhl/ZhlAvailabilityService.php');
+require_once(ROOT_DIR . 'lib/Application/Zhl/ZhlBundleService.php');
 
 /**
  * Presenter der ZHL-Dashboard-Startseite (verfügbarkeit-first Raster).
@@ -55,6 +56,16 @@ class ZhlDashboardPresenter
         );
         $grid = $service->BuildGrid($user, $start, $days, $scheduleId, $search);
 
+        // Bundles: Verfügbarkeit aus dem VOLLEN Pool (unabhängig vom Kategorie-/Such-Filter des Rasters).
+        $fullPools = ($scheduleId === 0 && $search === '')
+            ? $grid['pools']
+            : $service->BuildGrid($user, $start, $days, 0, '')['pools'];
+        $typeFreeMap = [];
+        foreach ($fullPools as $pool) {
+            $typeFreeMap[$pool['type']] = $pool['free'];
+        }
+        $bundles = (new ZhlBundleService($db))->GetBundles($typeFreeMap);
+
         // Kategorien = Schedules, nur solche mit sichtbaren Geräten.
         $schedules = (new ScheduleRepository())->GetAll();
         $categories = [];
@@ -72,6 +83,7 @@ class ZhlDashboardPresenter
             'categories' => $categories,
             'rows' => $grid['rows'],
             'pools' => $grid['pools'],
+            'bundles' => $bundles,
             'activeSchedule' => $scheduleId,
             'search' => $search,
             'startInput' => $start->Format('Y-m-d'),

@@ -1,6 +1,6 @@
 # SPEC-UX-DASHBOARD — Neue Medienausleihe-Oberfläche
 
-> **Status:** Entwurf v0.4 (2026-06-23) · §7/§10/§11 eingearbeitet · **v1 + v2a gebaut + auf media deployt** (verfügbarkeit-first Raster + Geräte-Typ-Tags + Pools, read-only).
+> **Status:** Entwurf v0.4 (2026-06-23) · §7/§10/§11 eingearbeitet · **v1 + v2a + v2b gebaut + auf media deployt** (Raster + Tags/Pools + Bundle-Katalog mit Live-Verfügbarkeit, read-only).
 > **Grundlage:** Mock 3 „Dashboard" (`docs/zhl/mocks/3-dashboard.html`, live `https://media.zhl-ubt.de/Web/mocks/`).
 > **Optik:** zhl-studio Style Guide (UBT-Grün `#009260`), siehe Memory `zhl-studio-design-system`.
 > **Nordstern:** LibreBooking modernisieren — neue, einfachere UX (STRATEGY.md, Säule 3).
@@ -356,6 +356,13 @@ SINGLE_LINE, name-heuristischer Seed → 56/58 Geräte getaggt) dient gleichzeit
 Typen nativ über „Manage Resources". (Codex-Hinweis: für Bundles später stabile Typ-Referenz statt
 Anzeigetext.) Smoke gegen echte media-Daten: 15 Pools korrekt, Typ-Suche ok.
 
+**Stand v2b (gebaut + deployt):** Bundle-Katalog (`zhl_bundle`/`zhl_bundle_item`, Migration `007`) mit
+9 Start-Bundles aus den §6-Beispielen (Vlog/Vorlesung/Imagefilm/Profi-Film/VR/Podcast/Studio/Drohne/
+Insta360). Dashboard-Bereich „Vorhaben & Bundles" zeigt je Bundle die Komponenten (Typ×Menge,
+Pflicht/optional, Hinweis, Schwierigkeit) + **Live-Verfügbarkeit je Position** (aus dem Pool je Typ);
+`ZhlBundleService`: „verfügbar = alle Pflicht-Positionen erfüllbar". Buchung weiter über die konkreten
+Einzelgeräte (Trichter). Verifiziert: 9 Bundles, Mengen-Schwellen korrekt.
+
 **Nächste Schritte:** (1) eingeloggt ansehen (`https://media.zhl-ubt.de/Web/zhl-dashboard.php`);
-(2) v2b: **Bundles** (`zhl_bundle`/`zhl_bundle_item` + Admin-Pflege-UI, stabile Typ-Referenzen,
-Pool-Reservierung über mehrere Einzelgeräte); (3) v3: Vorhaben-Dialoge + Einweisungs-Stufen.
+(2) **v2c: Admin-Pflege-UI** für Bundles (CRUD) + stabile Typ-Referenz statt Freitext (Codex);
+(3) v3: Vorhaben-Dialoge (Assistent) + Einweisungs-Stufen + Sequenz/Räume.

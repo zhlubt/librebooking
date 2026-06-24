@@ -496,4 +496,18 @@ zeigt die ZHL-Seite die Anforderung als Info, ohne Slot-Picker.
 `vorlauf_toleranz_h` unterschreiten); Reihenfolge-Flow: Übergabetermin VOR Reservierungsabschluss
 abstimmen (Team-Verfügbarkeit Mo/Di vs. Ausleihe ab Do → Abholung muss früher).
 
+**ENTSCHEIDUNG 2026-06-24: „Erst Terminplaner abwarten".** Nutzer baut zuerst die Terminplaner-API
+(lesen + buchen), DANN baut Claude den eingebetteten Slot-Picker in einem Rutsch. Bis dahin ZHL-Bau pausiert.
+
+**API-Vertrag, an dem der Embedded-Slot-Picker andockt (Claude wartet darauf — meet-Workstream Nutzer):**
+1. **Slots lesen:** `GET /api/lesson_slots.php?type_label=<Label>&member_id=<id?>` mit `X-API-Key`.
+   Antwort wie `handover_slots.php`: `{status:'ok', members:[{member_id, member_name, type_id, type_label,
+   duration, slots:[{slot_id, start_utc, end_utc, label, book_url}]}]}`. SHK priorisiert; member optional.
+2. **Slot buchen (für „im Tool bleiben"):** `POST /api/book_slot.php` mit X-API-Key + Body
+   `{member_id, type_id, slot_id, name, email, note}` → `{status:'ok', booking_id}`. Ohne diesen
+   Write-Endpunkt nur Deep-Link (`book.php?member=&type=&slot=`) möglich (User verlässt das Tool kurz).
+   (Exaktes Format darf abweichen — Nutzer nennt es, Claude passt `Web/zhl-handover-lib.php` an.)
+Beim Wiedereinstieg: Slot-Picker auf `zhl-book.php` (liest Slots je `einfuehrung_typ`/`tp_member_id` aus
+`zhl_uebergabe`), Regel „Termin vor Ausleihstart, darf Vorlauf um `vorlauf_toleranz_h` unterschreiten".
+
 **Danach:** v3b-3 Seminarraum (vorerst nur „Wo aufnehmen?"-Hinweis) · v3b-4 Studio-Dialoge · stabile Typ-Referenz.

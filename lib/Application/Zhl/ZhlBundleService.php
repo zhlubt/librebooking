@@ -25,6 +25,9 @@ class ZhlBundleView
     public $useCase;
     public $difficulty;
     public $hint;
+    public $einweisungLevel = 'keine';   // keine|empfehlenswert|zwingend|beratung
+    public $einweisungText = '';
+    public $einweisungUrl = '';
     /** @var ZhlBundleItemView[] */
     public $items = [];
     public $available = true;   // alle Pflicht-Positionen erfüllbar
@@ -50,7 +53,8 @@ class ZhlBundleService
     {
         $bundles = [];
         $reader = $this->db->Query(new AdHocCommand(
-            'SELECT id, name, use_case, difficulty, hint FROM zhl_bundle WHERE active = 1 ORDER BY sort_order, name'
+            'SELECT id, name, use_case, difficulty, hint, einweisung_level, einweisung_text, einweisung_url ' .
+            'FROM zhl_bundle WHERE active = 1 ORDER BY sort_order, name'
         ));
         while ($row = $reader->GetRow()) {
             $b = new ZhlBundleView();
@@ -59,6 +63,9 @@ class ZhlBundleService
             $b->useCase = (string)($row['use_case'] ?? '');
             $b->difficulty = (string)$row['difficulty'];
             $b->hint = (string)($row['hint'] ?? '');
+            $b->einweisungLevel = (string)($row['einweisung_level'] ?? 'keine');
+            $b->einweisungText = (string)($row['einweisung_text'] ?? '');
+            $b->einweisungUrl = (string)($row['einweisung_url'] ?? '');
             $bundles[$b->id] = $b;
         }
         $reader->Free();

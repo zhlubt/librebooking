@@ -55,6 +55,31 @@
 
 			{if $Selected->hint}<p class="zhl-bundle-hint">💡 {$Selected->hint|escape}</p>{/if}
 
+			{if $Selected->einweisungLevel == 'zwingend'}
+				<div class="zhl-einw zwingend">
+					<div class="zhl-einw-head">🔒 Einweisung erforderlich</div>
+					<p class="zhl-einw-text">{$Selected->einweisungText|escape}</p>
+					<div class="zhl-einw-ways">
+						<span class="zhl-einw-way"><strong>A) Monatsseminar</strong> „Studio-Einführung" – 1× pro Monat.</span>
+						<span class="zhl-einw-way"><strong>B) Einzeltermin</strong> mit dem ZHL-Team vor Ort.</span>
+					</div>
+					{if $Selected->einweisungUrl}<a class="zhl-btn zhl-btn-sm" href="{$Selected->einweisungUrl|escape}" target="_blank" rel="noopener">Einweisungstermin buchen ▸</a>{/if}
+					<p class="zhl-einw-fine">Hinweis: Diese Voraussetzung wird beim Buchen noch nicht automatisch geprüft – bitte vorab klären.</p>
+				</div>
+			{elseif $Selected->einweisungLevel == 'empfehlenswert'}
+				<div class="zhl-einw empf">
+					<div class="zhl-einw-head">💡 Einweisung empfehlenswert</div>
+					<p class="zhl-einw-text">{$Selected->einweisungText|escape}</p>
+					{if $Selected->einweisungUrl}<a class="zhl-btn zhl-btn-sm zhl-btn-ghost" href="{$Selected->einweisungUrl|escape}" target="_blank" rel="noopener">Termin ansehen ▸</a>{/if}
+				</div>
+			{elseif $Selected->einweisungLevel == 'beratung'}
+				<div class="zhl-einw berat">
+					<div class="zhl-einw-head">🗣 Experten-Beratung empfohlen</div>
+					<p class="zhl-einw-text">{$Selected->einweisungText|escape}</p>
+					{if $Selected->einweisungUrl}<a class="zhl-btn zhl-btn-sm zhl-btn-ghost" href="{$Selected->einweisungUrl|escape}" target="_blank" rel="noopener">Beratungstermin anfragen ▸</a>{/if}
+				</div>
+			{/if}
+
 			<h3 class="zhl-h3" style="margin-top:6px;">Das gehört dazu</h3>
 			<ul class="zhl-bundle-items">
 				{foreach from=$Selected->items item=it}
@@ -93,6 +118,9 @@
 					</div>
 					<div class="zhl-goal-foot">
 						{if $b->available}<span class="zhl-badge free">verfügbar</span>{else}<span class="zhl-badge full">nicht komplett frei</span>{/if}
+						{if $b->einweisungLevel == 'zwingend'}<span class="zhl-chip zwingend">🔒 Einweisung</span>
+						{elseif $b->einweisungLevel == 'empfehlenswert'}<span class="zhl-chip empf">💡 Einweisung</span>
+						{elseif $b->einweisungLevel == 'beratung'}<span class="zhl-chip berat">🗣 Beratung</span>{/if}
 						<span class="zhl-goal-go">wählen ▸</span>
 					</div>
 				</a>

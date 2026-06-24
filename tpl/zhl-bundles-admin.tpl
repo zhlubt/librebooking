@@ -30,7 +30,14 @@
 					</select>
 				</div>
 				<div class="col-md-2"><label class="form-label">Reihenfolge</label><input class="form-control" type="number" name="sort_order" value="0"></div>
-				<div class="col-12"><label class="form-label">Hinweis</label><input class="form-control" name="hint" placeholder="z. B. Einweisung zwingend / Folien-Tipp"></div>
+				<div class="col-12"><label class="form-label">Hinweis</label><input class="form-control" name="hint" placeholder="z. B. Folien-Tipp"></div>
+				<div class="col-md-3"><label class="form-label">Einweisung</label>
+					<select class="form-select" name="einweisung_level">
+						{foreach from=$EinweisungLevels item=l}<option value="{$l}">{$l}</option>{/foreach}
+					</select>
+				</div>
+				<div class="col-md-9"><label class="form-label">Einweisungs-Link (optional)</label><input class="form-control" name="einweisung_url" placeholder="https://… Termin-/Seminar-Link"></div>
+				<div class="col-12"><label class="form-label">Einweisungs-Text</label><input class="form-control" name="einweisung_text" placeholder="z. B. Vor dem Studio ist eine Einführung zwingend …"></div>
 				<div class="col-12"><button class="btn btn-primary">Bundle anlegen</button></div>
 			</form>
 		</div>
@@ -58,6 +65,13 @@
 					</div>
 					<div class="col-md-2"><label class="form-label">Reihenfolge</label><input class="form-control" type="number" name="sort_order" value="{$bundle.sort_order}"></div>
 					<div class="col-12"><label class="form-label">Hinweis</label><input class="form-control" name="hint" value="{$bundle.hint|escape}"></div>
+					<div class="col-md-3"><label class="form-label">Einweisung</label>
+						<select class="form-select" name="einweisung_level">
+							{foreach from=$EinweisungLevels item=l}<option value="{$l}" {if $bundle.einweisung_level == $l}selected{/if}>{$l}</option>{/foreach}
+						</select>
+					</div>
+					<div class="col-md-9"><label class="form-label">Einweisungs-Link (optional)</label><input class="form-control" name="einweisung_url" value="{$bundle.einweisung_url|escape}" placeholder="https://…"></div>
+					<div class="col-12"><label class="form-label">Einweisungs-Text</label><input class="form-control" name="einweisung_text" value="{$bundle.einweisung_text|escape}"></div>
 					<div class="col-12 d-flex gap-2">
 						<button class="btn btn-primary btn-sm">Speichern</button>
 					</div>

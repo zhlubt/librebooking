@@ -374,6 +374,23 @@ Einzelgeräte (Trichter). Verifiziert: 9 Bundles, Mengen-Schwellen korrekt.
 - **Theming** `Web/css/zhl-theme.css` (global via `css.extension.file`): zhl-studio-Look für alle
   nativen Seiten (Font, BG, Navbar, Cards, Grün-Gradient-Buttons, Inputs, Alerts, Login) — rein CSS.
 
-**Nächste Schritte:** (1) eingeloggt visuell abnehmen; (2) **v3b**: Einweisungs-Stufen erzwingen
-(zwingend/empfehlenswert/Beratung), Räume (Seminarraum), Sequenz (Video→Schnitt), echte
-Vorhaben-Dialoge mit Verzweigung (Personenzahl/Folien etc.); (3) stabile Typ-Referenz statt Freitext.
+**Stand v3b-1 (gebaut + deployt 2026-06-24):** Einweisungs-Stufen je Bundle (Migration `008`:
+`einweisung_level`/`_text`/`_url`, VARCHAR+Whitelist statt ENUM auf Codex-Rat). Drei Stufen mit eigener
+Assistent-UI: **zwingend** = rotes Gate (zwei Wege Monatsseminar/Einzeltermin + optionaler Termin-Link),
+**empfehlenswert** = gelber Hinweis (blockt nie), **beratung** = blaues Experten-Angebot; Chips schon auf
+den Vorhaben-Karten. Admin-CRUD pflegt alle drei Felder. **Bewusst Trichter-Hinweis, KEIN hartes
+Permission-Gate** (Codex): UI sagt explizit „wird beim Buchen noch nicht automatisch geprüft". Seed:
+Studio/Drohne→zwingend, Podcast→empfehlenswert, Insta360→beratung. Backup vor Migration via
+`*__bak008`-Snapshots + Text-Dump. Smoke: 9 Bundles, 4 Stufen korrekt, Seiten 302, keine Log-Fehler.
+
+**Codex-Gate v3b (2026-06-24):** bundle-level Einweisung als Trichter-Kompromiss ok (nicht wie techn.
+Sperre auftreten lassen — umgesetzt); VARCHAR>ENUM; Migration vor UI deployen; **Seminarraum NICHT per
+Roh-SQL** anlegen (autoassign-INSERT erzeugt keine Permissions via `AutoAssignResourcePermissionsCommand`
++ Pooling braucht `custom_attribute_values`-Eintrag) → **über native Admin-UI**, danach SQL nur lesen;
+Sequenz/Raum als begrenzte Bundle-Flags ok, Raumziele über Resource-ID (nicht Name); „nötiger Laptop"
+vs. getrennte optionale Buchung sauber formulieren; `type_label`-Freitext bleibt größte Integritätslücke.
+
+**Nächste Schritte:** (1) v3b-1 eingeloggt visuell abnehmen; (2) **v3b-2** Sequenz Video→Schnitt
+(Folge-Buchung Schnitt-/VR-PC, optional); (3) **v3b-3** Seminarraum **via Admin-UI** anlegen + „Wo willst
+du aufnehmen?"; (4) **v3b-4** verzweigte Studio-Dialoge (Personenzahl→Mikros, Folien→Laptop); (5) stabile
+Typ-Referenz (Geräte-Typ → SELECT_LIST).

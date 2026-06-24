@@ -174,3 +174,26 @@
 .zhl-dash .zhl-goal-card.is-unavail { border-top-color: var(--border); }
 .zhl-dash .zhl-goal-foot { display: flex; align-items: center; justify-content: space-between; }
 .zhl-dash .zhl-goal-go { font-size: 14px; font-weight: 600; color: var(--zg); }
+
+/* v3b — Einweisungs-Stufen (Gate/Hinweis im Assistenten) */
+.zhl-dash .zhl-einw { border-radius: 10px; padding: 12px 14px; margin: 4px 0 2px; border: 1px solid var(--border); }
+.zhl-dash .zhl-einw-head { font-weight: 700; font-size: 14px; margin-bottom: 4px; }
+.zhl-dash .zhl-einw-text { font-size: 13px; margin: 0 0 6px; color: var(--text2); }
+.zhl-dash .zhl-einw-ways { display: flex; flex-direction: column; gap: 2px; font-size: 12.5px; color: var(--text2); margin-bottom: 8px; }
+.zhl-dash .zhl-einw-fine { font-size: 11.5px; color: var(--muted); margin: 8px 0 0; font-style: italic; }
+.zhl-dash .zhl-einw.zwingend { background: #fef2f2; border-color: #fecaca; }
+.zhl-dash .zhl-einw.zwingend .zhl-einw-head { color: #991b1b; }
+.zhl-dash .zhl-einw.empf { background: #fffbeb; border-color: #fde68a; }
+.zhl-dash .zhl-einw.empf .zhl-einw-head { color: #92400e; }
+.zhl-dash .zhl-einw.berat { background: #eff6ff; border-color: #bfdbfe; }
+.zhl-dash .zhl-einw.berat .zhl-einw-head { color: #1e40af; }
+
+/* Kleine Einweisungs-Chips auf den Vorhaben-Karten */
+.zhl-dash .zhl-chip { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 20px; white-space: nowrap; }
+.zhl-dash .zhl-chip.zwingend { background: #fef2f2; color: #991b1b; }
+.zhl-dash .zhl-chip.empf { background: #fffbeb; color: #92400e; }
+.zhl-dash .zhl-chip.berat { background: #eff6ff; color: #1e40af; }
+
+/* Ghost-Button (sekundäre Einweisungs-CTAs) */
+.zhl-dash .zhl-btn-ghost { background: transparent; color: var(--zg-d); border: 1px solid var(--border); }
+.zhl-dash .zhl-btn-ghost:hover { background: var(--bg-soft); }

@@ -52,6 +52,11 @@ class ZhlBundlesAdminPage extends SecurePage implements IZhlBundlesAdminPage
     {
         $this->Set('Difficulties', $difficulties);
     }
+
+    public function SetEinweisungLevels($levels)
+    {
+        $this->Set('EinweisungLevels', $levels);
+    }
 }
 
 interface IZhlBundlesAdminPage
@@ -59,4 +64,5 @@ interface IZhlBundlesAdminPage
     public function SetBundles($bundles);
     public function SetKnownTypes($types);
     public function SetDifficulties($difficulties);
+    public function SetEinweisungLevels($levels);
 }

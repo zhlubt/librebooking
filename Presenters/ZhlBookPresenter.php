@@ -249,6 +249,12 @@ class ZhlBookPresenter
         $ids = [$resourceId];
         $out = [];
         foreach ($svc->GetByCategory(CustomAttributeCategory::RESERVATION) as $a) {
+            // ZHL-Buchungsseite zeigt bewusst NUR Pflichtfelder (z. B. Haftpflicht). Optionale
+            // Attribute (Language, „Einführung gewünscht?") verwirren hier — die Einführung regelt
+            // bereits der Slot-Picker. So bleibt das Formular schlank.
+            if (!$a->Required()) {
+                continue;
+            }
             if (($a->UniquePerEntity() && count(array_intersect($ids, $a->EntityIds())) == 0) ||
                 ($a->HasSecondaryEntities() && count(array_intersect($ids, $a->SecondaryEntityIds())) == 0)) {
                 continue;

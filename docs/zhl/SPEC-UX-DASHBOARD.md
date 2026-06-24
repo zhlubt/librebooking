@@ -528,6 +528,18 @@ gezeigt (User bleibt im Tool). Logik in ZhlBookPresenter:
 Verifiziert: Picker zeigt 12 echte Slots (Typ 33 Videostudio), Gate blockt ohne Slot, 409-Pfad sauber.
 Happy-Path (echter Slot) bewusst vom Nutzer live zu testen (legt echten Termin + Mail an).
 
+**Stand v-cert — Benanntes Zertifikat-System (gebaut + deployt + verifiziert 2026-06-24):** Migration `011`
+(`zhl_cert_type`, `zhl_cert_type_resource` = pflegbare Liste „Medium↔Zertifikat", `zhl_cert_grant` =
+Nutzer-Zuweisung mit optionalem Ablauf). 6 Typen geseedet (Videostudio/Pocket 6K/Sony ZV1/Drohne/Insta360
++ migrierter Schnitt-/VR-PC). **Bestehende F40-Grants reverse-migriert.** **Projektion:** nach jeder
+Änderung wird `zhl_certificate` aus den Grants neu aufgebaut (`RebuildProjection`) — so lesen mein
+Einführungs-Gate (`userIsCertified`) UND das native F40-Plugin unverändert weiter (kein Gate-Code geändert,
+„migrieren statt umbauen"). Admin-UI `Web/zhl-certificates-admin.php` (admin-only, POST+CSRF+PRG):
+Zertifikate anlegen/umbenennen/verbergen/löschen, Geräte zuordnen/entfernen, Nutzer zuweisen (E-Mail/
+Benutzername/ID + Ablaufdatum)/widerrufen. Dashboard-Link „🎓 Zertifikate". E2E verifiziert: 6 Typen
+rendern, grant→Projektion (certuser bekam res37) → revoke→Projektion sauber. Wer Zertifikat hat, bucht
+das Material ohne Einführungstermin (Gate zeigt „✓ bereits eingeführt"); **Abholung bleibt nötig**.
+
 **Noch offen (v-book-3):** Abholung-Slot-Picker (Typ 32 Medienübergabe) analog zur Einführung;
 Vorlauf-Toleranz (`vorlauf_toleranz_h`, 48h) — Konflikt mit nativer min_notice für Nicht-Admins, eigene
 Entscheidung nötig (min_notice senken vs. Bypass); Re-Render verliert aktuell Eingaben beim „Termine

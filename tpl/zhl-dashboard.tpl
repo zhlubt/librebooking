@@ -9,7 +9,7 @@
 			<h1 class="zhl-h1">Geräte einzeln buchen</h1>
 			<p class="zhl-sub">Wähle eine Kategorie und einen Zeitraum — du siehst sofort, welche Geräte frei sind. <span class="zhl-muted">({$TotalVisible} Geräte für dich sichtbar)</span></p>
 		</div>
-		{if $IsAdmin}<div><a class="zhl-btn zhl-btn-sm" href="{$Path}zhl-bundles-admin.php">⚙ Bundles verwalten</a></div>{/if}
+		{if $IsAdmin}<div class="d-flex gap-2"><a class="zhl-btn zhl-btn-sm" href="{$Path}zhl-bundles-admin.php">⚙ Bundles</a><a class="zhl-btn zhl-btn-sm" href="{$Path}zhl-certificates-admin.php">🎓 Zertifikate</a></div>{/if}
 	</div>
 
 	<nav class="zhl-modenav">

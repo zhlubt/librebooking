@@ -22,9 +22,10 @@
 			<form method="post" action="{$Path}zhl-certificates-admin.php" class="row g-2 align-items-end">
 				{csrf_token}
 				<input type="hidden" name="action" value="create_type">
-				<div class="col-md-8"><label class="form-label">Name</label><input class="form-control" name="name" placeholder="z. B. Einführung in Drohne" required></div>
+				<div class="col-md-6"><label class="form-label">Name</label><input class="form-control" name="name" placeholder="z. B. Einführung in Drohne" required></div>
+				<div class="col-md-4"><label class="form-label">Bestätigungs-Mail (Einweiser)</label><input class="form-control" type="email" name="confirm_email" placeholder="optional — erhält den Bestätigungs-Link"></div>
 				<div class="col-md-2"><label class="form-label">Reihenfolge</label><input class="form-control" type="number" name="sort_order" value="0"></div>
-				<div class="col-md-2"><button class="btn btn-primary w-100">Anlegen</button></div>
+				<div class="col-12"><button class="btn btn-primary">Anlegen</button></div>
 			</form>
 		</div>
 	</div>
@@ -42,8 +43,9 @@
 					{csrf_token}
 					<input type="hidden" name="action" value="update_type">
 					<input type="hidden" name="type_id" value="{$t.id}">
-					<div class="col-md-8"><label class="form-label">Name</label><input class="form-control" name="name" value="{$t.name|escape}"></div>
-					<div class="col-md-2"><label class="form-label">Reihenfolge</label><input class="form-control" type="number" name="sort_order" value="{$t.sort_order}"></div>
+					<div class="col-md-5"><label class="form-label">Name</label><input class="form-control" name="name" value="{$t.name|escape}"></div>
+					<div class="col-md-4"><label class="form-label">Bestätigungs-Mail (Einweiser)</label><input class="form-control" type="email" name="confirm_email" value="{$t.confirm_email|escape}" placeholder="optional"></div>
+					<div class="col-md-1"><label class="form-label">Reihenf.</label><input class="form-control" type="number" name="sort_order" value="{$t.sort_order}"></div>
 					<div class="col-md-2"><button class="btn btn-outline-primary w-100">Speichern</button></div>
 				</form>
 

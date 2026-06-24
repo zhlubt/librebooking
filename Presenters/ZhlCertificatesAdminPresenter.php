@@ -33,9 +33,10 @@ class ZhlCertificatesAdminPresenter
                 if ($name === '') {
                     return 'Name fehlt — Zertifikat nicht angelegt.';
                 }
-                $cmd = new AdHocCommand('INSERT INTO zhl_cert_type (name, active, sort_order) VALUES (@n,1,@s)');
+                $cmd = new AdHocCommand('INSERT INTO zhl_cert_type (name, active, sort_order, confirm_email) VALUES (@n,1,@s,@ce)');
                 $cmd->AddParameter(new Parameter('@n', $name));
                 $cmd->AddParameter(new Parameter('@s', $this->int($this->post('sort_order'), 0, 0, 9999)));
+                $cmd->AddParameter(new Parameter('@ce', trim($this->post('confirm_email')) ?: null));
                 $db->Execute($cmd);
                 return 'Zertifikat „' . $name . '" angelegt.';
 
@@ -45,9 +46,10 @@ class ZhlCertificatesAdminPresenter
                 if (!$id || $name === '') {
                     return 'Ungültige Eingabe.';
                 }
-                $cmd = new AdHocCommand('UPDATE zhl_cert_type SET name=@n, sort_order=@s WHERE id=@id');
+                $cmd = new AdHocCommand('UPDATE zhl_cert_type SET name=@n, sort_order=@s, confirm_email=@ce WHERE id=@id');
                 $cmd->AddParameter(new Parameter('@n', $name));
                 $cmd->AddParameter(new Parameter('@s', $this->int($this->post('sort_order'), 0, 0, 9999)));
+                $cmd->AddParameter(new Parameter('@ce', trim($this->post('confirm_email')) ?: null));
                 $cmd->AddParameter(new Parameter('@id', $id));
                 $db->Execute($cmd);
                 return 'Zertifikat gespeichert.';
@@ -151,7 +153,7 @@ class ZhlCertificatesAdminPresenter
         $db = ServiceLocator::GetDatabase();
 
         $types = [];
-        $reader = $db->Query(new AdHocCommand('SELECT id, name, active, sort_order FROM zhl_cert_type ORDER BY sort_order, name'));
+        $reader = $db->Query(new AdHocCommand('SELECT id, name, active, sort_order, confirm_email FROM zhl_cert_type ORDER BY sort_order, name'));
         while ($row = $reader->GetRow()) {
             $row['resources'] = [];
             $row['grants'] = [];

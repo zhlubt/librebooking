@@ -540,7 +540,21 @@ Benutzername/ID + Ablaufdatum)/widerrufen. Dashboard-Link „🎓 Zertifikate". 
 rendern, grant→Projektion (certuser bekam res37) → revoke→Projektion sauber. Wer Zertifikat hat, bucht
 das Material ohne Einführungstermin (Gate zeigt „✓ bereits eingeführt"); **Abholung bleibt nötig**.
 
+**Stand v-book-4..6 + Mail (gebaut + deployt + verifiziert 2026-06-24):**
+- **Absender:** media `config.php` SMTP gesetzt (mail.myubt.de:587, zhl.seminarmanagement@uni-bayreuth.de),
+  Connect+Auth verifiziert. Backup der config.php auf media.
+- **Studio-Migration:** bestehende Videostudio-Bucher bekommen automatisch das Videostudio-Zertifikat.
+- **Buchungs-Vorschläge (Migration 012 `booking_mode`):** zhl-book.php zeigt anklickbare Termin-Vorschläge
+  statt Datumsfelder — Tag-Chips+Dauer (Tagesmodus) bzw. Tag-Auswahl+2h-Slot-Chips (Slotmodus, Videostudio,
+  Slots aus Schedule-Perioden). Tageszeiten an Schedule-Grenzen ausgerichtet. E2E getestet (beide Modi).
+- **Dashboard-Vorschau:** Raster-Fenster von Ausleihdauer entkoppelt (min 7, Default 14 Tage), Vorlauf gelb
+  → frei grün; „Tage"→„Vorschau".
+- **Zertifikat-Bestätigung (Migration 013):** nach gebuchter Einführung wird eine offene Bestätigung
+  angelegt; Einweiser-Mail (confirm_email je Zertifikatstyp) mit Token-Link → `Web/zhl-cert-confirm.php`
+  („Ja" → Zertifikat-Grant + Projektion). E2E verifiziert (Ja→Grant→confirmed). Admin pflegt confirm_email.
+
 **Noch offen (v-book-3):** Abholung-Slot-Picker (Typ 32 Medienübergabe) analog zur Einführung;
+„Offene Bestätigungen"-Liste + manueller Confirm in der Zertifikat-Admin (bisher nur per Mail-Link);
 Vorlauf-Toleranz (`vorlauf_toleranz_h`, 48h) — Konflikt mit nativer min_notice für Nicht-Admins, eigene
 Entscheidung nötig (min_notice senken vs. Bypass); Re-Render verliert aktuell Eingaben beim „Termine
 aktualisieren"-Reload; Admin-UI für `zhl_uebergabe`.

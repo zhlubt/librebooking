@@ -134,6 +134,8 @@ class ZhlBookPresenter
             }
             $einfBooked = true;
             $desc .= ' · Einführung gebucht (' . (string)$ueb['einfuehrung_typ'] . ', #' . (string)($book['booking_id'] ?? '') . ')';
+            // Bestätigungs-Workflow: Einweiser bestätigt nach dem Termin → Zertifikat (US-16/F40).
+            $this->createCertConfirmation($db, (int)$user->UserId, $rid);
         }
 
         $facade = new ZhlReservationFacade($user->UserId, $rid, $titel, $desc, $beginDate, $beginTime, $endDate, $endTime, $facadeAttrs);
@@ -538,6 +540,90 @@ class ZhlBookPresenter
             $out['earliestLabel'] = Date::Parse($earliest, 'UTC')->ToTimezone($tz)->Format('d.m.Y, H:i') . ' Uhr';
         }
         return $out;
+    }
+
+    /**
+     * Nach gebuchter Einführung: offene Bestätigung anlegen (Einweiser bestätigt später → Zertifikat).
+     * Mappt das Gerät auf den passenden Zertifikatstyp; mailt den Bestätigungs-Link, falls am Typ
+     * eine confirm_email hinterlegt ist.
+     */
+    private function createCertConfirmation($db, int $userId, int $rid): void
+    {
+        $cmd = new AdHocCommand('SELECT t.id, t.name, t.confirm_email FROM zhl_cert_type_resource ctr JOIN zhl_cert_type t ON t.id = ctr.cert_type_id WHERE ctr.resource_id = @r AND t.active = 1 ORDER BY t.id LIMIT 1');
+        $cmd->AddParameter(new Parameter('@r', $rid));
+        $reader = $db->Query($cmd);
+        $row = $reader->GetRow();
+        $reader->Free();
+        if (!$row) {
+            return;
+        }
+        $ctid = (int)$row['id'];
+
+        $chk = new AdHocCommand('SELECT token FROM zhl_cert_confirmation WHERE user_id = @u AND cert_type_id = @t AND status = @s LIMIT 1');
+        $chk->AddParameter(new Parameter('@u', $userId));
+        $chk->AddParameter(new Parameter('@t', $ctid));
+        $chk->AddParameter(new Parameter('@s', 'pending'));
+        $r2 = $db->Query($chk);
+        $exists = $r2->GetRow();
+        $r2->Free();
+
+        if ($exists) {
+            $token = (string)$exists['token'];
+        } else {
+            $token = bin2hex(random_bytes(16));
+            $ins = new AdHocCommand('INSERT INTO zhl_cert_confirmation (token, user_id, cert_type_id, resource_id, status, created_at) VALUES (@tok,@u,@t,@r,@s,@now)');
+            $ins->AddParameter(new Parameter('@tok', $token));
+            $ins->AddParameter(new Parameter('@u', $userId));
+            $ins->AddParameter(new Parameter('@t', $ctid));
+            $ins->AddParameter(new Parameter('@r', $rid));
+            $ins->AddParameter(new Parameter('@s', 'pending'));
+            $ins->AddParameter(new Parameter('@now', gmdate('Y-m-d H:i:s')));
+            $db->Execute($ins);
+        }
+
+        $confirmEmail = trim((string)($row['confirm_email'] ?? ''));
+        if ($confirmEmail !== '') {
+            $this->sendConfirmationMail($confirmEmail, (string)$row['name'], $token);
+        }
+    }
+
+    private function sendConfirmationMail(string $to, string $certName, string $token): void
+    {
+        try {
+            $auto = ROOT_DIR . 'vendor/autoload.php';
+            if (!is_readable($auto)) {
+                return;
+            }
+            require_once($auto);
+            $cls = 'PHPMailer\\PHPMailer\\PHPMailer';
+            if (!class_exists($cls)) {
+                return;
+            }
+            $conf = include(ROOT_DIR . 'config/config.php');
+            $p = $conf['settings']['phpmailer'];
+            $em = $conf['settings']['email'];
+            $host = $_SERVER['HTTP_HOST'] ?? 'media.zhl-ubt.de';
+            $link = 'https://' . $host . '/Web/zhl-cert-confirm.php?t=' . $token;
+            $mail = new $cls(false);
+            $mail->isSMTP();
+            $mail->Host = $p['smtp.host'];
+            $mail->Port = (int)$p['smtp.port'];
+            $mail->SMTPAuth = true;
+            $mail->Username = $p['smtp.username'];
+            $mail->Password = $p['smtp.password'];
+            $mail->SMTPSecure = 'tls';
+            $mail->CharSet = 'UTF-8';
+            $mail->setFrom($em['default.from.address'], $em['default.from.name']);
+            $mail->addAddress($to);
+            $mail->Subject = 'Einführung bestätigen: ' . $certName;
+            $mail->isHTML(true);
+            $mail->Body = '<p>Eine Einführung wurde gebucht. Bitte bestätige <em>nach</em> dem Termin, ob die Person die Einführung „' . htmlspecialchars($certName) . '" erfolgreich absolviert hat:</p>'
+                . '<p><a href="' . htmlspecialchars($link) . '" style="display:inline-block;background:#009260;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;">Einführung bestätigen</a></p>'
+                . '<p style="color:#888;font-size:13px;">Mit „Ja" erhält die Person automatisch das passende Zertifikat und kann das Material selbstständig buchen.</p>';
+            $mail->send();
+        } catch (Throwable $e) {
+            Log::Error('ZHL cert-confirm mail: %s', $e->getMessage());
+        }
     }
 
     /** F40: hat der Nutzer ein gültiges Einführungs-Zertifikat für dieses Gerät? */

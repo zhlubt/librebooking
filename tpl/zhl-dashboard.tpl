@@ -110,7 +110,7 @@
 						<div class="zhl-card-foot">
 							{if $row->anyFree}
 								<span class="zhl-muted zhl-small">Nächster freier Tag: {$row->nextFreeLabel}</span>
-								<a class="zhl-btn zhl-btn-sm" href="{$Path}reservation.php?rid={$row->id}&amp;sid={$row->scheduleId}&amp;rd={$StartInput}">Buchen ▸</a>
+								<a class="zhl-btn zhl-btn-sm" href="{$Path}zhl-book.php?rid={$row->id}&amp;sid={$row->scheduleId}&amp;rd={$StartInput}">Buchen ▸</a>
 							{elseif $row->minNoticeDays > 0}
 								<span class="zhl-muted zhl-small">Erst ab {$row->earliestLabel} buchbar (Vorlauf {$row->minNoticeDays} Tage)</span>
 							{else}

@@ -421,5 +421,20 @@ Zeitraum-Wahl **und Auswahl Abholung vs. Einführung**. Recherche (2 Agenten) er
   PreReservation-Gate `plugins/PreReservation/ZhlHandover` blockt ohne bestätigte Übergabe,
   PostReservation `ZhlHandoverLink` trägt die Ref nach. „Einführung" = neue `type`-Variante ergänzen.
 
-**Danach offen:** v3b-3 Seminarraum (erstmal ohne echten Raum: nur „Wo aufnehmen?"-Hinweis) · v3b-4
-verzweigte Studio-Dialoge · stabile Typ-Referenz (Geräte-Typ → SELECT_LIST).
+**Entscheidung Buchungs-Epic (2026-06-24):** Nutzer wählt **(1) vollen Ersatz mit eigenem Write** und
+**(2) Abholung + Einführung beide echt** ans Übergabe-Modul verdrahten (inkl. neuem „Einführung"/training-Typ).
+
+**Stand v-book-1 (gebaut + deployt 2026-06-24, Anzeige-Stufe):** Neue ZHL-Buchungsseite
+`Web/zhl-book.php` + `Pages/ZhlBookPage.php` + `Presenters/ZhlBookPresenter.php` + `tpl/zhl-book.tpl`
+(SecurePage, HideNavBar, zhl-studio-Optik). Dashboard-„Buchen" führt jetzt hierher (statt direkt
+reservation.php). Zeigt Gerät (Laien-Tag+Modell+Kategorie), Zeitraum-Form (Datum/Zeit), Vorlauf/frühesten
+Start (Default-Datum wird nie vor frühesten Start gesetzt), und die Auswahl **📦 Abholung / 🎓 Einführung**.
+CSRF im Formular vorbereitet. Permission-geprüft (ungültige rid → Redirect Dashboard). Render-verifiziert.
+**Interim:** „Weiter" führt vorerst noch an native `reservation.php` (klar beschriftet) — wird in v-book-2
+durch eigenen Write ersetzt.
+
+**Nächste Schritte (Buchungs-Epic):** **v-book-2** eigener Write über Facade→`ReservationPresenterFactory`
+→ nativer `ReservationHandler` (Codex-Review des Schreibwegs läuft, Crash-/Pflichtfeld-Risiken klären);
+**v-book-3** Abholung/Einführung echt mit `zhl_booking_handover`+terminplaner verdrahten (neuer
+training-Typ). **Danach:** v3b-3 Seminarraum (vorerst nur „Wo aufnehmen?"-Hinweis) · v3b-4 Studio-Dialoge
+· stabile Typ-Referenz.

@@ -20,11 +20,13 @@ class ZhlResourceAvailabilityRow
     /** @var string */ public $name;          // Modell-/Inventarname (z. B. "DJI mic 1")
     /** @var string|null */ public $type = null; // Laien-Tag / Geräte-Typ (z. B. "Funkmikrofon")
     /** @var int */    public $scheduleId;
-    /** @var array[] */ public $days = [];     // [{label, weekday, date, free}]
+    /** @var array[] */ public $days = [];     // [{label, weekday, date, free, state}] state: free|busy|vorlauf
     /** @var int */    public $freeCount = 0;
     /** @var int */    public $totalDays = 0;
     /** @var bool */   public $anyFree = false;
     /** @var string|null */ public $nextFreeLabel = null;
+    /** @var int */    public $minNoticeDays = 0;          // Vorlauf in (aufgerundeten) Tagen, 0 = keiner
+    /** @var string|null */ public $earliestLabel = null;  // frühester buchbarer Tag (US-17), z. B. „27.06.2026"
 }
 
 class ZhlAvailabilityService
@@ -95,6 +97,8 @@ class ZhlAvailabilityService
 
         $end = $start->AddDays($days);
         $items = empty($resourceIds) ? [] : $this->availability->GetItemsBetween($start, $end, $resourceIds);
+        // Vorlaufzeit je Ressource (native min_notice_time_add, in SEKUNDEN) → frühester buchbarer Tag (US-17).
+        $noticeMap = empty($resourceIds) ? [] : $this->GetMinNoticeMap($resourceIds);
 
         // Belegung je Ressource indexieren — Interface-Methoden gelten für Reservierung UND Blackout.
         $byResource = [];
@@ -111,6 +115,16 @@ class ZhlAvailabilityService
             $row->scheduleId = (int)$r->ScheduleId;
             $row->totalDays = $days;
 
+            // Vorlauf: frühester buchbarer Tag = heute + min_notice_time_add (exakt wie native Rule).
+            $noticeSec = (int)($noticeMap[(int)$r->GetId()] ?? 0);
+            $earliestDateStr = null;
+            if ($noticeSec > 0) {
+                $earliestLocal = Date::Now()->ApplyDifference(TimeInterval::Parse($noticeSec)->Interval())->ToTimezone($tz);
+                $earliestDateStr = $earliestLocal->Format('Y-m-d');
+                $row->minNoticeDays = (int)ceil($noticeSec / 86400);
+                $row->earliestLabel = $earliestLocal->Format('d.m.Y');
+            }
+
             $resItems = $byResource[$r->GetId()] ?? [];
             for ($d = 0; $d < $days; $d++) {
                 $dayStart = $start->AddDays($d);
@@ -123,15 +137,20 @@ class ZhlAvailabilityService
                         break;
                     }
                 }
-                $free = !$busy;
 
                 $localDay = $dayStart->ToTimezone($tz);
+                $dayDateStr = $localDay->Format('Y-m-d');
+                $vorlauf = ($earliestDateStr !== null && $dayDateStr < $earliestDateStr);
+                $state = $busy ? 'busy' : ($vorlauf ? 'vorlauf' : 'free');
+                $free = ($state === 'free');
+
                 $weekday = self::WEEKDAYS[(int)$localDay->Format('N')] ?? '';
                 $row->days[] = [
                     'label' => $localDay->Format('d.m.'),
                     'weekday' => $weekday,
-                    'date' => $localDay->Format('Y-m-d'),
+                    'date' => $dayDateStr,
                     'free' => $free,
+                    'state' => $state,
                 ];
                 if ($free) {
                     $row->freeCount++;
@@ -179,6 +198,33 @@ class ZhlAvailabilityService
             return $b['total'] <=> $a['total'] ?: strcmp($a['type'], $b['type']);
         });
         return $list;
+    }
+
+    /**
+     * Vorlaufzeit je Ressource aus der nativen Spalte resources.min_notice_time_add (in SEKUNDEN).
+     * Nur Ressourcen mit gesetztem Vorlauf > 0 landen in der Map.
+     * @param int[] $resourceIds
+     * @return array<int,int>  resource_id → Sekunden
+     */
+    private function GetMinNoticeMap(array $resourceIds)
+    {
+        $map = [];
+        $ids = array_values(array_unique(array_map('intval', $resourceIds)));
+        if (empty($ids)) {
+            return $map;
+        }
+        // IDs sind app-intern (eigene Ressourcen-Filterung), kein User-Input → sichere Inline-Liste.
+        $in = implode(',', $ids);
+        $cmd = new AdHocCommand(
+            'SELECT resource_id, min_notice_time_add FROM resources ' .
+            'WHERE min_notice_time_add IS NOT NULL AND min_notice_time_add > 0 AND resource_id IN (' . $in . ')'
+        );
+        $reader = $this->db->Query($cmd);
+        while ($row = $reader->GetRow()) {
+            $map[(int)$row['resource_id']] = (int)$row['min_notice_time_add'];
+        }
+        $reader->Free();
+        return $map;
     }
 
     /**

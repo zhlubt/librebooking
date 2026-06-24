@@ -87,6 +87,8 @@
 							</div>
 							{if $row->anyFree}
 								<span class="zhl-badge free">{$row->freeCount}/{$row->totalDays} Tage frei</span>
+							{elseif $row->minNoticeDays > 0}
+								<span class="zhl-badge vorlauf">Vorlauf</span>
 							{else}
 								<span class="zhl-badge full">ausgebucht</span>
 							{/if}
@@ -94,17 +96,23 @@
 
 						<div class="zhl-days">
 							{foreach from=$row->days item=day}
-								<div class="zhl-day {if $day.free}f{else}b{/if}" title="{$day.weekday} {$day.label} — {if $day.free}frei{else}belegt{/if}">
+								<div class="zhl-day {if $day.state == 'free'}f{elseif $day.state == 'vorlauf'}v{else}b{/if}" title="{$day.weekday} {$day.label} — {if $day.state == 'free'}frei{elseif $day.state == 'vorlauf'}Vorlauf, noch nicht buchbar{else}belegt{/if}">
 									<span class="zhl-day-wd">{$day.weekday}</span>
 									<span class="zhl-day-dt">{$day.label}</span>
 								</div>
 							{/foreach}
 						</div>
 
+						{if $row->minNoticeDays > 0}
+							<div class="zhl-vorlauf-note">⏳ Vorlauf {$row->minNoticeDays} Tage — frühester Start: <strong>{$row->earliestLabel}</strong></div>
+						{/if}
+
 						<div class="zhl-card-foot">
 							{if $row->anyFree}
 								<span class="zhl-muted zhl-small">Nächster freier Tag: {$row->nextFreeLabel}</span>
 								<a class="zhl-btn zhl-btn-sm" href="{$Path}reservation.php?rid={$row->id}&amp;sid={$row->scheduleId}&amp;rd={$StartInput}">Buchen ▸</a>
+							{elseif $row->minNoticeDays > 0}
+								<span class="zhl-muted zhl-small">Erst ab {$row->earliestLabel} buchbar (Vorlauf {$row->minNoticeDays} Tage)</span>
 							{else}
 								<span class="zhl-muted zhl-small">Im Zeitraum komplett belegt</span>
 							{/if}

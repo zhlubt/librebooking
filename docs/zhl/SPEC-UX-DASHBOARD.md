@@ -398,6 +398,28 @@ Schnitt ab 18.7.), zeigt freien Pool, immer optional. Admin-Checkbox pro Bundle.
 Aufnahme-Bundles außer VR. Backup `zhl_bundle__bak009`. **Eingeloggt render-verifiziert** (curl-Login
 admin@zhl.local): Gate/Hinweis/Chips/Schnitt-Karte + korrektes Folgedatum, keine Smarty-Fehler.
 
-**Nächste Schritte:** (1) **v3b-3** Seminarraum **via Admin-UI** anlegen (Codex: kein Roh-SQL) + „Wo
-willst du aufnehmen?"-Frage; (2) **v3b-4** verzweigte Studio-Dialoge (Personenzahl→Mikros, Folien→Laptop);
-(3) stabile Typ-Referenz (Geräte-Typ → SELECT_LIST).
+**Stand Vorlauf-Anzeige (gebaut + deployt 2026-06-24, US-17):** Das Raster honoriert jetzt die native
+Vorlaufzeit `resources.min_notice_time_add` (in **Sekunden**; Videostudio 259200 = 3 Tage). Frühester
+buchbarer Tag = `Date::Now()->ApplyDifference(TimeInterval::Parse(sec))` (identisch zur nativen
+`ResourceMinimumNoticeRuleAdd`). Tageszellen haben drei Zustände **frei/belegt/Vorlauf** (Vorlauf =
+bernsteinfarben schraffiert), pro Gerät „⏳ Vorlauf N Tage — frühester Start: …"; voll im Vorlauf =
+Badge „Vorlauf" + „Erst ab … buchbar". Render-verifiziert (Videostudio: 25./26. Vorlauf, ab 27. frei).
+HINWEIS: fast alle Geräte haben aktuell 7 Tage Vorlauf gesetzt (mics/Objektive 604800 s) → Raster zeigt
+die ersten 7 Tage schraffiert; ggf. im Admin „Manage Resources" anpassen.
+
+**NÄCHSTES EPIC — eigener Buchungs-Schritt (Nutzer-Wunsch 2026-06-24):** Nach Geräte-Wahl landet man heute
+auf der nativen `reservation.php` („altes Layout"). Gewünscht: eine **ZHL-gestylte Buchungsseite** mit
+Zeitraum-Wahl **und Auswahl Abholung vs. Einführung**. Recherche (2 Agenten) ergab:
+- **Schreibweg (Option B, empfohlen):** eigener Presenter + schlanke Facade, die `IReservationSavePage`
+  implementiert → `ReservationPresenterFactory::Create()` → `ReservationSavePresenter::BuildReservation()`
+  + `HandleReservation()` → nativer `ReservationHandler` (volle Validierung/Konflikt/Vorlauf bleibt letzte
+  Instanz). CSRF selbst prüfen. Pflicht-Form-Keys: userId, resourceId, beginDate/beginPeriod,
+  endDate/endPeriod (Datum „Y-m-d", Zeit „H:i", tz aus UserSession), reservationTitle.
+- **Abholung/Einführung = bestehendes Übergabe-Modul wiederverwenden:** `zhl_booking_handover`
+  (type `pickup`/`return`, Status requested→confirmed→done, `handover_token`), Slots/Terminplaner über
+  `Web/zhl-handover-lib.php` (`zhl_handover_get`/`_sync`, HTTP an meet.zhl-ubt.de, X-API-Key),
+  PreReservation-Gate `plugins/PreReservation/ZhlHandover` blockt ohne bestätigte Übergabe,
+  PostReservation `ZhlHandoverLink` trägt die Ref nach. „Einführung" = neue `type`-Variante ergänzen.
+
+**Danach offen:** v3b-3 Seminarraum (erstmal ohne echten Raum: nur „Wo aufnehmen?"-Hinweis) · v3b-4
+verzweigte Studio-Dialoge · stabile Typ-Referenz (Geräte-Typ → SELECT_LIST).

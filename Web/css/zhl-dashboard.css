@@ -86,6 +86,10 @@
 }
 .zhl-dash .zhl-day.f { background: var(--ok); color: #fff; }
 .zhl-dash .zhl-day.b { background: #edf2f7; color: var(--muted); }
+/* v3b — Vorlauf (noch nicht buchbar): diagonal schraffiert, bernstein */
+.zhl-dash .zhl-day.v { color: #92400e; background: repeating-linear-gradient(45deg, #fef3c7, #fef3c7 4px, #fde9a8 4px, #fde9a8 8px); }
+.zhl-dash .zhl-badge.vorlauf { background: #fffbeb; color: #92400e; }
+.zhl-dash .zhl-vorlauf-note { font-size: 12px; color: #92400e; background: #fffbeb; border-radius: 8px; padding: 5px 9px; margin-top: 8px; }
 .zhl-dash .zhl-day-wd { font-size: 10px; opacity: .9; }
 .zhl-dash .zhl-day-dt { font-size: 11px; }
 

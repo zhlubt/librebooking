@@ -510,8 +510,32 @@ Pflicht), id6 „3 Terminvorschläge" (Multiline, Pflicht, nur best. Ressourcen)
 (opt), id9 Language (opt). **Achtung native Eigenheit:** Admins sind von Pflicht-Attributen befreit
 (leere Werte werden für Admins übersprungen) — Test daher mit Nicht-Admin.
 
+**Stand v-book-3 Inkrement 2 — Einführungs-Slot-Picker (gebaut + deployt + verifiziert 2026-06-24):**
+Auf `zhl-book.php` wird für Geräte mit `einfuehrung != keine` ein **eingebetteter Einführungs-Picker**
+gezeigt (User bleibt im Tool). Logik in ZhlBookPresenter:
+- **F40-Zertifikat:** `userIsCertified()` (zhl_certificate, expires NULL/zukunft) → „✓ bereits eingeführt",
+  kein Termin nötig.
+- **Slots:** `lesson_slots.php?type_label=<einfuehrung_typ>&member_id=<tp_member_id>` (Terminplaner),
+  client-seitig gefiltert auf **Termine vor dem Ausleihstart** (start_utc < loanStartUtc); „frühester Termin"-
+  Hinweis, wenn keiner vor dem Start frei ist (→ späteren Start wählen, „🔄 Termine aktualisieren"-Button
+  lädt mit neuem rd neu).
+- **Gate:** `einfuehrung='notwendig'` + nicht zertifiziert + kein Slot gewählt → Buchung blockiert
+  (Button disabled bei 0 Slots; Server lehnt ab). `moeglich` = optional.
+- **Buchungs-Flow (Entscheidung „Slot Pflicht, beides in einem Schritt"):** beim Absenden **erst** Slot via
+  `POST book_slot.php` (member/type/slot + Name/Email aus UserSession), **dann** Reservierung. Slot-Fehler
+  (409) → zurück zum Formular; Reservierung scheitert nach Slot-Buchung → Hinweis „Termin gebucht, beim Team
+  melden". Einführungstermin wird in die Reservierungs-Beschreibung geschrieben.
+Verifiziert: Picker zeigt 12 echte Slots (Typ 33 Videostudio), Gate blockt ohne Slot, 409-Pfad sauber.
+Happy-Path (echter Slot) bewusst vom Nutzer live zu testen (legt echten Termin + Mail an).
+
+**Noch offen (v-book-3):** Abholung-Slot-Picker (Typ 32 Medienübergabe) analog zur Einführung;
+Vorlauf-Toleranz (`vorlauf_toleranz_h`, 48h) — Konflikt mit nativer min_notice für Nicht-Admins, eigene
+Entscheidung nötig (min_notice senken vs. Bypass); Re-Render verliert aktuell Eingaben beim „Termine
+aktualisieren"-Reload; Admin-UI für `zhl_uebergabe`.
+
 **ENTSCHEIDUNG 2026-06-24: „Erst Terminplaner abwarten".** Nutzer baut zuerst die Terminplaner-API
-(lesen + buchen), DANN baut Claude den eingebetteten Slot-Picker in einem Rutsch. Bis dahin ZHL-Bau pausiert.
+(lesen + buchen), DANN baut Claude den eingebetteten Slot-Picker in einem Rutsch. (Erledigt: API steht,
+Picker gebaut — s. Inkrement 2 oben.)
 
 **API-Vertrag, an dem der Embedded-Slot-Picker andockt (Claude wartet darauf — meet-Workstream Nutzer):**
 1. **Slots lesen:** `GET /api/lesson_slots.php?type_label=<Label>&member_id=<id?>` mit `X-API-Key`.

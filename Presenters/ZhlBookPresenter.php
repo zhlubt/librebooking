@@ -84,6 +84,38 @@ class ZhlBookPresenter
             $facadeAttrs[] = $o;
         }
 
+        // --- Einführungs-Gate (US-16/US-20): Zertifikat ODER Terminplaner-Slot, je nach Gerät ---
+        $certified = $ueb['einfuehrung'] === 'keine' ? true : $this->userIsCertified($db, $user->UserId, $rid);
+        $einfRequired = ($ueb['einfuehrung'] === 'notwendig') && !$certified;
+        $chosenSlot = $this->post('einf_slot');
+        $einfTypeId = (int)$this->post('einf_type_id');
+        $einfMemberId = (int)$this->post('einf_member_id');
+        $einfBooked = false;
+
+        if ($einfRequired && $chosenSlot === '') {
+            $this->bindForm($user, $resource, $beginDate, $beginTime, $endDate, $endTime, $choice, ['Für dieses Gerät ist eine Einführung nötig — bitte wähle zuerst einen Einführungstermin (oder es ist aktuell keiner vor deinem Ausleihstart frei).'], $attrValues);
+            return;
+        }
+
+        if ($chosenSlot !== '' && !$certified && $ueb['einfuehrung'] !== 'keine') {
+            // Reihenfolge laut Entscheidung: erst Slot buchen, dann Reservierung.
+            $book = $this->tpRequest('POST', '/api/book_slot.php', [], [
+                'member_id' => $einfMemberId,
+                'type_id' => $einfTypeId,
+                'slot_id' => $chosenSlot,
+                'name' => trim($user->FirstName . ' ' . $user->LastName),
+                'email' => $user->Email,
+                'note' => 'ZHL Medienausleihe — ' . $titel,
+            ]);
+            if (!$book || ($book['status'] ?? '') !== 'ok') {
+                $msg = isset($book['error']) ? (string)$book['error'] : 'Der Einführungstermin konnte nicht gebucht werden (evtl. nicht mehr verfügbar). Bitte einen anderen Termin wählen.';
+                $this->bindForm($user, $resource, $beginDate, $beginTime, $endDate, $endTime, $choice, ['Einführungstermin: ' . $msg], $attrValues);
+                return;
+            }
+            $einfBooked = true;
+            $desc .= ' · Einführung gebucht (' . (string)$ueb['einfuehrung_typ'] . ', #' . (string)($book['booking_id'] ?? '') . ')';
+        }
+
         $facade = new ZhlReservationFacade($user->UserId, $rid, $titel, $desc, $beginDate, $beginTime, $endDate, $endTime, $facadeAttrs);
         try {
             $factory = new ReservationPresenterFactory();
@@ -92,7 +124,11 @@ class ZhlBookPresenter
             $presenter->HandleReservation($series);
         } catch (Exception $ex) {
             Log::Error('ZHL-Buchung fehlgeschlagen: %s', $ex);
-            $this->bindForm($user, $resource, $beginDate, $beginTime, $endDate, $endTime, $choice, ['Unerwarteter Fehler beim Buchen. Bitte erneut versuchen.'], $attrValues);
+            $errs = ['Unerwarteter Fehler beim Buchen. Bitte erneut versuchen.'];
+            if ($einfBooked) {
+                $errs[] = 'Hinweis: Dein Einführungstermin wurde bereits gebucht — bitte beim ZHL-Team melden, falls die Ausleihe nicht zustande kommt.';
+            }
+            $this->bindForm($user, $resource, $beginDate, $beginTime, $endDate, $endTime, $choice, $errs, $attrValues);
             return;
         }
 
@@ -104,6 +140,9 @@ class ZhlBookPresenter
         $errors = $facade->GetErrors();
         if (empty($errors)) {
             $errors = ['Die Buchung konnte nicht angelegt werden.'];
+        }
+        if ($einfBooked) {
+            $errors[] = 'Hinweis: Dein Einführungstermin wurde bereits gebucht — bitte beim ZHL-Team melden, falls die Ausleihe nicht zustande kommt.';
         }
         $this->bindForm($user, $resource, $beginDate, $beginTime, $endDate, $endTime, $choice, $errors, $attrValues);
     }
@@ -150,6 +189,30 @@ class ZhlBookPresenter
             }
         }
 
+        // Einführungs-Gate (F40-Zertifikat ODER Termin aus dem Terminplaner) — nur wenn konfiguriert.
+        $einf = [
+            'mode' => $ueb['einfuehrung'],
+            'typLabel' => $ueb['einfuehrung_typ'],
+            'certified' => false,
+            'slots' => [],
+            'earliestLabel' => null,
+            'typeId' => null,
+            'memberId' => null,
+            'blocked' => false,
+        ];
+        if ($ueb['einfuehrung'] !== 'keine') {
+            $einf['certified'] = $this->userIsCertified($db, $user->UserId, $rid);
+            if (!$einf['certified']) {
+                $loanStartUtc = Date::Parse($beginDate . ' ' . $beginTime, $tz)->ToTimezone('UTC')->Format('Y-m-d H:i:s');
+                $f = $this->fetchEinfuehrungSlots($ueb['einfuehrung_typ'], $ueb['tp_member_id'], $loanStartUtc, $tz);
+                $einf['slots'] = $f['slots'];
+                $einf['earliestLabel'] = $f['earliestLabel'];
+                $einf['typeId'] = $f['typeId'];
+                $einf['memberId'] = $f['memberId'];
+                $einf['blocked'] = ($ueb['einfuehrung'] === 'notwendig' && empty($f['slots']));
+            }
+        }
+
         $this->page->BindBooking([
             'resourceId' => $rid,
             'scheduleId' => (int)$resource->ScheduleId,
@@ -168,6 +231,7 @@ class ZhlBookPresenter
             'abholort' => $ueb['abholort'],
             'einfuehrung' => $ueb['einfuehrung'],
             'einfuehrungTyp' => $ueb['einfuehrung_typ'],
+            'einf' => $einf,
             'attributes' => $attributes,
             'errors' => $errors,
         ]);
@@ -215,6 +279,103 @@ class ZhlBookPresenter
             }
         }
         return null;
+    }
+
+    // --- Terminplaner-Anbindung (Einführungs-Slots) + F40-Zertifikat ---
+
+    private function tpConfig(): array
+    {
+        $f = ROOT_DIR . 'config/zhl-handover.php';
+        if (!is_readable($f)) {
+            $f = ROOT_DIR . 'config/zhl-handover.example.php';
+        }
+        $c = is_readable($f) ? (require $f) : [];
+        return is_array($c) ? $c : [];
+    }
+
+    /** GET/POST an den Terminplaner (X-API-Key). @return array|null dekodiertes JSON */
+    private function tpRequest(string $method, string $path, array $query = [], ?array $body = null): ?array
+    {
+        $c = $this->tpConfig();
+        $base = rtrim((string)($c['terminplaner_base_url'] ?? ''), '/');
+        $key = (string)($c['terminplaner_api_key'] ?? '');
+        $timeout = (int)($c['http_timeout'] ?? 6);
+        if ($base === '' || $key === '' || $key === 'REPLACE_WITH_CROSSBOOK_API_KEY') {
+            return null;
+        }
+        $url = $base . $path . ($query ? ('?' . http_build_query($query)) : '');
+        $header = "X-API-Key: $key\r\nUser-Agent: zhl-book/1\r\n";
+        $opt = ['method' => $method, 'timeout' => $timeout, 'ignore_errors' => true];
+        if ($body !== null) {
+            $header = "X-API-Key: $key\r\nContent-Type: application/json\r\nUser-Agent: zhl-book/1\r\n";
+            $opt['content'] = json_encode($body, JSON_UNESCAPED_UNICODE);
+        }
+        $opt['header'] = $header;
+        $raw = @file_get_contents($url, false, stream_context_create(['http' => $opt]));
+        if ($raw === false) {
+            return null;
+        }
+        $d = json_decode($raw, true);
+        return is_array($d) ? $d : null;
+    }
+
+    /**
+     * Einführungs-Slots aus dem Terminplaner, gefiltert auf Termine VOR dem Ausleihstart.
+     * @return array{slots: array[], earliestLabel: ?string, typeId: ?int, memberId: ?int}
+     */
+    private function fetchEinfuehrungSlots(?string $typLabel, ?int $memberId, ?string $loanStartUtc, $tz): array
+    {
+        $out = ['slots' => [], 'earliestLabel' => null, 'typeId' => null, 'memberId' => null];
+        if ($typLabel === null || $typLabel === '') {
+            return $out;
+        }
+        $q = ['type_label' => $typLabel];
+        if ($memberId) {
+            $q['member_id'] = $memberId;
+        }
+        $resp = $this->tpRequest('GET', '/api/lesson_slots.php', $q);
+        if (!$resp || empty($resp['members'])) {
+            return $out;
+        }
+        $earliest = null;
+        foreach ($resp['members'] as $mem) {
+            $out['typeId'] = $out['typeId'] ?? (isset($mem['type_id']) ? (int)$mem['type_id'] : null);
+            $out['memberId'] = $out['memberId'] ?? (isset($mem['member_id']) ? (int)$mem['member_id'] : null);
+            foreach ($mem['slots'] ?? [] as $s) {
+                $startUtc = $s['start_utc'] ?? null;
+                if (!$startUtc) {
+                    continue;
+                }
+                if ($earliest === null || $startUtc < $earliest) {
+                    $earliest = $startUtc;
+                }
+                if ($loanStartUtc !== null && $startUtc >= $loanStartUtc) {
+                    continue; // Einführung muss VOR der Nutzung liegen
+                }
+                $out['slots'][] = [
+                    'slot_id' => (string)$s['slot_id'],
+                    'label' => (string)($s['label'] ?? $startUtc),
+                    'type_id' => isset($mem['type_id']) ? (int)$mem['type_id'] : null,
+                    'member_id' => isset($mem['member_id']) ? (int)$mem['member_id'] : null,
+                ];
+            }
+        }
+        if ($earliest !== null) {
+            $out['earliestLabel'] = Date::Parse($earliest, 'UTC')->ToTimezone($tz)->Format('d.m.Y, H:i') . ' Uhr';
+        }
+        return $out;
+    }
+
+    /** F40: hat der Nutzer ein gültiges Einführungs-Zertifikat für dieses Gerät? */
+    private function userIsCertified($db, $userId, int $rid): bool
+    {
+        $cmd = new AdHocCommand('SELECT 1 FROM zhl_certificate WHERE user_id = @u AND resource_id = @r AND (expires_at IS NULL OR expires_at > UTC_TIMESTAMP()) LIMIT 1');
+        $cmd->AddParameter(new Parameter('@u', $userId));
+        $cmd->AddParameter(new Parameter('@r', $rid));
+        $reader = $db->Query($cmd);
+        $row = $reader->GetRow();
+        $reader->Free();
+        return (bool)$row;
     }
 
     private function lookupType($db, int $rid): ?string

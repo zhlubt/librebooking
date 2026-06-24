@@ -231,3 +231,11 @@
 .zhl-dash .zhl-attr-check { display: flex; gap: 9px; align-items: flex-start; border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; cursor: pointer; }
 .zhl-dash .zhl-attr-check input { margin-top: 3px; }
 .zhl-dash .zhl-req { color: #d97706; font-weight: 700; }
+
+/* v-book-3 — Einführungs-Slot-Picker */
+.zhl-dash .zhl-ueb-item.ok { border-left-color: #16a34a; background: #f0fdf4; }
+.zhl-dash .zhl-einf-pick { border: 1px solid var(--border); border-left: 3px solid #d97706; border-radius: 8px; padding: 12px 14px; background: #fffdf7; }
+.zhl-dash .zhl-einf-head { font-weight: 700; color: #92400e; margin-bottom: 2px; }
+.zhl-dash .zhl-slot { display: flex; gap: 9px; align-items: center; border: 1px solid var(--border); border-radius: 8px; padding: 8px 11px; margin-top: 6px; cursor: pointer; background: #fff; font-size: 14px; }
+.zhl-dash .zhl-slot:hover { border-color: var(--zg); }
+.zhl-dash .zhl-btn[disabled] { opacity: .5; cursor: not-allowed; box-shadow: none; transform: none; }

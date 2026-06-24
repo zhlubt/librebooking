@@ -84,6 +84,32 @@
 					{elseif $Einfuehrung == 'moeglich'}
 						<div class="zhl-ueb-item"><strong>🎓 Einführung möglich</strong> <span class="zhl-muted zhl-small">{if $EinfuehrungTyp}Termintyp „{$EinfuehrungTyp|escape}"{/if}</span></div>
 					{/if}
+
+					{if $Einf.mode != 'keine'}
+						{if $Einf.certified}
+							<div class="zhl-ueb-item ok"><strong>✓ Du bist bereits eingeführt</strong> <span class="zhl-muted zhl-small">Für dieses Gerät liegt ein Einführungs-Nachweis vor — kein Termin nötig.</span></div>
+						{elseif $Einf.slots}
+							<div class="zhl-einf-pick">
+								<div class="zhl-einf-head">Einführungstermin wählen{if $Einfuehrung == 'notwendig'} <span class="zhl-req">*</span>{/if}</div>
+								<div class="zhl-muted zhl-small" style="margin-bottom:8px;">Nur Termine <strong>vor</strong> deinem Ausleihstart. Änderst du den Start, lade die Termine neu.</div>
+								<input type="hidden" name="einf_type_id" value="{$Einf.typeId}">
+								<input type="hidden" name="einf_member_id" value="{$Einf.memberId}">
+								{foreach from=$Einf.slots item=s}
+									<label class="zhl-slot">
+										<input type="radio" name="einf_slot" value="{$s.slot_id|escape}" {if $Einfuehrung == 'notwendig'}required{/if}>
+										<span>{$s.label|escape}</span>
+									</label>
+								{/foreach}
+								<button type="button" class="zhl-btn zhl-btn-ghost zhl-btn-sm zhl-reload-slots" style="margin-top:8px;">🔄 Termine zum gewählten Start aktualisieren</button>
+							</div>
+						{else}
+							<div class="zhl-ueb-item req">
+								<strong>⛔ Kein Einführungstermin vor deinem Ausleihstart frei</strong>
+								<span class="zhl-muted zhl-small">{if $Einf.earliestLabel}Frühester Termin: {$Einf.earliestLabel}. Wähle einen späteren Ausleihstart und lade die Termine neu.{else}Aktuell ist kein Einführungstermin verfügbar — eine Buchung ist erst möglich, sobald Termine frei sind.{/if}</span>
+								<button type="button" class="zhl-btn zhl-btn-ghost zhl-btn-sm zhl-reload-slots" style="margin-top:8px;">🔄 Termine zum gewählten Start aktualisieren</button>
+							</div>
+						{/if}
+					{/if}
 				</div>
 
 				{if $Attributes}
@@ -112,12 +138,27 @@
 				{/if}
 
 				<div class="zhl-book-actions">
-					<button class="zhl-btn" type="submit">Verbindlich buchen ▸</button>
+					<button class="zhl-btn" type="submit" {if $Einf.blocked}disabled{/if}>Verbindlich buchen ▸</button>
+					{if $Einf.blocked}<span class="zhl-muted zhl-small" style="margin-left:10px;">Buchung erst möglich, wenn ein Einführungstermin frei ist.</span>{/if}
 				</div>
-				<p class="zhl-note">Verfügbarkeit, Vorlauf und Konflikte werden beim Buchen verbindlich geprüft. Die Übergabe-Anforderung dieses Geräts wird vermerkt; die Termin-Auswahl direkt hier im Tool (statt Weiterleitung) folgt mit der Terminplaner-Anbindung.</p>
+				<p class="zhl-note">Verfügbarkeit, Vorlauf und Konflikte werden beim Buchen verbindlich geprüft. Ist eine Einführung nötig, wird der gewählte Termin direkt im Terminplaner gebucht; danach wird die Reservierung angelegt.</p>
 			</form>
 		</div>
 	{/if}
 </div>
+
+<script>
+(function () {
+	function reloadSlots() {
+		var d = document.querySelector('input[name=beginDate]');
+		var rid = document.querySelector('input[name=resourceId]');
+		var sid = document.querySelector('input[name=scheduleId]');
+		if (!d || !rid) { return; }
+		window.location.href = window.location.pathname + '?rid=' + encodeURIComponent(rid.value) +
+			'&sid=' + encodeURIComponent(sid ? sid.value : '') + '&rd=' + encodeURIComponent(d.value);
+	}
+	document.querySelectorAll('.zhl-reload-slots').forEach(function (b) { b.addEventListener('click', reloadSlots); });
+})();
+</script>
 
 {include file='globalfooter.tpl'}

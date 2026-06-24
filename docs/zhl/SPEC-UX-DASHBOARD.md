@@ -545,8 +545,11 @@ das Material ohne Einführungstermin (Gate zeigt „✓ bereits eingeführt"); *
   Connect+Auth verifiziert. Backup der config.php auf media.
 - **Studio-Migration:** bestehende Videostudio-Bucher bekommen automatisch das Videostudio-Zertifikat.
 - **Buchungs-Vorschläge (Migration 012 `booking_mode`):** zhl-book.php zeigt anklickbare Termin-Vorschläge
-  statt Datumsfelder — Tag-Chips+Dauer (Tagesmodus) bzw. Tag-Auswahl+2h-Slot-Chips (Slotmodus, Videostudio,
-  Slots aus Schedule-Perioden). Tageszeiten an Schedule-Grenzen ausgerichtet. E2E getestet (beide Modi).
+  statt Datumsfelder — Tag-Chips+Dauer (Tagesmodus) bzw. **Wochen-Raster** (Slotmodus, Videostudio) wie
+  studio.uni-bayreuth.de: Mo–Fr × Stunden-Perioden, Zellen frei/belegt/nicht-buchbar (schraffiert),
+  Start- + End-Feld anklicken = **frei wählbare zusammenhängende Spanne (beliebige Länge)**, Wochen-Nav.
+  Tageszeiten an Schedule-Grenzen ausgerichtet. TZ = Europe/Berlin (Layout Europe/Zürich, identischer
+  Offset). E2E getestet: Tages- + Slot-/Range-Buchung (4h) klappen.
 - **Dashboard-Vorschau:** Raster-Fenster von Ausleihdauer entkoppelt (min 7, Default 14 Tage), Vorlauf gelb
   → frei grün; „Tage"→„Vorschau".
 - **Zertifikat-Bestätigung (Migration 013):** nach gebuchter Einführung wird eine offene Bestätigung

@@ -61,27 +61,37 @@
 
 				<div class="zhl-uplabel">Zeitraum</div>
 				{if $Picker.mode == 'slot'}
-					{* Videostudio o. ä.: Tag wählen (lädt neu) + freier 2-Stunden-Slot *}
-					<input type="hidden" name="slotDay" value="{$Picker.slotDay}">
-					<div class="zhl-muted zhl-small" style="margin-bottom:6px;">Tag wählen:</div>
-					<div class="zhl-daypick">
-						{foreach from=$Picker.slotDays item=dd}
-							<a class="zhl-daychip {if $dd.date == $Picker.slotDay}active{/if}" href="{$Path}zhl-book.php?rid={$ResourceId}&amp;sid={$ScheduleId}&amp;rd={$dd.date}">{$dd.label}</a>
-						{foreachelse}
-							<span class="zhl-muted zhl-small">Keine freien Tage gefunden.</span>
-						{/foreach}
+					{* Wochen-Raster: freie Zeitspanne anklicken (Start- und End-Feld). Beliebige Länge. *}
+					<input type="hidden" name="slotDay" id="slotDay" value="">
+					<input type="hidden" name="slotBegin" id="slotBegin" value="">
+					<input type="hidden" name="slotEnd" id="slotEnd" value="">
+					<div class="zhl-week-nav">
+						<a class="zhl-btn zhl-btn-ghost zhl-btn-sm" href="{$Path}zhl-book.php?rid={$ResourceId}&amp;sid={$ScheduleId}&amp;rd={$Picker.grid.prevWeek}">‹ Zurück</a>
+						<a class="zhl-btn zhl-btn-ghost zhl-btn-sm" href="{$Path}zhl-book.php?rid={$ResourceId}&amp;sid={$ScheduleId}&amp;rd={$Picker.grid.thisWeek}">Diese Woche</a>
+						<span class="zhl-week-label">{$Picker.grid.weekLabel}</span>
+						<a class="zhl-btn zhl-btn-ghost zhl-btn-sm" href="{$Path}zhl-book.php?rid={$ResourceId}&amp;sid={$ScheduleId}&amp;rd={$Picker.grid.nextWeek}">Weiter ›</a>
 					</div>
-					<div class="zhl-muted zhl-small" style="margin:12px 0 6px;">Freie 2-Stunden-Slots:</div>
-					<div class="zhl-slotpick">
-						{foreach from=$Picker.slots item=s}
-							{if $s.free}
-								<label class="zhl-slotchip"><input type="radio" name="slot" value="{$s.begin}-{$s.end}" required><span>{$s.label}</span></label>
-							{else}
-								<span class="zhl-slotchip is-busy" title="belegt">{$s.label}</span>
-							{/if}
-						{foreachelse}
-							<span class="zhl-muted zhl-small">An diesem Tag keine Slots.</span>
-						{/foreach}
+					<div class="zhl-grid-scroll">
+						<table class="zhl-weekgrid">
+							<thead><tr><th></th>{foreach from=$Picker.grid.hours item=h}<th>{$h}</th>{/foreach}</tr></thead>
+							<tbody>
+								{foreach from=$Picker.grid.days item=d}
+									<tr>
+										<th class="zhl-wg-day">{$d.label}<br><span>{$d.dm}</span></th>
+										{foreach from=$d.cells item=c}
+											<td class="zhl-wg-cell s-{$c.state}" {if $c.state == 'free'}data-day="{$d.date}" data-b="{$c.h}" data-e="{$c.he}"{/if}></td>
+										{/foreach}
+									</tr>
+								{/foreach}
+							</tbody>
+						</table>
+					</div>
+					<div class="zhl-wg-legend zhl-muted zhl-small">
+						<span><i class="lg lg-free"></i> frei</span>
+						<span><i class="lg lg-busy"></i> belegt</span>
+						<span><i class="lg lg-past"></i> nicht buchbar</span>
+						<span><i class="lg lg-sel"></i> deine Auswahl</span>
+						<strong id="zhl-sel-label" style="margin-left:auto;">Klicke Start- und End-Feld an einem Tag.</strong>
 					</div>
 				{else}
 					{* Tagesmodus: freie Starttage als Chips + Dauer *}
@@ -195,6 +205,34 @@
 			'&sid=' + encodeURIComponent(sid ? sid.value : '') + '&rd=' + encodeURIComponent(d.value);
 	}
 	document.querySelectorAll('.zhl-reload-slots').forEach(function (b) { b.addEventListener('click', reloadSlots); });
+
+	// Wochen-Raster: zusammenhängende freie Zeitspanne anklicken (Start- und End-Feld).
+	var grid = document.querySelector('.zhl-weekgrid');
+	if (grid) {
+		var anchor = null;
+		var sD = document.getElementById('slotDay'), sB = document.getElementById('slotBegin'), sE = document.getElementById('slotEnd');
+		var label = document.getElementById('zhl-sel-label');
+		function clearSel() { grid.querySelectorAll('.zhl-wg-cell.sel').forEach(function (c) { c.classList.remove('sel'); }); }
+		function setOne(td) {
+			anchor = { td: td, row: td.parentElement };
+			clearSel(); td.classList.add('sel');
+			sD.value = td.getAttribute('data-day'); sB.value = td.getAttribute('data-b'); sE.value = td.getAttribute('data-e');
+			label.textContent = td.getAttribute('data-day') + '  ' + sB.value + '–' + sE.value;
+		}
+		grid.addEventListener('click', function (ev) {
+			var td = ev.target.closest('td.s-free'); if (!td) { return; }
+			if (!anchor || anchor.row !== td.parentElement) { setOne(td); return; }
+			var cells = Array.prototype.slice.call(td.parentElement.querySelectorAll('td.zhl-wg-cell'));
+			var lo = Math.min(cells.indexOf(anchor.td), cells.indexOf(td));
+			var hi = Math.max(cells.indexOf(anchor.td), cells.indexOf(td));
+			for (var i = lo; i <= hi; i++) { if (!cells[i].classList.contains('s-free')) { setOne(td); return; } }
+			clearSel();
+			for (var j = lo; j <= hi; j++) { cells[j].classList.add('sel'); }
+			sD.value = cells[lo].getAttribute('data-day'); sB.value = cells[lo].getAttribute('data-b'); sE.value = cells[hi].getAttribute('data-e');
+			label.textContent = sD.value + '  ' + sB.value + '–' + sE.value;
+			anchor = null;
+		});
+	}
 })();
 </script>
 

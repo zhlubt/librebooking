@@ -68,13 +68,14 @@ class ZhlBookPresenter
         if ($ueb['booking_mode'] === 'slot') {
             $beginDate = $this->postDate('slotDay', $tz);
             $endDate = $beginDate;
-            $slot = $this->post('slot');
-            if (!preg_match('/^([01]\d|2[0-3]):[0-5]\d-([01]\d|2[0-3]):[0-5]\d$/', $slot)) {
-                $this->bindForm($user, $resource, $beginDate, '09:00', $endDate, '11:00', $choice, ['Bitte wähle einen freien Zeit-Slot.']);
+            $sb = $this->post('slotBegin');
+            $se = $this->post('slotEnd');
+            if (!preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', $sb) || !preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', $se) || strcmp($se, $sb) <= 0) {
+                $this->bindForm($user, $resource, $beginDate, '09:00', $endDate, '11:00', $choice, ['Bitte wähle im Wochen-Raster eine freie Zeitspanne (Start- und End-Feld anklicken).']);
                 return;
             }
-            $beginTime = substr($slot, 0, 5);
-            $endTime = substr($slot, 6, 5);
+            $beginTime = $sb;
+            $endTime = $se;
         } else {
             $beginDate = $this->postDate('beginDate', $tz);
             $dd = (int)$this->post('durationDays');
@@ -176,6 +177,7 @@ class ZhlBookPresenter
         $db = ServiceLocator::GetDatabase();
         $tz = $user->Timezone;
         $rid = (int)$resource->GetId();
+        $requestedDate = $beginDate; // vor der Vorlauf-Klammerung (für Wochen-Navigation im Slotmodus)
 
         // Reservierungs-Custom-Attribute, die für dieses Gerät gelten (Pflicht-/Optionalfelder).
         $attributes = [];
@@ -235,15 +237,10 @@ class ZhlBookPresenter
             }
         }
 
-        // Termin-Vorschläge: freie Tage (Tagesmodus) bzw. 2h-Slots eines Tages (Slotmodus).
-        $picker = ['mode' => $ueb['booking_mode'], 'days' => [], 'slotDays' => [], 'slotDay' => $beginDate, 'slots' => []];
+        // Termin-Vorschläge: Wochen-Raster (Slotmodus, frei wählbare Spanne) bzw. freie Starttage (Tagesmodus).
+        $picker = ['mode' => $ueb['booking_mode'], 'days' => [], 'grid' => null];
         if ($ueb['booking_mode'] === 'slot') {
-            $picker['slotDays'] = $this->availableDays($user, $resource, $beginDate, $noticeSec, 21);
-            $availDates = array_column($picker['slotDays'], 'date');
-            if (!in_array($beginDate, $availDates, true) && !empty($availDates)) {
-                $picker['slotDay'] = $availDates[0];
-            }
-            $picker['slots'] = $this->freeSlots($user, $resource, $picker['slotDay'], 2);
+            $picker['grid'] = $this->weekGrid($user, $resource, $requestedDate, $noticeSec);
         } else {
             $picker['days'] = $this->availableDays($user, $resource, $beginDate, $noticeSec, 14);
         }
@@ -455,6 +452,78 @@ class ZhlBookPresenter
         // Endet die letzte Periode um Mitternacht (Ganztags-Layout)? → Ende liegt am Folgetag.
         $endNextDay = ($endStr === '00:00');
         return ['begin' => $beginStr, 'end' => $endStr, 'endNextDay' => $endNextDay];
+    }
+
+    /**
+     * Wochen-Raster (Mo–Fr × Stunden-Perioden) für den Slotmodus — wie studio.uni-bayreuth.de.
+     * Jede Zelle: state free|busy|past. Der Nutzer wählt im Frontend eine zusammenhängende Spanne.
+     * @return array{weekStart:string, prevWeek:string, nextWeek:string, thisWeek:string, weekLabel:string, hours:string[], days:array[]}
+     */
+    private function weekGrid(UserSession $user, $resource, string $aroundYmd, int $minNoticeSec): array
+    {
+        $tz = $user->Timezone;
+        $repo = new ScheduleRepository();
+        $layout = $repo->GetLayout((int)$resource->ScheduleId, new ScheduleLayoutFactory($tz));
+        $earliest = $minNoticeSec > 0
+            ? Date::Now()->ApplyDifference(TimeInterval::Parse($minNoticeSec)->Interval())
+            : Date::Now();
+
+        $todayYmd = Date::Now()->ToTimezone($tz)->Format('Y-m-d');
+        $refYmd = ($aroundYmd < $todayYmd) ? $todayYmd : $aroundYmd;
+        $ref = Date::Parse($refYmd . ' 00:00:00', $tz)->ToTimezone($tz);
+        $dow = (int)$ref->Format('N');
+        $weekStart = $ref->AddDays(-($dow - 1)); // Montag
+        $mondayToday = (function () use ($tz) {
+            $t = Date::Now()->ToTimezone($tz);
+            return $t->AddDays(-((int)$t->Format('N') - 1));
+        })();
+
+        $days = [];
+        $hours = [];
+        for ($dn = 0; $dn < 5; $dn++) {
+            $day = $weekStart->AddDays($dn);
+            $periods = $layout->GetLayout($day, false);
+            $resv = (new ResourceAvailability(new ReservationViewRepository()))->GetItemsBetween($day, $day->AddDays(1), [(int)$resource->GetId()]);
+            $cells = [];
+            foreach ($periods as $p) {
+                if (!method_exists($p, 'IsReservable') || !$p->IsReservable() || $p->BeginDate() === null || $p->EndDate() === null) {
+                    continue;
+                }
+                $b = $p->BeginDate();
+                $e = $p->EndDate();
+                if ($b->LessThan($earliest)) {
+                    $state = 'past';
+                } else {
+                    $busy = false;
+                    foreach ($resv as $it) {
+                        if ($it->GetStartDate()->LessThan($e) && $it->GetEndDate()->GreaterThan($b)) {
+                            $busy = true;
+                            break;
+                        }
+                    }
+                    $state = $busy ? 'busy' : 'free';
+                }
+                $cells[] = ['h' => $b->ToTimezone($tz)->Format('H:i'), 'he' => $e->ToTimezone($tz)->Format('H:i'), 'state' => $state];
+            }
+            $local = $day->ToTimezone($tz);
+            $days[] = ['date' => $local->Format('Y-m-d'), 'label' => self::WD[(int)$local->Format('N')], 'dm' => $local->Format('d.m.'), 'cells' => $cells];
+        }
+        if (!empty($days)) {
+            foreach ($days[0]['cells'] as $c) {
+                $hours[] = $c['h'];
+            }
+        }
+        $wsLocal = $weekStart->ToTimezone($tz);
+        $weLocal = $weekStart->AddDays(4)->ToTimezone($tz);
+        return [
+            'weekStart' => $wsLocal->Format('Y-m-d'),
+            'prevWeek' => $weekStart->AddDays(-7)->ToTimezone($tz)->Format('Y-m-d'),
+            'nextWeek' => $weekStart->AddDays(7)->ToTimezone($tz)->Format('Y-m-d'),
+            'thisWeek' => $mondayToday->Format('Y-m-d'),
+            'weekLabel' => $wsLocal->Format('d.m.') . ' – ' . $weLocal->Format('d.m.Y'),
+            'hours' => $hours,
+            'days' => $days,
+        ];
     }
 
     // --- Terminplaner-Anbindung (Einführungs-Slots) + F40-Zertifikat ---

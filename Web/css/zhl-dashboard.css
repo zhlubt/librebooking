@@ -251,3 +251,23 @@
 .zhl-dash .zhl-slotchip:hover { border-color: var(--zg); }
 .zhl-dash .zhl-slotchip:has(input:checked) { background: var(--grad); color: #fff; border-color: transparent; }
 .zhl-dash .zhl-slotchip.is-busy { opacity: .4; text-decoration: line-through; cursor: not-allowed; }
+
+/* v-book — Wochen-Raster (Slot-Range-Picker, Studio-Style) */
+.zhl-dash .zhl-week-nav { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+.zhl-dash .zhl-week-label { font-weight: 600; color: var(--text); }
+.zhl-dash .zhl-grid-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: 10px; }
+.zhl-dash .zhl-weekgrid { border-collapse: collapse; width: 100%; min-width: 720px; font-size: 12px; }
+.zhl-dash .zhl-weekgrid th { font-weight: 600; color: var(--muted); padding: 6px 4px; text-align: center; white-space: nowrap; }
+.zhl-dash .zhl-weekgrid thead th { border-bottom: 1px solid var(--border); position: sticky; top: 0; background: #fff; }
+.zhl-dash .zhl-wg-day { text-align: right; padding-right: 10px; color: var(--text); white-space: nowrap; }
+.zhl-dash .zhl-wg-day span { color: var(--muted); font-weight: 400; }
+.zhl-dash .zhl-wg-cell { width: 46px; height: 34px; border: 1px solid #eef1f4; }
+.zhl-dash .zhl-wg-cell.s-free { background: repeating-linear-gradient(45deg,#f0fdf4,#f0fdf4 5px,#dcfce7 5px,#dcfce7 10px); cursor: pointer; }
+.zhl-dash .zhl-wg-cell.s-free:hover { background: #bbf7d0; }
+.zhl-dash .zhl-wg-cell.s-busy { background: repeating-linear-gradient(45deg,#fef2f2,#fef2f2 5px,#fecaca 5px,#fecaca 10px); }
+.zhl-dash .zhl-wg-cell.s-past { background: repeating-linear-gradient(45deg,#f8fafc,#f8fafc 5px,#eef1f4 5px,#eef1f4 10px); }
+.zhl-dash .zhl-wg-cell.sel { background: var(--zg) !important; border-color: var(--zg-d); }
+.zhl-dash .zhl-wg-legend { display: flex; align-items: center; gap: 14px; margin-top: 10px; flex-wrap: wrap; }
+.zhl-dash .zhl-wg-legend .lg { display: inline-block; width: 13px; height: 13px; border-radius: 3px; vertical-align: -2px; margin-right: 4px; }
+.zhl-dash .lg-free { background: #dcfce7; } .zhl-dash .lg-busy { background: #fecaca; }
+.zhl-dash .lg-past { background: #eef1f4; } .zhl-dash .lg-sel { background: var(--zg); }

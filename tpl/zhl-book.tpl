@@ -3,77 +3,91 @@
 
 <div class="zhl-dash">
 
-	<div class="zhl-dash-head">
-		<div>
-			<div class="zhl-uplabel">Medienausleihe ZHL</div>
-			<h1 class="zhl-h1">Buchung</h1>
-			<p class="zhl-sub">Prüfe dein Gerät und den Zeitraum und wähle, ob du <strong>abholst</strong> oder eine <strong>Einführung</strong> brauchst.</p>
+	{if $Mode == 'success'}
+		<div class="zhl-dash-head">
+			<div>
+				<div class="zhl-uplabel">Medienausleihe ZHL</div>
+				<h1 class="zhl-h1">✅ Buchung bestätigt</h1>
+			</div>
 		</div>
-	</div>
-
-	<a class="zhl-back" href="{$Path}zhl-dashboard.php">← zurück zur Geräteauswahl</a>
-
-	<div class="zhl-book-grid">
-		{* Gerät *}
-		<div class="zhl-book-card">
-			<div class="zhl-uplabel">Dein Gerät</div>
-			{if $ResourceType}
-				<h2 class="zhl-h2">{$ResourceType|escape}</h2>
-				<div class="zhl-card-sub">{$ResourceName|escape}</div>
-			{else}
-				<h2 class="zhl-h2">{$ResourceName|escape}</h2>
-			{/if}
-			{if $ScheduleName}<div class="zhl-muted zhl-small" style="margin-top:6px;">Kategorie: {$ScheduleName|escape}</div>{/if}
-			{if $MinNoticeDays > 0}
-				<div class="zhl-vorlauf-note" style="margin-top:10px;">⏳ Vorlauf {$MinNoticeDays} Tage — frühester Start: <strong>{$EarliestLabel}</strong></div>
-			{/if}
+		<div class="zhl-book-card" style="max-width:560px;">
+			<p class="zhl-sub">Deine Reservierung ist angelegt.</p>
+			{if $ReferenceNumber}<p>Buchungsnummer: <strong>{$ReferenceNumber|escape}</strong></p>{/if}
+			<div class="zhl-book-actions" style="display:flex; gap:10px; flex-wrap:wrap;">
+				<a class="zhl-btn" href="{$Path}my-calendar.php">📅 Meine Buchungen</a>
+				<a class="zhl-btn zhl-btn-ghost" href="{$Path}zhl-dashboard.php">Weiteres Gerät buchen</a>
+			</div>
 		</div>
 
-		{* Buchungs-Formular *}
-		<form class="zhl-book-card" method="post" action="{$Path}zhl-book.php" id="zhl-book-form">
-			{csrf_token}
-			<input type="hidden" name="resourceId" value="{$ResourceId}">
-			<input type="hidden" name="scheduleId" value="{$ScheduleId}">
+	{else}
+		<div class="zhl-dash-head">
+			<div>
+				<div class="zhl-uplabel">Medienausleihe ZHL</div>
+				<h1 class="zhl-h1">Buchung</h1>
+				<p class="zhl-sub">Prüfe dein Gerät und den Zeitraum und wähle, ob du <strong>abholst</strong> oder eine <strong>Einführung</strong> brauchst.</p>
+			</div>
+		</div>
 
-			<div class="zhl-uplabel">Zeitraum</div>
-			<div class="zhl-book-row">
-				<div class="zhl-field"><label>Von (Datum)</label><input class="zhl-input" type="date" name="beginDate" value="{$BeginDate}" min="{$EarliestLabel|default:''}"></div>
-				<div class="zhl-field"><label>Uhrzeit</label><input class="zhl-input" type="time" name="beginPeriod" value="{$BeginTime}"></div>
+		<a class="zhl-back" href="{$Path}zhl-dashboard.php">← zurück zur Geräteauswahl</a>
+
+		{if $Errors}
+			<div class="zhl-book-errors">
+				<strong>Buchung nicht möglich:</strong>
+				<ul>{foreach from=$Errors item=e}<li>{$e|escape}</li>{/foreach}</ul>
 			</div>
-			<div class="zhl-book-row">
-				<div class="zhl-field"><label>Bis (Datum)</label><input class="zhl-input" type="date" name="endDate" value="{$EndDate}"></div>
-				<div class="zhl-field"><label>Uhrzeit</label><input class="zhl-input" type="time" name="endPeriod" value="{$EndTime}"></div>
+		{/if}
+
+		<div class="zhl-book-grid">
+			{* Gerät *}
+			<div class="zhl-book-card">
+				<div class="zhl-uplabel">Dein Gerät</div>
+				{if $ResourceType}
+					<h2 class="zhl-h2">{$ResourceType|escape}</h2>
+					<div class="zhl-card-sub">{$ResourceName|escape}</div>
+				{else}
+					<h2 class="zhl-h2">{$ResourceName|escape}</h2>
+				{/if}
+				{if $ScheduleName}<div class="zhl-muted zhl-small" style="margin-top:6px;">Kategorie: {$ScheduleName|escape}</div>{/if}
+				{if $MinNoticeDays > 0}
+					<div class="zhl-vorlauf-note" style="margin-top:10px;">⏳ Vorlauf {$MinNoticeDays} Tage — frühester Start: <strong>{$EarliestLabel}</strong></div>
+				{/if}
 			</div>
 
-			<div class="zhl-uplabel" style="margin-top:16px;">Übergabe</div>
-			<div class="zhl-choice">
-				<label class="zhl-choice-opt">
-					<input type="radio" name="handoverChoice" value="pickup" checked>
-					<span><strong>📦 Abholung</strong><br><span class="zhl-muted zhl-small">Ich kenne das Gerät und hole es zum Termin ab.</span></span>
-				</label>
-				<label class="zhl-choice-opt">
-					<input type="radio" name="handoverChoice" value="training">
-					<span><strong>🎓 Einführung</strong><br><span class="zhl-muted zhl-small">Ich möchte vorab eine kurze Einführung in das Gerät.</span></span>
-				</label>
-			</div>
+			{* Buchungs-Formular *}
+			<form class="zhl-book-card" method="post" action="{$Path}zhl-book.php">
+				{csrf_token}
+				<input type="hidden" name="resourceId" value="{$ResourceId}">
+				<input type="hidden" name="scheduleId" value="{$ScheduleId}">
 
-			<div class="zhl-book-actions">
-				<a class="zhl-btn" id="zhl-book-next" href="{$Path}reservation.php?rid={$ResourceId}&amp;sid={$ScheduleId}&amp;rd={$BeginDate}">Weiter zur Buchung ▸</a>
-			</div>
-			<p class="zhl-note">Hinweis: Der verbindliche Buchungs-Schritt mit Abholungs-/Einführungs-Termin wird gerade fertiggestellt — aktuell führt „Weiter" noch zur gewohnten Buchungsmaske.</p>
-		</form>
-	</div>
+				<div class="zhl-uplabel">Zeitraum</div>
+				<div class="zhl-book-row">
+					<div class="zhl-field"><label>Von (Datum)</label><input class="zhl-input" type="date" name="beginDate" value="{$BeginDate}" {if $EarliestYmd}min="{$EarliestYmd}"{/if} required></div>
+					<div class="zhl-field"><label>Uhrzeit</label><input class="zhl-input" type="time" name="beginPeriod" value="{$BeginTime}" required></div>
+				</div>
+				<div class="zhl-book-row">
+					<div class="zhl-field"><label>Bis (Datum)</label><input class="zhl-input" type="date" name="endDate" value="{$EndDate}" {if $EarliestYmd}min="{$EarliestYmd}"{/if} required></div>
+					<div class="zhl-field"><label>Uhrzeit</label><input class="zhl-input" type="time" name="endPeriod" value="{$EndTime}" required></div>
+				</div>
+
+				<div class="zhl-uplabel" style="margin-top:16px;">Übergabe</div>
+				<div class="zhl-choice">
+					<label class="zhl-choice-opt">
+						<input type="radio" name="handoverChoice" value="pickup" {if $Choice != 'training'}checked{/if}>
+						<span><strong>📦 Abholung</strong><br><span class="zhl-muted zhl-small">Ich kenne das Gerät und hole es zum Termin ab.</span></span>
+					</label>
+					<label class="zhl-choice-opt">
+						<input type="radio" name="handoverChoice" value="training" {if $Choice == 'training'}checked{/if}>
+						<span><strong>🎓 Einführung</strong><br><span class="zhl-muted zhl-small">Ich möchte vorab eine kurze Einführung in das Gerät.</span></span>
+					</label>
+				</div>
+
+				<div class="zhl-book-actions">
+					<button class="zhl-btn" type="submit">Verbindlich buchen ▸</button>
+				</div>
+				<p class="zhl-note">Verfügbarkeit, Vorlauf und Konflikte werden beim Buchen verbindlich geprüft. Die gewählte Übergabe-Art (Abholung/Einführung) wird vermerkt; die Termin-Verknüpfung folgt im nächsten Ausbauschritt.</p>
+			</form>
+		</div>
+	{/if}
 </div>
-
-<script>
-(function () {
-	var d = document.querySelector('input[name=beginDate]');
-	var a = document.getElementById('zhl-book-next');
-	if (d && a) {
-		var base = a.getAttribute('href').split('&rd=')[0];
-		d.addEventListener('change', function () { a.setAttribute('href', base + '&rd=' + encodeURIComponent(d.value)); });
-	}
-})();
-</script>
 
 {include file='globalfooter.tpl'}

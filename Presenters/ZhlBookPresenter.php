@@ -7,15 +7,15 @@ require_once(ROOT_DIR . 'Domain/namespace.php');
 require_once(ROOT_DIR . 'Domain/Access/namespace.php');
 require_once(ROOT_DIR . 'lib/Application/Schedule/namespace.php');
 require_once(ROOT_DIR . 'lib/Application/Attributes/namespace.php');
+require_once(ROOT_DIR . 'Presenters/Reservation/ReservationPresenterFactory.php');
+require_once(ROOT_DIR . 'Presenters/ZhlReservationFacade.php');
 
 /**
- * ZHL-Buchungs-Schritt (v-book, Stufe 1: Anzeige). Eine ZHL-gestylte Seite, die nach der Geräte-Wahl
- * statt der nativen reservation.php erscheint: zeigt das gewählte Gerät (Laien-Tag + Modellname),
- * den Zeitraum (mit Vorlauf/frühestem Start) und die Auswahl „Abholung vs. Einführung".
- *
- * Stufe 1 ist READ-ONLY (kein eigener Write); der „Weiter"-Button übergibt vorerst an die native
- * reservation.php. Stufe 2 ersetzt das durch einen eigenen Write über die native Validierung
- * (ReservationPresenterFactory/Facade), Stufe 3 verdrahtet Abholung/Einführung mit dem Übergabe-Modul.
+ * ZHL-Buchungs-Schritt (v-book). Eine ZHL-gestylte Seite zwischen Geräte-Wahl und Buchung:
+ * zeigt Gerät + Zeitraum (mit Vorlauf) + Auswahl Abholung/Einführung und legt beim Absenden eine
+ * ECHTE native Reservierung an — über ZhlReservationFacade → ReservationPresenterFactory →
+ * nativer ReservationHandler (volle Validierung bleibt letzte Instanz). v-book-3 verdrahtet die
+ * Abholung/Einführung zusätzlich mit dem Übergabe-Modul (zhl_booking_handover/terminplaner).
  */
 class ZhlBookPresenter
 {
@@ -26,49 +26,97 @@ class ZhlBookPresenter
         $this->page = $page;
     }
 
+    /** GET: Buchungsformular anzeigen (oder Erfolgs-Panel nach Redirect). */
     public function PageLoad(UserSession $user)
     {
+        $booked = isset($_GET['booked']) ? trim((string)$_GET['booked']) : '';
+        if ($booked !== '') {
+            $this->page->BindSuccess(['referenceNumber' => $booked]);
+            return;
+        }
+
         $tz = $user->Timezone;
         $rid = $this->readInt(QueryStringKeys::RESOURCE_ID, 0);
         $dateStr = $this->readDate(QueryStringKeys::RESERVATION_DATE, $tz);
 
-        $resourceService = new ResourceService(
-            new ResourceRepository(),
-            new SchedulePermissionService(PluginManager::Instance()->LoadPermission()),
-            new AttributeService(new AttributeRepository()),
-            new UserRepository(),
-            new AccessoryRepository()
-        );
-
-        // Permission-gefiltert laden — nur Geräte, die der Nutzer buchen darf.
-        $resource = null;
-        foreach ($resourceService->GetAllResources(false, $user) as $r) {
-            if ((int)$r->GetId() === $rid && $r->StatusId != ResourceStatus::HIDDEN) {
-                $resource = $r;
-                break;
-            }
+        $resource = $this->loadResource($user, $rid);
+        if ($resource === null) {
+            $this->page->RedirectToDashboard();
+            return;
         }
+        $this->bindForm($user, $resource, $dateStr, '09:00', $dateStr, '17:00', 'pickup', []);
+    }
+
+    /** POST: echte Reservierung anlegen. */
+    public function HandlePost(UserSession $user)
+    {
+        $tz = $user->Timezone;
+        $rid = (int)$this->post('resourceId');
+        $resource = $this->loadResource($user, $rid);
         if ($resource === null) {
             $this->page->RedirectToDashboard();
             return;
         }
 
+        $beginDate = $this->postDate('beginDate', $tz);
+        $endDate = $this->postDate('endDate', $tz);
+        $beginTime = $this->postTime('beginPeriod', '09:00');
+        $endTime = $this->postTime('endPeriod', '17:00');
+        $choice = $this->post('handoverChoice') === 'training' ? 'training' : 'pickup';
+
+        $type = $this->lookupType(ServiceLocator::GetDatabase(), $rid);
+        $titel = 'Ausleihe: ' . ($type !== null ? $type : $resource->GetName());
+        // Abholung/Einführung-Wunsch vorerst als Notiz mitführen (echte Verknüpfung folgt v-book-3).
+        $desc = $choice === 'training' ? '[ZHL] Einführung gewünscht' : '[ZHL] Abholung';
+
+        $facade = new ZhlReservationFacade($user->UserId, $rid, $titel, $desc, $beginDate, $beginTime, $endDate, $endTime);
+        try {
+            $factory = new ReservationPresenterFactory();
+            $presenter = $factory->Create($facade, $user);
+            $series = $presenter->BuildReservation();
+            $presenter->HandleReservation($series);
+        } catch (Exception $ex) {
+            Log::Error('ZHL-Buchung fehlgeschlagen: %s', $ex);
+            $this->bindForm($user, $resource, $beginDate, $beginTime, $endDate, $endTime, $choice, ['Unerwarteter Fehler beim Buchen. Bitte erneut versuchen.']);
+            return;
+        }
+
+        if ($facade->WasSaved()) {
+            $this->page->RedirectToSuccess($facade->ReferenceNumber());
+            return;
+        }
+
+        $errors = $facade->GetErrors();
+        if (empty($errors)) {
+            $errors = ['Die Buchung konnte nicht angelegt werden.'];
+        }
+        $this->bindForm($user, $resource, $beginDate, $beginTime, $endDate, $endTime, $choice, $errors);
+    }
+
+    // --- intern ---
+
+    private function bindForm(UserSession $user, $resource, $beginDate, $beginTime, $endDate, $endTime, $choice, array $errors)
+    {
         $db = ServiceLocator::GetDatabase();
+        $tz = $user->Timezone;
+        $rid = (int)$resource->GetId();
         $type = $this->lookupType($db, $rid);
         $scheduleName = $this->lookupScheduleName($db, (int)$resource->ScheduleId);
 
-        // Vorlauf: frühester buchbarer Tag (identisch zur nativen ResourceMinimumNoticeRuleAdd).
         $noticeSec = $this->lookupMinNotice($db, $rid);
-        $earliestDateStr = $dateStr;
         $minNoticeDays = 0;
         $earliestLabel = null;
+        $earliestYmd = null;
         if ($noticeSec > 0) {
             $earliest = Date::Now()->ApplyDifference(TimeInterval::Parse($noticeSec)->Interval())->ToTimezone($tz);
             $minNoticeDays = (int)ceil($noticeSec / 86400);
             $earliestLabel = $earliest->Format('d.m.Y');
-            // Default-Datum nie vor dem frühesten Start.
-            if ($dateStr < $earliest->Format('Y-m-d')) {
-                $earliestDateStr = $earliest->Format('Y-m-d');
+            $earliestYmd = $earliest->Format('Y-m-d');
+            if ($beginDate < $earliestYmd) {
+                $beginDate = $earliestYmd;
+            }
+            if ($endDate < $beginDate) {
+                $endDate = $beginDate;
             }
         }
 
@@ -78,13 +126,36 @@ class ZhlBookPresenter
             'resourceName' => (string)$resource->GetName(),
             'resourceType' => $type,
             'scheduleName' => $scheduleName,
-            'beginDate' => $earliestDateStr,
-            'endDate' => $earliestDateStr,
-            'beginTime' => '09:00',
-            'endTime' => '17:00',
+            'beginDate' => $beginDate,
+            'endDate' => $endDate,
+            'beginTime' => $beginTime,
+            'endTime' => $endTime,
+            'choice' => $choice,
             'minNoticeDays' => $minNoticeDays,
             'earliestLabel' => $earliestLabel,
+            'earliestYmd' => $earliestYmd,
+            'errors' => $errors,
         ]);
+    }
+
+    private function loadResource(UserSession $user, int $rid)
+    {
+        if ($rid <= 0) {
+            return null;
+        }
+        $resourceService = new ResourceService(
+            new ResourceRepository(),
+            new SchedulePermissionService(PluginManager::Instance()->LoadPermission()),
+            new AttributeService(new AttributeRepository()),
+            new UserRepository(),
+            new AccessoryRepository()
+        );
+        foreach ($resourceService->GetAllResources(false, $user) as $r) {
+            if ((int)$r->GetId() === $rid && $r->StatusId != ResourceStatus::HIDDEN) {
+                return $r;
+            }
+        }
+        return null;
     }
 
     private function lookupType($db, int $rid): ?string
@@ -132,9 +203,30 @@ class ZhlBookPresenter
     private function readDate($key, $tz)
     {
         $v = isset($_GET[$key]) ? (string)$_GET[$key] : '';
+        return $this->validDate($v, $tz);
+    }
+
+    private function postDate($key, $tz)
+    {
+        return $this->validDate($this->post($key), $tz);
+    }
+
+    private function postTime($key, $default)
+    {
+        $v = $this->post($key);
+        return preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', $v) ? $v : $default;
+    }
+
+    private function validDate($v, $tz)
+    {
         if (preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $v, $m) && checkdate((int)$m[2], (int)$m[3], (int)$m[1])) {
             return $v;
         }
         return Date::Now()->ToTimezone($tz)->Format('Y-m-d');
+    }
+
+    private function post($key)
+    {
+        return isset($_POST[$key]) ? (string)$_POST[$key] : '';
     }
 }

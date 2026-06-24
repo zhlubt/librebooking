@@ -433,8 +433,19 @@ CSRF im Formular vorbereitet. Permission-geprüft (ungültige rid → Redirect D
 **Interim:** „Weiter" führt vorerst noch an native `reservation.php` (klar beschriftet) — wird in v-book-2
 durch eigenen Write ersetzt.
 
-**Nächste Schritte (Buchungs-Epic):** **v-book-2** eigener Write über Facade→`ReservationPresenterFactory`
-→ nativer `ReservationHandler` (Codex-Review des Schreibwegs läuft, Crash-/Pflichtfeld-Risiken klären);
-**v-book-3** Abholung/Einführung echt mit `zhl_booking_handover`+terminplaner verdrahten (neuer
-training-Typ). **Danach:** v3b-3 Seminarraum (vorerst nur „Wo aufnehmen?"-Hinweis) · v3b-4 Studio-Dialoge
-· stabile Typ-Referenz.
+**Stand v-book-2 (gebaut + deployt + E2E-verifiziert 2026-06-24, eigener Write):**
+`Presenters/ZhlReservationFacade.php` implementiert die VOLLE `IReservationSavePage` (inkl.
+IReservationSaveResultsView + IRepeatOptionsComposite — Codex-Review bestätigte: jede Methode nötig,
+sonst Crash; Einzel-Buchung, keine Wiederholung/Reminder/Teilnehmer). ZhlBookPage POST →
+EnforceCSRFCheck → `ReservationPresenterFactory::Create($facade,$user)` → BuildReservation +
+HandleReservation → **nativer ReservationHandler** (volle Validierung bleibt letzte Instanz). Erfolg →
+PRG auf `?booked=<ref>` (Erfolgs-Panel + „Meine Buchungen"); Fehler → Formular mit nativen Fehlertexten.
+**E2E gegen media getestet:** echte Reservierung angelegt (TZ korrekt 09→07 UTC, title „Ausleihe:
+Videostudio", desc „[ZHL] Abholung", Ressource 21), Erfolgsseite ok; Testbuchung danach wieder gelöscht.
+Fehlerpfad: „Startzeitpunkt muss vor Endzeitpunkt" sauber gerendert. **Kein „altes Layout" mehr beim
+Speichern.** Übergabe-Wahl wird vorerst nur als Notiz im `description` mitgeführt.
+
+**Nächste Schritte (Buchungs-Epic):** **v-book-3** Abholung/Einführung echt mit `zhl_booking_handover` +
+terminplaner (meet.zhl-ubt.de) verdrahten — neuer „Einführung"/training-Typ (braucht Slot-Endpunkt im
+Terminplaner), Token-Erzeugung + PostReservation-Verknüpfung der Ref. **Danach:** v3b-3 Seminarraum
+(vorerst nur „Wo aufnehmen?"-Hinweis) · v3b-4 Studio-Dialoge · stabile Typ-Referenz.

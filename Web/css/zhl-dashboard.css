@@ -218,3 +218,5 @@
 .zhl-dash .zhl-choice-opt:hover { border-color: var(--zg); background: var(--bg-soft); }
 .zhl-dash .zhl-choice-opt input { margin-top: 3px; }
 .zhl-dash .zhl-book-actions { margin-top: 18px; }
+.zhl-dash .zhl-book-errors { background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; border-radius: 10px; padding: 12px 16px; margin-bottom: 16px; }
+.zhl-dash .zhl-book-errors ul { margin: 6px 0 0; padding-left: 20px; }

@@ -32,7 +32,9 @@ class ZhlDashboardPresenter
         $tz = $user->Timezone;
 
         $startStr = $this->readDate('start', $tz);
-        $days = $this->readInt('days', 7, 1, 31);
+        // „days" = Vorschau-Zeitraum des Rasters (nicht die Ausleihdauer — die wählt man beim Buchen).
+        // Mindestens 7 Tage Vorschau, damit man sieht, WANN ein Gerät frei wird (Vorlauf gelb → frei grün).
+        $days = max(7, $this->readInt('days', 14, 1, 31));
         $scheduleId = $this->readInt('schedule', 0, 0, PHP_INT_MAX);
         $search = trim((string)$this->readRaw('q'));
 

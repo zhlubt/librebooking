@@ -30,14 +30,12 @@
 			<input class="zhl-input" type="date" name="start" value="{$StartInput}">
 		</div>
 		<div class="zhl-field">
-			<label>Tage</label>
-			<select class="zhl-input" name="days">
-				<option value="1" {if $Days == 1}selected{/if}>1</option>
-				<option value="3" {if $Days == 3}selected{/if}>3</option>
-				<option value="7" {if $Days == 7}selected{/if}>7</option>
-				<option value="14" {if $Days == 14}selected{/if}>14</option>
-				<option value="21" {if $Days == 21}selected{/if}>21</option>
-				<option value="30" {if $Days == 30}selected{/if}>30</option>
+			<label>Vorschau</label>
+			<select class="zhl-input" name="days" title="Wie viele Tage Verfügbarkeit das Raster zeigt (die Ausleihdauer wählst du beim Buchen).">
+				<option value="7" {if $Days == 7}selected{/if}>7 Tage</option>
+				<option value="14" {if $Days == 14}selected{/if}>14 Tage</option>
+				<option value="21" {if $Days == 21}selected{/if}>21 Tage</option>
+				<option value="30" {if $Days == 30}selected{/if}>30 Tage</option>
 			</select>
 		</div>
 		<button class="zhl-btn" type="submit">Anzeigen</button>

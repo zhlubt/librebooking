@@ -69,22 +69,27 @@
 					<div class="zhl-field"><label>Uhrzeit</label><input class="zhl-input" type="time" name="endPeriod" value="{$EndTime}" required></div>
 				</div>
 
-				<div class="zhl-uplabel" style="margin-top:16px;">Übergabe</div>
-				<div class="zhl-choice">
-					<label class="zhl-choice-opt">
-						<input type="radio" name="handoverChoice" value="pickup" {if $Choice != 'training'}checked{/if}>
-						<span><strong>📦 Abholung</strong><br><span class="zhl-muted zhl-small">Ich kenne das Gerät und hole es zum Termin ab.</span></span>
-					</label>
-					<label class="zhl-choice-opt">
-						<input type="radio" name="handoverChoice" value="training" {if $Choice == 'training'}checked{/if}>
-						<span><strong>🎓 Einführung</strong><br><span class="zhl-muted zhl-small">Ich möchte vorab eine kurze Einführung in das Gerät.</span></span>
-					</label>
+				<div class="zhl-uplabel" style="margin-top:16px;">Übergabe & Einführung</div>
+				<div class="zhl-ueb">
+					{if $Abholung == 'nicht_noetig'}
+						<div class="zhl-ueb-item"><strong>🔑 Keine Abholung nötig</strong> <span class="zhl-muted zhl-small">Zugang z. B. über Schlüsseltresor.</span></div>
+					{elseif $Abholung == 'abholen_persoenlich'}
+						<div class="zhl-ueb-item"><strong>📦 Abholung – persönlich</strong> <span class="zhl-muted zhl-small">{if $Abholort}Ort: {$Abholort|escape} · {/if}Dieses Gerät wird persönlich übergeben.</span></div>
+					{else}
+						<div class="zhl-ueb-item"><strong>📦 Abholung</strong>{if $Abholort} <span class="zhl-muted zhl-small">Ort: {$Abholort|escape}</span>{/if}</div>
+					{/if}
+
+					{if $Einfuehrung == 'notwendig'}
+						<div class="zhl-ueb-item req"><strong>🎓 Einführung erforderlich</strong> <span class="zhl-muted zhl-small">{if $EinfuehrungTyp}Termintyp „{$EinfuehrungTyp|escape}" · {/if}vor der Nutzung persönlich nötig (auch zu früherem Termin).</span></div>
+					{elseif $Einfuehrung == 'moeglich'}
+						<div class="zhl-ueb-item"><strong>🎓 Einführung möglich</strong> <span class="zhl-muted zhl-small">{if $EinfuehrungTyp}Termintyp „{$EinfuehrungTyp|escape}"{/if}</span></div>
+					{/if}
 				</div>
 
 				<div class="zhl-book-actions">
 					<button class="zhl-btn" type="submit">Verbindlich buchen ▸</button>
 				</div>
-				<p class="zhl-note">Verfügbarkeit, Vorlauf und Konflikte werden beim Buchen verbindlich geprüft. Die gewählte Übergabe-Art (Abholung/Einführung) wird vermerkt; die Termin-Verknüpfung folgt im nächsten Ausbauschritt.</p>
+				<p class="zhl-note">Verfügbarkeit, Vorlauf und Konflikte werden beim Buchen verbindlich geprüft. Die Übergabe-Anforderung dieses Geräts wird vermerkt; die Termin-Auswahl direkt hier im Tool (statt Weiterleitung) folgt mit der Terminplaner-Anbindung.</p>
 			</form>
 		</div>
 	{/if}

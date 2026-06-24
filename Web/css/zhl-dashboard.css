@@ -220,3 +220,8 @@
 .zhl-dash .zhl-book-actions { margin-top: 18px; }
 .zhl-dash .zhl-book-errors { background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; border-radius: 10px; padding: 12px 16px; margin-bottom: 16px; }
 .zhl-dash .zhl-book-errors ul { margin: 6px 0 0; padding-left: 20px; }
+
+/* v-book-3 — Übergabe/Einführung-Anforderungen (pro Gerät) */
+.zhl-dash .zhl-ueb { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+.zhl-dash .zhl-ueb-item { border: 1px solid var(--border); border-left: 3px solid var(--zg); border-radius: 8px; padding: 10px 12px; }
+.zhl-dash .zhl-ueb-item.req { border-left-color: #d97706; background: #fffbeb; }

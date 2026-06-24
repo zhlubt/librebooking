@@ -64,10 +64,12 @@ class ZhlBookPresenter
         $endTime = $this->postTime('endPeriod', '17:00');
         $choice = $this->post('handoverChoice') === 'training' ? 'training' : 'pickup';
 
-        $type = $this->lookupType(ServiceLocator::GetDatabase(), $rid);
+        $db = ServiceLocator::GetDatabase();
+        $type = $this->lookupType($db, $rid);
         $titel = 'Ausleihe: ' . ($type !== null ? $type : $resource->GetName());
-        // Abholung/Einführung-Wunsch vorerst als Notiz mitführen (echte Verknüpfung folgt v-book-3).
-        $desc = $choice === 'training' ? '[ZHL] Einführung gewünscht' : '[ZHL] Abholung';
+        // Übergabe-Anforderung des Geräts als Notiz an die Reservierung mitführen (v-book-3).
+        $ueb = $this->lookupUebergabe($db, $rid);
+        $desc = $this->uebergabeNote($ueb);
 
         $facade = new ZhlReservationFacade($user->UserId, $rid, $titel, $desc, $beginDate, $beginTime, $endDate, $endTime);
         try {
@@ -103,6 +105,8 @@ class ZhlBookPresenter
         $type = $this->lookupType($db, $rid);
         $scheduleName = $this->lookupScheduleName($db, (int)$resource->ScheduleId);
 
+        $ueb = $this->lookupUebergabe($db, $rid);
+
         $noticeSec = $this->lookupMinNotice($db, $rid);
         $minNoticeDays = 0;
         $earliestLabel = null;
@@ -134,6 +138,10 @@ class ZhlBookPresenter
             'minNoticeDays' => $minNoticeDays,
             'earliestLabel' => $earliestLabel,
             'earliestYmd' => $earliestYmd,
+            'abholung' => $ueb['abholung'],
+            'abholort' => $ueb['abholort'],
+            'einfuehrung' => $ueb['einfuehrung'],
+            'einfuehrungTyp' => $ueb['einfuehrung_typ'],
             'errors' => $errors,
         ]);
     }
@@ -182,6 +190,47 @@ class ZhlBookPresenter
         $row = $reader->GetRow();
         $reader->Free();
         return $row ? (string)$row['name'] : '';
+    }
+
+    /** Übergabe-Konfiguration des Geräts (zhl_uebergabe) mit Defaults, falls nicht gepflegt. */
+    private function lookupUebergabe($db, int $rid): array
+    {
+        $def = ['abholung' => 'abholen', 'abholort' => null, 'einfuehrung' => 'keine', 'einfuehrung_typ' => null, 'tp_member_id' => null, 'vorlauf_toleranz_h' => 0];
+        $cmd = new AdHocCommand('SELECT abholung, abholort, einfuehrung, einfuehrung_typ, tp_member_id, vorlauf_toleranz_h FROM zhl_uebergabe WHERE resource_id = @r LIMIT 1');
+        $cmd->AddParameter(new Parameter('@r', $rid));
+        $reader = $db->Query($cmd);
+        $row = $reader->GetRow();
+        $reader->Free();
+        if (!$row) {
+            return $def;
+        }
+        return [
+            'abholung' => (string)($row['abholung'] ?? 'abholen'),
+            'abholort' => $row['abholort'] !== null && $row['abholort'] !== '' ? (string)$row['abholort'] : null,
+            'einfuehrung' => (string)($row['einfuehrung'] ?? 'keine'),
+            'einfuehrung_typ' => $row['einfuehrung_typ'] !== null && $row['einfuehrung_typ'] !== '' ? (string)$row['einfuehrung_typ'] : null,
+            'tp_member_id' => $row['tp_member_id'] !== null ? (int)$row['tp_member_id'] : null,
+            'vorlauf_toleranz_h' => (int)($row['vorlauf_toleranz_h'] ?? 0),
+        ];
+    }
+
+    /** Notiz für die Reservierungs-Beschreibung aus der Übergabe-Konfiguration. */
+    private function uebergabeNote(array $ueb): string
+    {
+        $parts = [];
+        if ($ueb['abholung'] === 'abholen_persoenlich') {
+            $parts[] = 'Abholung (persönlich)' . ($ueb['abholort'] ? ': ' . $ueb['abholort'] : '');
+        } elseif ($ueb['abholung'] === 'abholen') {
+            $parts[] = 'Abholung' . ($ueb['abholort'] ? ': ' . $ueb['abholort'] : '');
+        } elseif ($ueb['abholung'] === 'nicht_noetig') {
+            $parts[] = 'keine Abholung nötig';
+        }
+        if ($ueb['einfuehrung'] === 'notwendig') {
+            $parts[] = 'Einführung NÖTIG' . ($ueb['einfuehrung_typ'] ? ' (' . $ueb['einfuehrung_typ'] . ')' : '');
+        } elseif ($ueb['einfuehrung'] === 'moeglich') {
+            $parts[] = 'Einführung möglich' . ($ueb['einfuehrung_typ'] ? ' (' . $ueb['einfuehrung_typ'] . ')' : '');
+        }
+        return '[ZHL] ' . implode(' · ', $parts);
     }
 
     private function lookupMinNotice($db, int $rid): int

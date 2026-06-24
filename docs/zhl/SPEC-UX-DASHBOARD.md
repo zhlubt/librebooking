@@ -473,7 +473,27 @@ pflegt) vs. pro Buchung? feste Liste + Freitext? (b) Mapping Gerät/Bundle → E
 wo gepflegt (neue ZHL-Tabelle/Attribut), und die konkreten type_ids; (c) Reihenfolge: erst buchen dann
 Termin, oder Termin als Voraussetzung? (d) Terminplaner-Rework liefert stabile type_ids/Exponierung.
 
-**Buildbar auf ZHL-Seite (sobald a–c geklärt):** Buchungsseite trennt „Abholung" (Ort anzeigen/wählen)
-von „Einführung" (Deep-Link zum passenden Termintyp); Admin-Mapping Gerät→Termintyp.
+**Stand v-book-3 Inkrement 1 (gebaut + deployt + verifiziert 2026-06-24):** Per-Gerät-Übergabe-Konfig
+`zhl_uebergabe` (Migration `010`, Schlüssel resource_id — Typ-Ebene reicht nicht: Pocket 6K + Sony ZV1
+beide Typ „Kamera"). Felder: abholung (nicht_noetig|abholen|abholen_persoenlich), abholort (Freitext
+Medienmanager), einfuehrung (keine|moeglich|notwendig), einfuehrung_typ (Terminplaner-Label),
+tp_member_id (default 2/Paul), vorlauf_toleranz_h (default 48). Seed: Videostudio (keine Abholung,
+Einführung notwendig „Einführung ins Videostudio"), Pocket 6K (Abholung persönlich, Einführung möglich
+„Einführung in Medien"), 9 Funkmikrofone (Abholung, Einführung möglich). Buchungsseite zeigt die
+Anforderungen pro Gerät (statt statischer Radios); Reservierungs-Notiz wird daraus gebaut. Alle 4 Fälle
+render-verifiziert.
+
+**WICHTIG — Embedded-Slots blockiert auf Terminplaner-Rework:** Nutzer will, dass der User NICHT auf meet
+geht, sondern Slots **im Tool** sieht + bucht (prioritär SHK; Typen „Einführung Medien"/„Einführung
+Videostudio"; Test-Typen + Termine existieren bei member 2). Aber: `handover_slots.php` exponiert nur
+Typ 32 „Medienübergabe"; `/api/types|slots|training_slots|einfuehrung_slots.php` → 404. **Benötigte
+Terminplaner-API (meet-Workstream, Nutzer):** (1) READ Slots gefiltert nach Termintyp-Label/member
+(„Einführung …"), (2) WRITE: Slot aus dem Tool heraus buchen (sonst kein „im Tool bleiben"). Bis dahin
+zeigt die ZHL-Seite die Anforderung als Info, ohne Slot-Picker.
+
+**Noch offen (ZHL-Seite, baubar ohne Terminplaner):** Admin-UI zum Pflegen von `zhl_uebergabe` pro Gerät
+(inkl. Bulk „für ganzen Typ"); Vorlauf-Toleranz-Logik (Übergabe-/Einweisungstermin darf Vorlauf um
+`vorlauf_toleranz_h` unterschreiten); Reihenfolge-Flow: Übergabetermin VOR Reservierungsabschluss
+abstimmen (Team-Verfügbarkeit Mo/Di vs. Ausleihe ab Do → Abholung muss früher).
 
 **Danach:** v3b-3 Seminarraum (vorerst nur „Wo aufnehmen?"-Hinweis) · v3b-4 Studio-Dialoge · stabile Typ-Referenz.

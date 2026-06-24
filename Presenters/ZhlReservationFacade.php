@@ -24,6 +24,8 @@ class ZhlReservationFacade implements IReservationSavePage
     private $endDate;     // 'Y-m-d'
     private $beginTime;   // 'H:i'
     private $endTime;     // 'H:i'
+    /** @var object[] je Element ->Id (int) und ->Value (string) — Reservierungs-Custom-Attribute */
+    private $attributeValues = [];
 
     // Ergebnis (von Handler/Presenter zurückgeschrieben)
     private $saved = false;
@@ -32,7 +34,7 @@ class ZhlReservationFacade implements IReservationSavePage
     private $referenceNumber = '';
     private $requiresApproval = false;
 
-    public function __construct($userId, $resourceId, $title, $description, $beginDate, $beginTime, $endDate, $endTime)
+    public function __construct($userId, $resourceId, $title, $description, $beginDate, $beginTime, $endDate, $endTime, array $attributeValues = [])
     {
         $this->userId = (int)$userId;
         $this->resourceId = (int)$resourceId;
@@ -42,6 +44,7 @@ class ZhlReservationFacade implements IReservationSavePage
         $this->beginTime = (string)$beginTime;
         $this->endDate = (string)$endDate;
         $this->endTime = (string)$endTime;
+        $this->attributeValues = $attributeValues;
     }
 
     // --- Eingabe (IReservationSavePage) ---
@@ -95,7 +98,7 @@ class ZhlReservationFacade implements IReservationSavePage
     }
     public function GetAttributes()
     {
-        return [];
+        return $this->attributeValues;
     }
     public function GetAttachments()
     {

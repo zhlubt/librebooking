@@ -496,6 +496,20 @@ zeigt die ZHL-Seite die Anforderung als Info, ohne Slot-Picker.
 `vorlauf_toleranz_h` unterschreiten); Reihenfolge-Flow: Übergabetermin VOR Reservierungsabschluss
 abstimmen (Team-Verfügbarkeit Mo/Di vs. Ausleihe ab Do → Abholung muss früher).
 
+**Terminplaner-API STEHT (verifiziert 2026-06-24):** `GET /api/lesson_slots.php?type_label=<Label>&member_id=<id?>`
+(X-API-Key) → wie handover_slots: members[].slots[]. type_id **33** = „Einführung ins Videostudio" (30 min),
+**34** = „Einführung in Medien" (15 min). `POST /api/book_slot.php` (X-API-Key) Body
+`{member_id,type_id,slot_id,name,email,note}` → `{status:'ok',booking_id}` (Probe mit ungültigem slot →
+`409 „slot nicht mehr verfügbar"`). Beide Endpunkte live für member 2 (Paul).
+
+**Reservierungs-Custom-Attribute (Fix 2026-06-24):** ZhlBookPresenter lädt via AttributeService::GetByCategory
+(RESERVATION=1) die für das Gerät geltenden Attribute (Skip-Logik wie native Validate: Unique/Secondary-Entity
++ AdminOnly), rendert sie (Checkbox/Text/Textarea/Select) und reicht Werte über die Facade als
+`{Id,Value}` durch → in custom_attribute_values persistiert. media: id5 „Haftpflichtversicherung" (Checkbox,
+Pflicht), id6 „3 Terminvorschläge" (Multiline, Pflicht, nur best. Ressourcen), id7 „Einführung gewünscht?"
+(opt), id9 Language (opt). **Achtung native Eigenheit:** Admins sind von Pflicht-Attributen befreit
+(leere Werte werden für Admins übersprungen) — Test daher mit Nicht-Admin.
+
 **ENTSCHEIDUNG 2026-06-24: „Erst Terminplaner abwarten".** Nutzer baut zuerst die Terminplaner-API
 (lesen + buchen), DANN baut Claude den eingebetteten Slot-Picker in einem Rutsch. Bis dahin ZHL-Bau pausiert.
 

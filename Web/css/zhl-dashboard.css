@@ -225,3 +225,9 @@
 .zhl-dash .zhl-ueb { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
 .zhl-dash .zhl-ueb-item { border: 1px solid var(--border); border-left: 3px solid var(--zg); border-radius: 8px; padding: 10px 12px; }
 .zhl-dash .zhl-ueb-item.req { border-left-color: #d97706; background: #fffbeb; }
+
+/* v-book — Reservierungs-Custom-Attribute (z. B. Haftpflicht-Pflichtfeld) */
+.zhl-dash .zhl-attrs { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; }
+.zhl-dash .zhl-attr-check { display: flex; gap: 9px; align-items: flex-start; border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; cursor: pointer; }
+.zhl-dash .zhl-attr-check input { margin-top: 3px; }
+.zhl-dash .zhl-req { color: #d97706; font-weight: 700; }

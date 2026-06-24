@@ -86,6 +86,31 @@
 					{/if}
 				</div>
 
+				{if $Attributes}
+					<div class="zhl-uplabel" style="margin-top:16px;">Angaben</div>
+					<div class="zhl-attrs">
+						{foreach from=$Attributes item=a}
+							{if $a.type == 4}
+								<label class="zhl-attr-check">
+									<input type="checkbox" name="attr_{$a.id}" value="1" {if $a.value != ''}checked{/if} {if $a.required}required{/if}>
+									<span>{$a.label|escape}{if $a.required} <span class="zhl-req">*</span>{/if}</span>
+								</label>
+							{elseif $a.type == 2}
+								<div class="zhl-field"><label>{$a.label|escape}{if $a.required} <span class="zhl-req">*</span>{/if}</label><textarea class="zhl-input" name="attr_{$a.id}" rows="2" {if $a.required}required{/if}>{$a.value|escape}</textarea></div>
+							{elseif $a.type == 3}
+								<div class="zhl-field"><label>{$a.label|escape}{if $a.required} <span class="zhl-req">*</span>{/if}</label>
+									<select class="zhl-input" name="attr_{$a.id}" {if $a.required}required{/if}>
+										<option value="">– bitte wählen –</option>
+										{foreach from=$a.options item=opt}<option value="{$opt|escape}" {if $a.value == $opt}selected{/if}>{$opt|escape}</option>{/foreach}
+									</select>
+								</div>
+							{else}
+								<div class="zhl-field"><label>{$a.label|escape}{if $a.required} <span class="zhl-req">*</span>{/if}</label><input class="zhl-input" type="text" name="attr_{$a.id}" value="{$a.value|escape}" {if $a.required}required{/if}></div>
+							{/if}
+						{/foreach}
+					</div>
+				{/if}
+
 				<div class="zhl-book-actions">
 					<button class="zhl-btn" type="submit">Verbindlich buchen ▸</button>
 				</div>

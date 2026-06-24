@@ -71,7 +71,20 @@ class ZhlBookPresenter
         $ueb = $this->lookupUebergabe($db, $rid);
         $desc = $this->uebergabeNote($ueb);
 
-        $facade = new ZhlReservationFacade($user->UserId, $rid, $titel, $desc, $beginDate, $beginTime, $endDate, $endTime);
+        // Reservierungs-Custom-Attribute (z. B. Pflichtfeld „Haftpflichtversicherung") einsammeln.
+        $attrDefs = $this->applicableReservationAttributes($rid, (bool)$user->IsAdmin);
+        $attrValues = [];      // id => eingegebener Wert (für Re-Render)
+        $facadeAttrs = [];     // ->Id/->Value für die Facade
+        foreach ($attrDefs as $a) {
+            $val = isset($_POST['attr_' . $a->Id()]) ? trim((string)$_POST['attr_' . $a->Id()]) : '';
+            $attrValues[(int)$a->Id()] = $val;
+            $o = new stdClass();
+            $o->Id = (int)$a->Id();
+            $o->Value = $val;
+            $facadeAttrs[] = $o;
+        }
+
+        $facade = new ZhlReservationFacade($user->UserId, $rid, $titel, $desc, $beginDate, $beginTime, $endDate, $endTime, $facadeAttrs);
         try {
             $factory = new ReservationPresenterFactory();
             $presenter = $factory->Create($facade, $user);
@@ -79,7 +92,7 @@ class ZhlBookPresenter
             $presenter->HandleReservation($series);
         } catch (Exception $ex) {
             Log::Error('ZHL-Buchung fehlgeschlagen: %s', $ex);
-            $this->bindForm($user, $resource, $beginDate, $beginTime, $endDate, $endTime, $choice, ['Unerwarteter Fehler beim Buchen. Bitte erneut versuchen.']);
+            $this->bindForm($user, $resource, $beginDate, $beginTime, $endDate, $endTime, $choice, ['Unerwarteter Fehler beim Buchen. Bitte erneut versuchen.'], $attrValues);
             return;
         }
 
@@ -92,16 +105,29 @@ class ZhlBookPresenter
         if (empty($errors)) {
             $errors = ['Die Buchung konnte nicht angelegt werden.'];
         }
-        $this->bindForm($user, $resource, $beginDate, $beginTime, $endDate, $endTime, $choice, $errors);
+        $this->bindForm($user, $resource, $beginDate, $beginTime, $endDate, $endTime, $choice, $errors, $attrValues);
     }
 
     // --- intern ---
 
-    private function bindForm(UserSession $user, $resource, $beginDate, $beginTime, $endDate, $endTime, $choice, array $errors)
+    private function bindForm(UserSession $user, $resource, $beginDate, $beginTime, $endDate, $endTime, $choice, array $errors, array $attrValues = [])
     {
         $db = ServiceLocator::GetDatabase();
         $tz = $user->Timezone;
         $rid = (int)$resource->GetId();
+
+        // Reservierungs-Custom-Attribute, die für dieses Gerät gelten (Pflicht-/Optionalfelder).
+        $attributes = [];
+        foreach ($this->applicableReservationAttributes($rid, (bool)$user->IsAdmin) as $a) {
+            $attributes[] = [
+                'id' => (int)$a->Id(),
+                'label' => (string)$a->Label(),
+                'type' => (int)$a->Type(),
+                'required' => (bool)$a->Required(),
+                'options' => $a->PossibleValueList(),
+                'value' => array_key_exists((int)$a->Id(), $attrValues) ? (string)$attrValues[(int)$a->Id()] : '',
+            ];
+        }
         $type = $this->lookupType($db, $rid);
         $scheduleName = $this->lookupScheduleName($db, (int)$resource->ScheduleId);
 
@@ -142,8 +168,33 @@ class ZhlBookPresenter
             'abholort' => $ueb['abholort'],
             'einfuehrung' => $ueb['einfuehrung'],
             'einfuehrungTyp' => $ueb['einfuehrung_typ'],
+            'attributes' => $attributes,
             'errors' => $errors,
         ]);
+    }
+
+    /**
+     * Reservierungs-Custom-Attribute, die für dieses Gerät gelten — gleiche Skip-Logik wie
+     * AttributeService::Validate (Unique/Secondary-Entity-Filter + AdminOnly). So zeigt die ZHL-Seite
+     * genau die Felder, die die native Save-Validierung erwartet (z. B. Pflicht „Haftpflichtversicherung").
+     * @return CustomAttribute[]
+     */
+    private function applicableReservationAttributes(int $resourceId, bool $isAdmin): array
+    {
+        $svc = new AttributeService(new AttributeRepository());
+        $ids = [$resourceId];
+        $out = [];
+        foreach ($svc->GetByCategory(CustomAttributeCategory::RESERVATION) as $a) {
+            if (($a->UniquePerEntity() && count(array_intersect($ids, $a->EntityIds())) == 0) ||
+                ($a->HasSecondaryEntities() && count(array_intersect($ids, $a->SecondaryEntityIds())) == 0)) {
+                continue;
+            }
+            if ($a->AdminOnly() && !$isAdmin) {
+                continue;
+            }
+            $out[] = $a;
+        }
+        return $out;
     }
 
     private function loadResource(UserSession $user, int $rid)

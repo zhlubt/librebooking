@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Anmelden – Medienausleihe ZHL</title>
+{literal}
+<style>
+  :root {
+    --green:#009260; --green-dark:#00744c;
+    --grad:linear-gradient(135deg,#009260 0%,#007a50 100%);
+    --grad-hero:linear-gradient(150deg,#007a50 0%,#009260 55%,#00a86d 100%);
+    --ink:#1f2a25; --ink-2:#3f4d46; --muted:#6b7a72;
+    --line:#e3eae6; --bg:#f5f8f6; --bg-soft:#eef3f0; --card:#fff;
+    --r-sm:10px; --r:14px; --r-lg:20px;
+    --shadow:0 2px 8px rgba(20,40,30,.06);
+    --shadow-lg:0 18px 50px rgba(0,116,76,.16);
+    --ease:cubic-bezier(.2,.7,.2,1);
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; min-height:100vh; display:flex; flex-direction:column; background:var(--bg); color:var(--ink-2);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Oxygen,Ubuntu,Cantarell,sans-serif; line-height:1.55; }
+  a { color:inherit; text-decoration:none; }
+  h1,h2,h3 { color:var(--ink); font-weight:650; letter-spacing:-.02em; margin:0; }
+  .wrap { max-width:1140px; margin:0 auto; padding:0 24px; width:100%; }
+
+  header { background:var(--grad); color:#fff; box-shadow:0 2px 14px rgba(0,80,52,.18); }
+  .nav { display:flex; align-items:center; gap:16px; height:68px; }
+  .logo img { height:34px; filter:brightness(0) invert(1); }
+  .nav .right { margin-left:auto; display:flex; align-items:center; gap:12px; }
+  .back { font-size:15px; color:rgba(255,255,255,.9); display:inline-flex; align-items:center; gap:8px; padding:8px 14px; border-radius:var(--r-sm); transition:background .15s var(--ease); }
+  .back:hover { background:rgba(255,255,255,.14); color:#fff; }
+  .back svg { width:17px; height:17px; }
+  .lang-btn { background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.4); color:#fff; font:inherit; font-size:13px; font-weight:600; padding:7px 12px; border-radius:var(--r-sm); cursor:pointer; transition:background .15s var(--ease); }
+  .lang-btn:hover { background:rgba(255,255,255,.24); }
+
+  main { flex:1; display:flex; align-items:center; padding:clamp(28px,5vw,64px) 0; }
+  .login-card { display:grid; grid-template-columns:1.05fr 1fr; max-width:920px; margin:0 auto; width:100%; background:var(--card); border:1px solid var(--line); border-radius:var(--r-lg); box-shadow:var(--shadow-lg); overflow:hidden; }
+  @media (max-width:760px){ .login-card { grid-template-columns:1fr; } }
+
+  .explain { background:var(--grad-hero); color:#fff; padding:clamp(28px,3.4vw,42px); }
+  .explain .eyebrow { font-size:13px; font-weight:600; letter-spacing:.04em; color:rgba(255,255,255,.82); margin:0 0 10px; }
+  .explain h1 { color:#fff; font-size:clamp(24px,2.6vw,30px); line-height:1.12; margin-bottom:8px; }
+  .explain > p { color:rgba(255,255,255,.9); font-size:15px; margin:0 0 24px; }
+  .points { display:flex; flex-direction:column; gap:16px; }
+  .point { display:flex; gap:13px; align-items:flex-start; }
+  .point .pic { width:38px; height:38px; border-radius:11px; background:rgba(255,255,255,.14); border:1px solid rgba(255,255,255,.22); display:flex; align-items:center; justify-content:center; flex:none; }
+  .point .pic svg { width:19px; height:19px; stroke:#fff; }
+  .point b { color:#fff; display:block; font-size:15px; margin-bottom:2px; }
+  .point span { color:rgba(255,255,255,.85); font-size:13.5px; }
+
+  .form { padding:clamp(28px,3.4vw,42px); display:flex; flex-direction:column; justify-content:center; }
+  .form h2 { font-size:22px; margin-bottom:4px; }
+  .form .sub { color:var(--muted); font-size:14.5px; margin:0 0 22px; }
+
+  .alert-err { display:flex; gap:10px; align-items:flex-start; background:#fef2f2; border:1px solid #fecaca; color:#991b1b; border-radius:var(--r); padding:12px 14px; margin-bottom:18px; font-size:14px; }
+  .alert-err svg { width:18px; height:18px; stroke:#991b1b; flex:none; margin-top:1px; }
+
+  .callout { display:flex; gap:11px; align-items:flex-start; background:#fffaf0; border:1px solid #f3e2bd; border-radius:var(--r); padding:13px 15px; margin-bottom:22px; }
+  .callout svg { width:20px; height:20px; stroke:#a86a12; flex:none; margin-top:1px; }
+  .callout p { margin:0; font-size:13.5px; color:#7a5510; }
+  .callout b { color:#5e410b; }
+
+  label { display:block; font-size:13.5px; font-weight:600; color:var(--ink-2); margin:0 0 6px; }
+  .field { margin-bottom:16px; }
+  .input-wrap { position:relative; }
+  .input-wrap > svg { position:absolute; left:13px; top:50%; transform:translateY(-50%); width:18px; height:18px; stroke:var(--muted); }
+  input[type=email], input[type=password], input[type=text] { width:100%; padding:12px 14px 12px 40px; border:1px solid var(--line); border-radius:var(--r-sm); font-size:15px; color:var(--ink); background:#fff; font-family:inherit; transition:border-color .15s var(--ease),box-shadow .15s var(--ease); }
+  input:focus { outline:none; border-color:var(--green); box-shadow:0 0 0 3px rgba(0,146,96,.12); }
+  .row { display:flex; align-items:center; justify-content:space-between; margin:2px 0 20px; }
+  .check { display:flex; align-items:center; gap:8px; font-size:14px; color:var(--ink-2); font-weight:400; margin:0; }
+  .check input { accent-color:var(--green); width:16px; height:16px; }
+  .forgot { font-size:14px; color:var(--green-dark); font-weight:500; }
+  .forgot:hover { text-decoration:underline; }
+  .btn-login { width:100%; border:none; cursor:pointer; background:var(--grad); color:#fff; font-weight:600; font-size:16px; padding:13px; border-radius:var(--r-sm); box-shadow:0 5px 14px rgba(0,146,96,.28); display:inline-flex; align-items:center; justify-content:center; gap:9px; font-family:inherit; transition:transform .12s var(--ease),box-shadow .12s var(--ease); }
+  .btn-login:hover { transform:translateY(-1px); box-shadow:0 9px 20px rgba(0,146,96,.36); }
+  .btn-login svg { width:18px; height:18px; }
+  .divider { display:flex; align-items:center; gap:12px; margin:22px 0; color:var(--muted); font-size:13px; }
+  .divider::before,.divider::after { content:""; flex:1; height:1px; background:var(--line); }
+  .register-hint { text-align:center; font-size:14.5px; color:var(--muted); }
+  .register-hint a { color:var(--green-dark); font-weight:600; }
+  .register-hint a:hover { text-decoration:underline; }
+  .social { display:flex; flex-direction:column; gap:8px; margin-top:18px; }
+  .social a { display:inline-flex; align-items:center; justify-content:center; gap:8px; border:1px solid var(--line); border-radius:var(--r-sm); padding:10px; font-size:14px; font-weight:500; color:var(--ink-2); }
+  .social a:hover { background:var(--bg-soft); }
+
+  footer { text-align:center; font-size:13px; color:var(--muted); padding:24px; }
+  footer a { color:var(--green-dark); }
+</style>
+{/literal}
+</head>
+<body>
+
+<header>
+  <div class="wrap nav">
+    <a class="logo" href="zhl-start.php" aria-label="ZHL"><img src="img/ZHL-Logo-Text_Side-Green-Background.png" alt="Zentrum für Hochschullehre"></a>
+    <div class="right">
+      <a class="back" href="zhl-start.php">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+        <span data-en="Back to home">Zur Startseite</span>
+      </a>
+      <button class="lang-btn" data-lang-btn onclick="toggleLang()">EN</button>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="wrap">
+    <form role="form" name="login" id="login" method="post" action="{$smarty.server.SCRIPT_NAME}">
+    <div class="login-card">
+
+      <div class="explain">
+        <p class="eyebrow">Medienausleihe · ZHL</p>
+        <h1 data-en="Sign in to media lending">Anmeldung zur Medienausleihe</h1>
+        <p data-en="Reservations are open to all members of the University of Bayreuth (teaching staff and students).">Reservierung ist allen Mitgliedern der Universität Bayreuth vorbehalten (Lehrende und Studierende).</p>
+        <div class="points">
+          <div class="point">
+            <span class="pic"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/><polyline points="22,6 12,13 2,6"/></svg></span>
+            <div><b data-en="Only @uni-bayreuth.de">Nur @uni-bayreuth.de</b><span data-en="Sign-in and registration work only with your University of Bayreuth email address.">Anmeldung und Registrierung gehen ausschließlich mit Ihrer Uni-Bayreuth-Mailadresse.</span></div>
+          </div>
+          <div class="point">
+            <span class="pic"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>
+            <div><b data-en="Your own password">Eigenes Passwort</b><span data-en="You set a separate password here. The central password for your bt account does not work.">Sie legen sich hier ein separates Passwort an. Das zentrale Passwort zur bt-Kennung funktioniert nicht.</span></div>
+          </div>
+          <div class="point">
+            <span class="pic"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/></svg></span>
+            <div><b data-en="Reserve early">Früh reservieren</b><span data-en="Allow about a week of lead time, staff capacity is limited.">Planen Sie rund eine Woche Vorlauf ein, die personellen Ressourcen sind begrenzt.</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="form">
+        <h2 data-en="Welcome back">Willkommen zurück</h2>
+        <p class="sub" data-en="Sign in with your account.">Melden Sie sich mit Ihrem Konto an.</p>
+
+        {if $ShowLoginError}
+          <div class="alert-err">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            <span>{if !empty($LoginErrorMessage)}{$LoginErrorMessage}{else}{translate key='LoginError'}{/if}</span>
+          </div>
+        {/if}
+
+        <div class="callout">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          <p data-en="Can't get in with the central university password? That is expected: media lending needs a <b>separate account</b>. Don't have one yet? Just register below.">Kommen Sie mit dem zentralen Uni-Passwort nicht rein? Das ist normal: für die Ausleihe brauchen Sie ein <b>eigenes Konto</b>. Noch keins? Einfach unten registrieren.</p>
+        </div>
+
+        {if $ShowUsernamePrompt}
+          <div class="field">
+            <label for="email" data-en="University of Bayreuth email">Uni-Bayreuth-Mailadresse</label>
+            <div class="input-wrap">
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+              <input id="email" type="email" required {formname key=EMAIL} placeholder="vorname.nachname@uni-bayreuth.de" autocomplete="username">
+            </div>
+          </div>
+        {/if}
+
+        {if $ShowPasswordPrompt}
+          <div class="field">
+            <label for="password" data-en="Password">Passwort</label>
+            <div class="input-wrap">
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              <input id="password" type="password" required {formname key=PASSWORD} placeholder="Ihr Ausleih-Passwort" data-en-ph="Your lending password" autocomplete="current-password">
+            </div>
+          </div>
+        {/if}
+
+        {if $EnableCaptcha}
+          <div class="field" style="text-align:center">{control type="CaptchaControl"}</div>
+        {else}
+          <input type="hidden" {formname key=CAPTCHA} value="">
+        {/if}
+
+        <div class="row">
+          {if $ShowPersistLoginPrompt}
+            <label class="check"><input type="checkbox" {formname key=PERSIST_LOGIN}> <span data-en="Stay signed in">Angemeldet bleiben</span></label>
+          {else}<span></span>{/if}
+          {if $ShowForgotPasswordPrompt}
+            <a class="forgot" href="{$ForgotPasswordUrl}" {if isset($ForgotPasswordUrlNew)}{$ForgotPasswordUrlNew}{/if} data-en="Forgot password?">Passwort vergessen?</a>
+          {/if}
+        </div>
+
+        <button class="btn-login" type="submit" name="{Actions::LOGIN}" value="submit">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+          <span data-en="Sign in">Anmelden</span>
+        </button>
+        <input type="hidden" {formname key=RESUME} value="{$ResumeUrl}">
+
+        {if $ShowRegisterLink}
+          <div class="divider" data-en="no account yet?">noch kein Konto?</div>
+          <p class="register-hint">
+            <span data-en="Done in two minutes:">In zwei Minuten erledigt:</span>
+            <a href="{$RegisterUrl}" {if isset($RegisterUrlNew)}{$RegisterUrlNew}{/if}><span data-en="Register now">Jetzt registrieren</span></a>
+          </p>
+        {/if}
+
+        {if $AllowGoogleLogin || $AllowMicrosoftLogin}
+          <div class="social">
+            {if $AllowGoogleLogin}<a href="{$GoogleUrl}">{translate key='SignInWith'} Google</a>{/if}
+            {if $AllowMicrosoftLogin}<a href="{$MicrosoftUrl}">{translate key='SignInWith'} Microsoft</a>{/if}
+          </div>
+        {/if}
+      </div>
+
+    </div>
+    </form>
+  </div>
+</main>
+
+<footer>
+  <span data-en="Questions about lending?">Fragen zur Ausleihe?</span> <a href="mailto:zhlmedien@uni-bayreuth.de">zhlmedien@uni-bayreuth.de</a> · Zentrum für Hochschullehre, Universität Bayreuth
+</footer>
+
+{literal}
+<script>
+  var TITLE = { de: "Anmelden – Medienausleihe ZHL", en: "Sign in – Media Lending ZHL" };
+  var cur = "de";
+  function applyLang(l){
+    document.documentElement.lang = l;
+    document.title = TITLE[l];
+    document.querySelectorAll("[data-en]").forEach(function(el){
+      if (el.dataset.de === undefined) el.dataset.de = el.innerHTML;
+      el.innerHTML = (l === "en") ? el.dataset.en : el.dataset.de;
+    });
+    document.querySelectorAll("[data-en-ph]").forEach(function(el){
+      if (el.dataset.dePh === undefined) el.dataset.dePh = el.getAttribute("placeholder");
+      el.setAttribute("placeholder", (l === "en") ? el.dataset.enPh : el.dataset.dePh);
+    });
+    document.querySelectorAll("[data-lang-btn]").forEach(function(b){ b.textContent = (l === "en") ? "DE" : "EN"; });
+    try { localStorage.setItem("zhlLang", l); } catch(e){}
+    cur = l;
+  }
+  function toggleLang(){ applyLang(cur === "de" ? "en" : "de"); }
+  (function(){ try { var s = localStorage.getItem("zhlLang"); if (s === "en") applyLang("en"); } catch(e){} })();
+</script>
+{/literal}
+</body>
+</html>

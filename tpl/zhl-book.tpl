@@ -60,14 +60,51 @@
 				<input type="hidden" name="scheduleId" value="{$ScheduleId}">
 
 				<div class="zhl-uplabel">Zeitraum</div>
-				<div class="zhl-book-row">
-					<div class="zhl-field"><label>Von (Datum)</label><input class="zhl-input" type="date" name="beginDate" value="{$BeginDate}" {if $EarliestYmd}min="{$EarliestYmd}"{/if} required></div>
-					<div class="zhl-field"><label>Uhrzeit</label><input class="zhl-input" type="time" name="beginPeriod" value="{$BeginTime}" required></div>
-				</div>
-				<div class="zhl-book-row">
-					<div class="zhl-field"><label>Bis (Datum)</label><input class="zhl-input" type="date" name="endDate" value="{$EndDate}" {if $EarliestYmd}min="{$EarliestYmd}"{/if} required></div>
-					<div class="zhl-field"><label>Uhrzeit</label><input class="zhl-input" type="time" name="endPeriod" value="{$EndTime}" required></div>
-				</div>
+				{if $Picker.mode == 'slot'}
+					{* Videostudio o. ä.: Tag wählen (lädt neu) + freier 2-Stunden-Slot *}
+					<input type="hidden" name="slotDay" value="{$Picker.slotDay}">
+					<div class="zhl-muted zhl-small" style="margin-bottom:6px;">Tag wählen:</div>
+					<div class="zhl-daypick">
+						{foreach from=$Picker.slotDays item=dd}
+							<a class="zhl-daychip {if $dd.date == $Picker.slotDay}active{/if}" href="{$Path}zhl-book.php?rid={$ResourceId}&amp;sid={$ScheduleId}&amp;rd={$dd.date}">{$dd.label}</a>
+						{foreachelse}
+							<span class="zhl-muted zhl-small">Keine freien Tage gefunden.</span>
+						{/foreach}
+					</div>
+					<div class="zhl-muted zhl-small" style="margin:12px 0 6px;">Freie 2-Stunden-Slots:</div>
+					<div class="zhl-slotpick">
+						{foreach from=$Picker.slots item=s}
+							{if $s.free}
+								<label class="zhl-slotchip"><input type="radio" name="slot" value="{$s.begin}-{$s.end}" required><span>{$s.label}</span></label>
+							{else}
+								<span class="zhl-slotchip is-busy" title="belegt">{$s.label}</span>
+							{/if}
+						{foreachelse}
+							<span class="zhl-muted zhl-small">An diesem Tag keine Slots.</span>
+						{/foreach}
+					</div>
+				{else}
+					{* Tagesmodus: freie Starttage als Chips + Dauer *}
+					<div class="zhl-muted zhl-small" style="margin-bottom:6px;">Wähle einen freien Starttag:</div>
+					<div class="zhl-daypick">
+						{foreach from=$Picker.days item=dd}
+							<label class="zhl-daychip"><input type="radio" name="beginDate" value="{$dd.date}" required><span>{$dd.label}</span></label>
+						{foreachelse}
+							<span class="zhl-muted zhl-small">Aktuell keine freien Tage im nächsten Zeitraum gefunden.</span>
+						{/foreach}
+					</div>
+					<div class="zhl-field" style="max-width:170px;margin-top:12px;">
+						<label>Dauer</label>
+						<select class="zhl-input" name="durationDays">
+							<option value="1">1 Tag</option>
+							<option value="2">2 Tage</option>
+							<option value="3">3 Tage</option>
+							<option value="5">5 Tage</option>
+							<option value="7">7 Tage</option>
+							<option value="14">14 Tage</option>
+						</select>
+					</div>
+				{/if}
 
 				<div class="zhl-uplabel" style="margin-top:16px;">Übergabe & Einführung</div>
 				<div class="zhl-ueb">

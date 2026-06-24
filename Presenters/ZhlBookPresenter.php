@@ -7,6 +7,7 @@ require_once(ROOT_DIR . 'Domain/namespace.php');
 require_once(ROOT_DIR . 'Domain/Access/namespace.php');
 require_once(ROOT_DIR . 'lib/Application/Schedule/namespace.php');
 require_once(ROOT_DIR . 'lib/Application/Attributes/namespace.php');
+require_once(ROOT_DIR . 'lib/Application/Reservation/namespace.php');
 require_once(ROOT_DIR . 'Presenters/Reservation/ReservationPresenterFactory.php');
 require_once(ROOT_DIR . 'Presenters/ZhlReservationFacade.php');
 
@@ -19,6 +20,8 @@ require_once(ROOT_DIR . 'Presenters/ZhlReservationFacade.php');
  */
 class ZhlBookPresenter
 {
+    private const WD = ['', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
+
     private $page;
 
     public function __construct($page)
@@ -58,17 +61,34 @@ class ZhlBookPresenter
             return;
         }
 
-        $beginDate = $this->postDate('beginDate', $tz);
-        $endDate = $this->postDate('endDate', $tz);
-        $beginTime = $this->postTime('beginPeriod', '09:00');
-        $endTime = $this->postTime('endPeriod', '17:00');
         $choice = $this->post('handoverChoice') === 'training' ? 'training' : 'pickup';
-
         $db = ServiceLocator::GetDatabase();
+        $ueb = $this->lookupUebergabe($db, $rid);
+
+        if ($ueb['booking_mode'] === 'slot') {
+            $beginDate = $this->postDate('slotDay', $tz);
+            $endDate = $beginDate;
+            $slot = $this->post('slot');
+            if (!preg_match('/^([01]\d|2[0-3]):[0-5]\d-([01]\d|2[0-3]):[0-5]\d$/', $slot)) {
+                $this->bindForm($user, $resource, $beginDate, '09:00', $endDate, '11:00', $choice, ['Bitte wähle einen freien Zeit-Slot.']);
+                return;
+            }
+            $beginTime = substr($slot, 0, 5);
+            $endTime = substr($slot, 6, 5);
+        } else {
+            $beginDate = $this->postDate('beginDate', $tz);
+            $dd = (int)$this->post('durationDays');
+            $durationDays = ($dd >= 1 && $dd <= 31) ? $dd : 1;
+            // Zeiten an die buchbaren Schedule-Grenzen ausrichten (sonst lehnt SchedulePeriodRule ab).
+            $bounds = $this->scheduleDayBounds($user, $resource, $beginDate);
+            $beginTime = $bounds['begin'];
+            $endTime = $bounds['end'];
+            $endOffset = $bounds['endNextDay'] ? $durationDays : ($durationDays - 1);
+            $endDate = Date::Parse($beginDate . ' 00:00:00', $tz)->AddDays($endOffset)->Format('Y-m-d');
+        }
+
         $type = $this->lookupType($db, $rid);
         $titel = 'Ausleihe: ' . ($type !== null ? $type : $resource->GetName());
-        // Übergabe-Anforderung des Geräts als Notiz an die Reservierung mitführen (v-book-3).
-        $ueb = $this->lookupUebergabe($db, $rid);
         $desc = $this->uebergabeNote($ueb);
 
         // Reservierungs-Custom-Attribute (z. B. Pflichtfeld „Haftpflichtversicherung") einsammeln.
@@ -213,6 +233,19 @@ class ZhlBookPresenter
             }
         }
 
+        // Termin-Vorschläge: freie Tage (Tagesmodus) bzw. 2h-Slots eines Tages (Slotmodus).
+        $picker = ['mode' => $ueb['booking_mode'], 'days' => [], 'slotDays' => [], 'slotDay' => $beginDate, 'slots' => []];
+        if ($ueb['booking_mode'] === 'slot') {
+            $picker['slotDays'] = $this->availableDays($user, $resource, $beginDate, $noticeSec, 21);
+            $availDates = array_column($picker['slotDays'], 'date');
+            if (!in_array($beginDate, $availDates, true) && !empty($availDates)) {
+                $picker['slotDay'] = $availDates[0];
+            }
+            $picker['slots'] = $this->freeSlots($user, $resource, $picker['slotDay'], 2);
+        } else {
+            $picker['days'] = $this->availableDays($user, $resource, $beginDate, $noticeSec, 14);
+        }
+
         $this->page->BindBooking([
             'resourceId' => $rid,
             'scheduleId' => (int)$resource->ScheduleId,
@@ -232,6 +265,7 @@ class ZhlBookPresenter
             'einfuehrung' => $ueb['einfuehrung'],
             'einfuehrungTyp' => $ueb['einfuehrung_typ'],
             'einf' => $einf,
+            'picker' => $picker,
             'attributes' => $attributes,
             'errors' => $errors,
         ]);
@@ -285,6 +319,140 @@ class ZhlBookPresenter
             }
         }
         return null;
+    }
+
+    // --- Verfügbarkeits-Vorschläge: freie Tage (Tagesmodus) bzw. 2h-Slots (Slotmodus) ---
+
+    /**
+     * Freie Tage ab $fromYmd (Vorlauf berücksichtigt), max $maxResults Treffer.
+     * @return array[] [{date:'Y-m-d', label:'Do 03.07.'}]
+     */
+    private function availableDays(UserSession $user, $resource, string $fromYmd, int $minNoticeSec, int $maxResults = 14, int $windowDays = 45): array
+    {
+        $tz = $user->Timezone;
+        $earliestYmd = $fromYmd;
+        if ($minNoticeSec > 0) {
+            $e = Date::Now()->ApplyDifference(TimeInterval::Parse($minNoticeSec)->Interval())->ToTimezone($tz)->Format('Y-m-d');
+            if ($earliestYmd < $e) {
+                $earliestYmd = $e;
+            }
+        }
+        $todayYmd = Date::Now()->ToTimezone($tz)->Format('Y-m-d');
+        if ($earliestYmd < $todayYmd) {
+            $earliestYmd = $todayYmd;
+        }
+        $from = Date::Parse($earliestYmd . ' 00:00:00', $tz);
+        $to = $from->AddDays($windowDays);
+        $items = (new ResourceAvailability(new ReservationViewRepository()))->GetItemsBetween($from, $to, [(int)$resource->GetId()]);
+        $out = [];
+        for ($dd = 0; $dd < $windowDays && count($out) < $maxResults; $dd++) {
+            $dayStart = $from->AddDays($dd);
+            $dayEnd = $from->AddDays($dd + 1);
+            $busy = false;
+            foreach ($items as $it) {
+                if ($it->GetStartDate()->LessThan($dayEnd) && $it->GetEndDate()->GreaterThan($dayStart)) {
+                    $busy = true;
+                    break;
+                }
+            }
+            if ($busy) {
+                continue;
+            }
+            $local = $dayStart->ToTimezone($tz);
+            $out[] = ['date' => $local->Format('Y-m-d'), 'label' => self::WD[(int)$local->Format('N')] . ' ' . $local->Format('d.m.')];
+        }
+        return $out;
+    }
+
+    /**
+     * Freie 2h-Slots eines Tages aus den buchbaren Schedule-Perioden (Slotmodus, z. B. Videostudio).
+     * @return array[] [{begin:'H:i', end:'H:i', label:'09:00–11:00', free:bool}]
+     */
+    private function freeSlots(UserSession $user, $resource, string $dayYmd, int $blockHours = 2): array
+    {
+        $tz = $user->Timezone;
+        $repo = new ScheduleRepository();
+        $layout = $repo->GetLayout((int)$resource->ScheduleId, new ScheduleLayoutFactory($tz));
+        $day = Date::Parse($dayYmd . ' 00:00:00', $tz);
+        $periods = $layout->GetLayout($day, false);
+
+        // Buchbare Perioden (sortiert) sammeln.
+        $resv = (new ResourceAvailability(new ReservationViewRepository()))->GetItemsBetween($day, $day->AddDays(1), [(int)$resource->GetId()]);
+        $blocks = [];
+        foreach ($periods as $p) {
+            if (!method_exists($p, 'IsReservable') || !$p->IsReservable() || $p->BeginDate() === null || $p->EndDate() === null) {
+                continue;
+            }
+            $blocks[] = ['begin' => $p->BeginDate(), 'end' => $p->EndDate()];
+        }
+        usort($blocks, fn($a, $b) => $a['begin']->Compare($b['begin']));
+
+        // Je 2 aufeinanderfolgende Stunden-Perioden zu einem 2h-Slot bündeln (nicht überlappend).
+        $slots = [];
+        for ($i = 0; $i + $blockHours - 1 < count($blocks); $i += $blockHours) {
+            $begin = $blocks[$i]['begin'];
+            $end = $blocks[$i + $blockHours - 1]['end'];
+            // zusammenhängend?
+            $contiguous = true;
+            for ($k = $i; $k < $i + $blockHours - 1; $k++) {
+                if (!$blocks[$k]['end']->Equals($blocks[$k + 1]['begin'])) {
+                    $contiguous = false;
+                    break;
+                }
+            }
+            if (!$contiguous) {
+                continue;
+            }
+            $free = true;
+            foreach ($resv as $it) {
+                if ($it->GetStartDate()->LessThan($end) && $it->GetEndDate()->GreaterThan($begin)) {
+                    $free = false;
+                    break;
+                }
+            }
+            $bl = $begin->ToTimezone($tz)->Format('H:i');
+            $el = $end->ToTimezone($tz)->Format('H:i');
+            $slots[] = ['begin' => $bl, 'end' => $el, 'label' => $bl . '–' . $el, 'free' => $free];
+        }
+        return $slots;
+    }
+
+    /**
+     * Buchbare Tagesgrenzen aus dem Schedule-Layout (erste reservable Periode → letzte) — damit
+     * Tagesbuchungen auf Periodengrenzen liegen (native SchedulePeriodRule). 'endNextDay' = letzte
+     * Periode endet um Mitternacht (Ganztags-Layout) → Ende liegt am Folgetag.
+     * @return array{begin:string,end:string,endNextDay:bool}
+     */
+    private function scheduleDayBounds(UserSession $user, $resource, string $dayYmd): array
+    {
+        $tz = $user->Timezone;
+        $repo = new ScheduleRepository();
+        $layout = $repo->GetLayout((int)$resource->ScheduleId, new ScheduleLayoutFactory($tz));
+        $day = Date::Parse($dayYmd . ' 00:00:00', $tz);
+        $periods = $layout->GetLayout($day, false);
+        $begin = null;
+        $end = null;
+        foreach ($periods as $p) {
+            if (!method_exists($p, 'IsReservable') || !$p->IsReservable() || $p->BeginDate() === null || $p->EndDate() === null) {
+                continue;
+            }
+            $b = $p->BeginDate();
+            $e = $p->EndDate();
+            if ($begin === null || $b->LessThan($begin)) {
+                $begin = $b;
+            }
+            if ($end === null || $e->GreaterThan($end)) {
+                $end = $e;
+            }
+        }
+        if ($begin === null || $end === null) {
+            return ['begin' => '09:00', 'end' => '17:00', 'endNextDay' => false];
+        }
+        $beginStr = $begin->ToTimezone($tz)->Format('H:i');
+        $endStr = $end->ToTimezone($tz)->Format('H:i');
+        // Endet die letzte Periode um Mitternacht (Ganztags-Layout)? → Ende liegt am Folgetag.
+        $endNextDay = ($endStr === '00:00');
+        return ['begin' => $beginStr, 'end' => $endStr, 'endNextDay' => $endNextDay];
     }
 
     // --- Terminplaner-Anbindung (Einführungs-Slots) + F40-Zertifikat ---
@@ -413,8 +581,8 @@ class ZhlBookPresenter
     /** Übergabe-Konfiguration des Geräts (zhl_uebergabe) mit Defaults, falls nicht gepflegt. */
     private function lookupUebergabe($db, int $rid): array
     {
-        $def = ['abholung' => 'abholen', 'abholort' => null, 'einfuehrung' => 'keine', 'einfuehrung_typ' => null, 'tp_member_id' => null, 'vorlauf_toleranz_h' => 0];
-        $cmd = new AdHocCommand('SELECT abholung, abholort, einfuehrung, einfuehrung_typ, tp_member_id, vorlauf_toleranz_h FROM zhl_uebergabe WHERE resource_id = @r LIMIT 1');
+        $def = ['abholung' => 'abholen', 'abholort' => null, 'einfuehrung' => 'keine', 'einfuehrung_typ' => null, 'tp_member_id' => null, 'vorlauf_toleranz_h' => 0, 'booking_mode' => 'day'];
+        $cmd = new AdHocCommand('SELECT abholung, abholort, einfuehrung, einfuehrung_typ, tp_member_id, vorlauf_toleranz_h, booking_mode FROM zhl_uebergabe WHERE resource_id = @r LIMIT 1');
         $cmd->AddParameter(new Parameter('@r', $rid));
         $reader = $db->Query($cmd);
         $row = $reader->GetRow();
@@ -429,6 +597,7 @@ class ZhlBookPresenter
             'einfuehrung_typ' => $row['einfuehrung_typ'] !== null && $row['einfuehrung_typ'] !== '' ? (string)$row['einfuehrung_typ'] : null,
             'tp_member_id' => $row['tp_member_id'] !== null ? (int)$row['tp_member_id'] : null,
             'vorlauf_toleranz_h' => (int)($row['vorlauf_toleranz_h'] ?? 0),
+            'booking_mode' => (string)($row['booking_mode'] ?? 'day'),
         ];
     }
 

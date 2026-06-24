@@ -239,3 +239,15 @@
 .zhl-dash .zhl-slot { display: flex; gap: 9px; align-items: center; border: 1px solid var(--border); border-radius: 8px; padding: 8px 11px; margin-top: 6px; cursor: pointer; background: #fff; font-size: 14px; }
 .zhl-dash .zhl-slot:hover { border-color: var(--zg); }
 .zhl-dash .zhl-btn[disabled] { opacity: .5; cursor: not-allowed; box-shadow: none; transform: none; }
+
+/* v-book — Termin-Vorschläge (Tag-Chips + Slot-Chips) */
+.zhl-dash .zhl-daypick, .zhl-dash .zhl-slotpick { display: flex; flex-wrap: wrap; gap: 8px; }
+.zhl-dash .zhl-daychip { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--border); border-radius: 9px; padding: 7px 12px; font-size: 14px; cursor: pointer; background: #fff; text-decoration: none; color: var(--text); }
+.zhl-dash .zhl-daychip:hover { border-color: var(--zg); }
+.zhl-dash .zhl-daychip.active { background: var(--grad); color: #fff; border-color: transparent; }
+.zhl-dash .zhl-daychip input { margin: 0; }
+.zhl-dash .zhl-daychip:has(input:checked) { background: var(--grad); color: #fff; border-color: transparent; }
+.zhl-dash .zhl-slotchip { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--border); border-radius: 9px; padding: 8px 12px; font-size: 14px; cursor: pointer; background: #fff; }
+.zhl-dash .zhl-slotchip:hover { border-color: var(--zg); }
+.zhl-dash .zhl-slotchip:has(input:checked) { background: var(--grad); color: #fff; border-color: transparent; }
+.zhl-dash .zhl-slotchip.is-busy { opacity: .4; text-decoration: line-through; cursor: not-allowed; }

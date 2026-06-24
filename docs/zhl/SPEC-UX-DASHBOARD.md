@@ -445,7 +445,35 @@ Videostudio", desc „[ZHL] Abholung", Ressource 21), Erfolgsseite ok; Testbuchu
 Fehlerpfad: „Startzeitpunkt muss vor Endzeitpunkt" sauber gerendert. **Kein „altes Layout" mehr beim
 Speichern.** Übergabe-Wahl wird vorerst nur als Notiz im `description` mitgeführt.
 
-**Nächste Schritte (Buchungs-Epic):** **v-book-3** Abholung/Einführung echt mit `zhl_booking_handover` +
-terminplaner (meet.zhl-ubt.de) verdrahten — neuer „Einführung"/training-Typ (braucht Slot-Endpunkt im
-Terminplaner), Token-Erzeugung + PostReservation-Verknüpfung der Ref. **Danach:** v3b-3 Seminarraum
-(vorerst nur „Wo aufnehmen?"-Hinweis) · v3b-4 Studio-Dialoge · stabile Typ-Referenz.
+### v-book-3 — Übergabe-Modell (Abholung vs. Einführung) — IN AUSARBEITUNG (2026-06-24)
+Nutzer-Klärung: **Abholung und Einführung sind getrennte Dinge.**
+
+**Abholung** (Gerät bekommen):
+- persönlich an festem Ort (z. B. Raum 4.2.10, „vor Mensa") ODER
+- an einem **vom Medienmanager festgelegten Abholort** (Freitext, z. B. Cateringwagen, im Videostudio,
+  Raum xxx). → braucht ein Abholort-Feld, gesetzt vom Personal (pro Gerät? pro Buchung? offen).
+
+**Einführung** (Gerät erklärt bekommen):
+- muss **persönlich** erfolgen (meist vor Ort, gelegentlich Zoom), individuell festzulegen.
+- eigener **Terminplaner-Termintyp** je Gegenstand: „Einführung in Ausleihgeräte" / „Einführung in
+  Videostudio" / „Einführung in Kamera XY". → braucht Mapping Gerät/Bundle → Termintyp-id (admin-pflegbar).
+
+**Terminplaner-Realität (meet.zhl-ubt.de, read-only API verifiziert 2026-06-24):**
+- Paul Dölle = `member_id 2`. `handover_slots.php` liefert für ihn nur Typ `32 „Medienübergabe (TEST)"`
+  mit echten Slots (`book.php?member=2&type=32&slot=…`). Die neuen „Einführung…"-Termintypen werden von
+  der Handover-API NICHT exponiert (eigener Typ, nicht als handover geflaggt).
+- Nutzer-Ansage: **Termin-Buchungs-Tool muss noch überarbeitet werden** → die API-Exponierung der
+  Einführungs-/Abhol-Typen ist ein eigener Workstream auf meet (nicht in scope „nur media").
+
+**Gewählte Kopplung:** Deep-Link-Button (einfach) von der ZHL-Buchungsseite in den Terminplaner
+(`book.php?member=…&type=…`), KEIN harter Gate/Token-Flow zunächst.
+
+**Offen (vor dem Bau zu klären):** (a) Woher kommt der Abholort — Ressourcen-Attribut (Medienmanager
+pflegt) vs. pro Buchung? feste Liste + Freitext? (b) Mapping Gerät/Bundle → Einführungs-Termintyp-id:
+wo gepflegt (neue ZHL-Tabelle/Attribut), und die konkreten type_ids; (c) Reihenfolge: erst buchen dann
+Termin, oder Termin als Voraussetzung? (d) Terminplaner-Rework liefert stabile type_ids/Exponierung.
+
+**Buildbar auf ZHL-Seite (sobald a–c geklärt):** Buchungsseite trennt „Abholung" (Ort anzeigen/wählen)
+von „Einführung" (Deep-Link zum passenden Termintyp); Admin-Mapping Gerät→Termintyp.
+
+**Danach:** v3b-3 Seminarraum (vorerst nur „Wo aufnehmen?"-Hinweis) · v3b-4 Studio-Dialoge · stabile Typ-Referenz.

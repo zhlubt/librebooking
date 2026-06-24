@@ -18,6 +18,9 @@ require_once(ROOT_DIR . 'lib/Application/Zhl/ZhlBundleService.php');
  */
 class ZhlAssistantPresenter
 {
+    // US-15: Geräte-Typ des Schnittplatzes (Pool-/Such-Schlüssel; nicht der Modellname).
+    private const SCHNITT_TYPE = 'Schnitt-/VR-PC';
+
     private $page;
 
     public function __construct($page)
@@ -60,12 +63,18 @@ class ZhlAssistantPresenter
         }
 
         $end = $start->AddDays($days);
+        // Schnitt-Folgebuchung (US-15) startet am Tag nach der Drehphase, eigener Zeitraum.
+        $schnittStart = $end->ToTimezone($tz);
+        $schnittPool = isset($typeFreeMap[self::SCHNITT_TYPE]) ? (int)$typeFreeMap[self::SCHNITT_TYPE] : null;
         $this->page->BindAssistant([
             'bundles' => $bundles,
             'selected' => $selected,
             'startInput' => $start->Format('Y-m-d'),
             'days' => $days,
             'rangeLabel' => $start->ToTimezone($tz)->Format('d.m.Y') . ' – ' . $end->AddDays(-1)->ToTimezone($tz)->Format('d.m.Y'),
+            'schnittType' => self::SCHNITT_TYPE,
+            'schnittStartInput' => $schnittStart->Format('Y-m-d'),
+            'schnittPool' => $schnittPool,
         ]);
     }
 

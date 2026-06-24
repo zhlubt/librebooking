@@ -38,6 +38,7 @@
 				</div>
 				<div class="col-md-9"><label class="form-label">Einweisungs-Link (optional)</label><input class="form-control" name="einweisung_url" placeholder="https://… Termin-/Seminar-Link"></div>
 				<div class="col-12"><label class="form-label">Einweisungs-Text</label><input class="form-control" name="einweisung_text" placeholder="z. B. Vor dem Studio ist eine Einführung zwingend …"></div>
+				<div class="col-12"><div class="form-check"><input class="form-check-input" type="checkbox" name="offer_schnitt" value="1" id="osnew"><label class="form-check-label" for="osnew">Schnitt-Folgebuchung anbieten (Schnitt-/VR-PC nach der Aufnahme)</label></div></div>
 				<div class="col-12"><button class="btn btn-primary">Bundle anlegen</button></div>
 			</form>
 		</div>
@@ -72,6 +73,7 @@
 					</div>
 					<div class="col-md-9"><label class="form-label">Einweisungs-Link (optional)</label><input class="form-control" name="einweisung_url" value="{$bundle.einweisung_url|escape}" placeholder="https://…"></div>
 					<div class="col-12"><label class="form-label">Einweisungs-Text</label><input class="form-control" name="einweisung_text" value="{$bundle.einweisung_text|escape}"></div>
+					<div class="col-12"><div class="form-check"><input class="form-check-input" type="checkbox" name="offer_schnitt" value="1" id="os{$bundle.id}" {if $bundle.offer_schnitt}checked{/if}><label class="form-check-label" for="os{$bundle.id}">Schnitt-Folgebuchung anbieten</label></div></div>
 					<div class="col-12 d-flex gap-2">
 						<button class="btn btn-primary btn-sm">Speichern</button>
 					</div>

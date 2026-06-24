@@ -197,3 +197,8 @@
 /* Ghost-Button (sekundäre Einweisungs-CTAs) */
 .zhl-dash .zhl-btn-ghost { background: transparent; color: var(--zg-d); border: 1px solid var(--border); }
 .zhl-dash .zhl-btn-ghost:hover { background: var(--bg-soft); }
+
+/* v3b-2 — Sequenz Video→Schnitt (Folge-Buchungs-Karte) */
+.zhl-dash .zhl-seq { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 10px; padding: 12px 14px; margin: 10px 0 2px; }
+.zhl-dash .zhl-seq-head { font-weight: 700; font-size: 14px; color: #166534; margin-bottom: 4px; }
+.zhl-dash .zhl-seq-text { font-size: 13px; color: var(--text2); margin: 0 0 8px; }

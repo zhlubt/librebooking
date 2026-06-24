@@ -34,7 +34,7 @@ class ZhlBundlesAdminPresenter
                 if ($name === '') {
                     return 'Name fehlt — Bundle nicht angelegt.';
                 }
-                $cmd = new AdHocCommand('INSERT INTO zhl_bundle (name, use_case, difficulty, hint, einweisung_level, einweisung_text, einweisung_url, active, sort_order) VALUES (@n,@u,@d,@h,@el,@et,@eu,1,@s)');
+                $cmd = new AdHocCommand('INSERT INTO zhl_bundle (name, use_case, difficulty, hint, einweisung_level, einweisung_text, einweisung_url, offer_schnitt, active, sort_order) VALUES (@n,@u,@d,@h,@el,@et,@eu,@os,1,@s)');
                 $cmd->AddParameter(new Parameter('@n', $name));
                 $cmd->AddParameter(new Parameter('@u', trim($this->post('use_case'))));
                 $cmd->AddParameter(new Parameter('@d', $this->difficulty($this->post('difficulty'))));
@@ -42,6 +42,7 @@ class ZhlBundlesAdminPresenter
                 $cmd->AddParameter(new Parameter('@el', $this->einweisungLevel($this->post('einweisung_level'))));
                 $cmd->AddParameter(new Parameter('@et', trim($this->post('einweisung_text'))));
                 $cmd->AddParameter(new Parameter('@eu', trim($this->post('einweisung_url'))));
+                $cmd->AddParameter(new Parameter('@os', $this->post('offer_schnitt') ? 1 : 0));
                 $cmd->AddParameter(new Parameter('@s', $this->int($this->post('sort_order'), 0, 0, 9999)));
                 $db->Execute($cmd);
                 return 'Bundle „' . $name . '" angelegt.';
@@ -51,7 +52,7 @@ class ZhlBundlesAdminPresenter
                 if (!$id) {
                     return 'Ungültige Bundle-ID.';
                 }
-                $cmd = new AdHocCommand('UPDATE zhl_bundle SET name=@n, use_case=@u, difficulty=@d, hint=@h, einweisung_level=@el, einweisung_text=@et, einweisung_url=@eu, sort_order=@s WHERE id=@id');
+                $cmd = new AdHocCommand('UPDATE zhl_bundle SET name=@n, use_case=@u, difficulty=@d, hint=@h, einweisung_level=@el, einweisung_text=@et, einweisung_url=@eu, offer_schnitt=@os, sort_order=@s WHERE id=@id');
                 $cmd->AddParameter(new Parameter('@n', trim($this->post('name'))));
                 $cmd->AddParameter(new Parameter('@u', trim($this->post('use_case'))));
                 $cmd->AddParameter(new Parameter('@d', $this->difficulty($this->post('difficulty'))));
@@ -59,6 +60,7 @@ class ZhlBundlesAdminPresenter
                 $cmd->AddParameter(new Parameter('@el', $this->einweisungLevel($this->post('einweisung_level'))));
                 $cmd->AddParameter(new Parameter('@et', trim($this->post('einweisung_text'))));
                 $cmd->AddParameter(new Parameter('@eu', trim($this->post('einweisung_url'))));
+                $cmd->AddParameter(new Parameter('@os', $this->post('offer_schnitt') ? 1 : 0));
                 $cmd->AddParameter(new Parameter('@s', $this->int($this->post('sort_order'), 0, 0, 9999)));
                 $cmd->AddParameter(new Parameter('@id', $id));
                 $db->Execute($cmd);
@@ -115,7 +117,7 @@ class ZhlBundlesAdminPresenter
         $db = ServiceLocator::GetDatabase();
 
         $bundles = [];
-        $reader = $db->Query(new AdHocCommand('SELECT id, name, use_case, difficulty, hint, einweisung_level, einweisung_text, einweisung_url, active, sort_order FROM zhl_bundle ORDER BY sort_order, name'));
+        $reader = $db->Query(new AdHocCommand('SELECT id, name, use_case, difficulty, hint, einweisung_level, einweisung_text, einweisung_url, offer_schnitt, active, sort_order FROM zhl_bundle ORDER BY sort_order, name'));
         while ($row = $reader->GetRow()) {
             $row['items'] = [];
             $bundles[(int)$row['id']] = $row;

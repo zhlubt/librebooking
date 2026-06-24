@@ -28,6 +28,7 @@ class ZhlBundleView
     public $einweisungLevel = 'keine';   // keine|empfehlenswert|zwingend|beratung
     public $einweisungText = '';
     public $einweisungUrl = '';
+    public $offerSchnitt = false;   // US-15: Schnitt-/VR-PC als getrennte Folge-Buchung anbieten
     /** @var ZhlBundleItemView[] */
     public $items = [];
     public $available = true;   // alle Pflicht-Positionen erfüllbar
@@ -53,7 +54,7 @@ class ZhlBundleService
     {
         $bundles = [];
         $reader = $this->db->Query(new AdHocCommand(
-            'SELECT id, name, use_case, difficulty, hint, einweisung_level, einweisung_text, einweisung_url ' .
+            'SELECT id, name, use_case, difficulty, hint, einweisung_level, einweisung_text, einweisung_url, offer_schnitt ' .
             'FROM zhl_bundle WHERE active = 1 ORDER BY sort_order, name'
         ));
         while ($row = $reader->GetRow()) {
@@ -66,6 +67,7 @@ class ZhlBundleService
             $b->einweisungLevel = (string)($row['einweisung_level'] ?? 'keine');
             $b->einweisungText = (string)($row['einweisung_text'] ?? '');
             $b->einweisungUrl = (string)($row['einweisung_url'] ?? '');
+            $b->offerSchnitt = ((int)($row['offer_schnitt'] ?? 0)) === 1;
             $bundles[$b->id] = $b;
         }
         $reader->Free();

@@ -390,7 +390,14 @@ Roh-SQL** anlegen (autoassign-INSERT erzeugt keine Permissions via `AutoAssignRe
 Sequenz/Raum als begrenzte Bundle-Flags ok, Raumziele über Resource-ID (nicht Name); „nötiger Laptop"
 vs. getrennte optionale Buchung sauber formulieren; `type_label`-Freitext bleibt größte Integritätslücke.
 
-**Nächste Schritte:** (1) v3b-1 eingeloggt visuell abnehmen; (2) **v3b-2** Sequenz Video→Schnitt
-(Folge-Buchung Schnitt-/VR-PC, optional); (3) **v3b-3** Seminarraum **via Admin-UI** anlegen + „Wo willst
-du aufnehmen?"; (4) **v3b-4** verzweigte Studio-Dialoge (Personenzahl→Mikros, Folien→Laptop); (5) stabile
-Typ-Referenz (Geräte-Typ → SELECT_LIST).
+**Stand v3b-2 (gebaut + deployt 2026-06-24):** Sequenz Video→Schnitt (US-15, Migration `009`:
+`offer_schnitt`). Bundles mit Flag zeigen im Assistent-Detail eine grüne „🎬 Danach schneiden?"-Karte:
+verlinkt den Schnitt-/VR-PC (Typ-Konstante im Presenter, nicht Modellname — Codex) als **getrennte
+Folge-Buchung**, deren Startdatum automatisch = Tag nach der Drehphase (z. B. Start 15.7. + 3 Tage →
+Schnitt ab 18.7.), zeigt freien Pool, immer optional. Admin-Checkbox pro Bundle. Seed: alle
+Aufnahme-Bundles außer VR. Backup `zhl_bundle__bak009`. **Eingeloggt render-verifiziert** (curl-Login
+admin@zhl.local): Gate/Hinweis/Chips/Schnitt-Karte + korrektes Folgedatum, keine Smarty-Fehler.
+
+**Nächste Schritte:** (1) **v3b-3** Seminarraum **via Admin-UI** anlegen (Codex: kein Roh-SQL) + „Wo
+willst du aufnehmen?"-Frage; (2) **v3b-4** verzweigte Studio-Dialoge (Personenzahl→Mikros, Folien→Laptop);
+(3) stabile Typ-Referenz (Geräte-Typ → SELECT_LIST).

@@ -100,6 +100,14 @@
 				{/if}
 			</div>
 			<p class="zhl-note" style="margin-top:10px;">Klick auf eine Position, um die konkreten Geräte zu sehen und einzeln zu buchen. (Sammel-Buchung folgt.)</p>
+
+			{if $Selected->offerSchnitt}
+				<div class="zhl-seq">
+					<div class="zhl-seq-head">🎬 Danach schneiden?</div>
+					<p class="zhl-seq-text">Nach der Aufnahme kannst du am <strong>Schnittplatz</strong> schneiden – eine <strong>getrennte Buchung</strong> für die Zeit <em>nach</em> deiner Drehphase, ganz optional.{if $SchnittPool !== null} <span class="zhl-muted">({$SchnittPool} Schnitt-/VR-PC frei)</span>{/if}</p>
+					<a class="zhl-btn zhl-btn-sm zhl-btn-ghost" href="{$Path}zhl-dashboard.php?q={$SchnittType|escape:'url'}&amp;start={$SchnittStartInput}&amp;days=7">Schnittplatz ab {$SchnittStartInput} ansehen ▸</a>
+				</div>
+			{/if}
 		</div>
 	{else}
 		{* Schritt 1: Vorhaben wählen *}

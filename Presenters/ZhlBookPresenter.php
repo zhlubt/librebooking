@@ -11,6 +11,7 @@ require_once(ROOT_DIR . 'lib/Application/Reservation/namespace.php');
 require_once(ROOT_DIR . 'Presenters/Reservation/ReservationPresenterFactory.php');
 require_once(ROOT_DIR . 'Presenters/ZhlReservationFacade.php');
 require_once(ROOT_DIR . 'Presenters/ZhlHauspostEmail.php');
+require_once(ROOT_DIR . 'Web/zhl-audit-lib.php');
 
 /**
  * ZHL-Buchungs-Schritt (v-book). Eine ZHL-gestylte Seite zwischen Geräte-Wahl und Buchung:
@@ -117,9 +118,10 @@ class ZhlBookPresenter
         $db = ServiceLocator::GetDatabase();
         $ueb = $this->lookupUebergabe($db, $rid);
 
-        // Fulfillment-Wahl (C2): 'pickup' (Default, persönliche Abholung) oder 'hauspost' (Versand).
-        // 'hauspost' nur gültig, wenn das Gerät es erlaubt und überhaupt eine Abholung im Spiel ist.
-        $hauspostAllowed = !empty($ueb['hauspost_allowed']) && $this->pickupApplies($ueb);
+        // Fulfillment-Wahl (C2): 'pickup' (Default, persönliche Abholung/Ablageort) oder 'hauspost' (Versand).
+        // Hauspost ist ein EIGENSTÄNDIGES Geräte-Flag (Admin-Matrix) und gilt unabhängig vom Übergabe-Modus
+        // — der Haken allein entscheidet (ZHL-Entscheidung 2026-06-26).
+        $hauspostAllowed = !empty($ueb['hauspost_allowed']);
         $fulfillment = ($this->post('fulfillment') === 'hauspost' && $hauspostAllowed) ? 'hauspost' : 'pickup';
         // Hauspost-Formularwerte einsammeln (für Re-Render + ggf. Persistenz/Mail).
         $hpValues = [
@@ -449,6 +451,22 @@ class ZhlBookPresenter
             }
         }
 
+        zhl_audit_log(array_merge(zhl_audit_actor($user), [
+            'action' => 'booking.create',
+            'entity_type' => 'reservation',
+            'entity_id' => (string)$rid,
+            'reference_number' => $ref,
+            'detail' => [
+                'device' => ($type !== null ? $type : (string)$resource->GetName()),
+                'fulfillment' => $fulfillment,
+                'from' => $reservBeginDate,
+                'to' => $endDate,
+                'pickup' => $pickupPlan !== null,
+                'einf' => $einfPlan !== null,
+                'warnings' => $warnings,
+            ],
+        ]));
+
         $this->page->RedirectToSuccess($ref, implode(' · ', $warnings));
     }
 
@@ -538,10 +556,10 @@ class ZhlBookPresenter
             ];
         }
 
-        // Hauspost-Alternative (C2) — nur wenn das Gerät es erlaubt UND eine Abholung im Spiel ist.
+        // Hauspost-Alternative (C2) — eigenständiges Geräte-Flag, gilt unabhängig vom Übergabe-Modus.
         // Die Re-Render-Werte (a–f2) werden durchgereicht, damit ein Validierungsfehler die Eingaben behält.
         $hauspost = null;
-        if (!empty($ueb['hauspost_allowed']) && $this->pickupApplies($ueb)) {
+        if (!empty($ueb['hauspost_allowed'])) {
             $cfg = $this->hauspostConfig();
             $hauspost = [
                 'allowed' => true,
@@ -1267,6 +1285,14 @@ class ZhlBookPresenter
         $ins->AddParameter(new Parameter('@status', 'pending_review'));
         $ins->AddParameter(new Parameter('@now', gmdate('Y-m-d H:i:s')));
         $db->Execute($ins);
+
+        zhl_audit_log(array_merge(zhl_audit_actor($user), [
+            'action' => 'hauspost.request',
+            'entity_type' => 'resource',
+            'entity_id' => (string)$rid,
+            'reference_number' => $referenceNumber,
+            'detail' => ['device' => $device, 'einsatz' => $hp['einsatz_titel'], 'status' => 'pending_review'],
+        ]));
 
         // --- Klartext-Mail ---
         $transportEmail = trim((string)($cfg['transport_email'] ?? ''));

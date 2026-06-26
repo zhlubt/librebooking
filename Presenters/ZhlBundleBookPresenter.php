@@ -11,6 +11,7 @@ require_once(ROOT_DIR . 'lib/Application/Reservation/namespace.php');
 require_once(ROOT_DIR . 'lib/Application/Zhl/ZhlBundleResolver.php');
 require_once(ROOT_DIR . 'Presenters/Reservation/ReservationPresenterFactory.php');
 require_once(ROOT_DIR . 'Presenters/ZhlReservationFacade.php');
+require_once(ROOT_DIR . 'Web/zhl-audit-lib.php');
 
 /**
  * ZHL Bundle-Buchung (SPEC-BUNDLE-BOOKING). Bucht ein ganzes Bundle „in EINER Reservierung" (Codex:
@@ -476,6 +477,21 @@ class ZhlBundleBookPresenter
         }
 
         $allWarnings = array_merge($postWarnings, ($afterWarning !== '' ? [$afterWarning] : []));
+
+        zhl_audit_log(array_merge(zhl_audit_actor($user), [
+            'action' => 'booking.create.bundle',
+            'entity_type' => 'bundle',
+            'entity_id' => (string)($bundle['id'] ?? ''),
+            'reference_number' => $mainRef,
+            'detail' => [
+                'bundle' => (string)($bundle['name'] ?? ''),
+                'afterRef' => $afterRef,
+                'pickup' => $pickupPlan !== null,
+                'einf' => $einfPlan !== null,
+                'warnings' => $allWarnings,
+            ],
+        ]));
+
         $this->redirectSuccess($mainRef, $afterRef, implode(' · ', $allWarnings), $pickupInfo);
     }
 

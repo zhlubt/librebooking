@@ -18,6 +18,7 @@ declare(strict_types=1);
 define('ROOT_DIR', '../');
 require_once(ROOT_DIR . 'Pages/SecurePage.php');
 require_once(__DIR__ . '/zhl-handover-lib.php');
+require_once(__DIR__ . '/zhl-audit-lib.php');
 
 class ZhlHandoverCheckPage extends SecurePage
 {
@@ -179,6 +180,14 @@ class ZhlHandoverCheckPage extends SecurePage
             }
 
             $pdo->commit();
+
+            zhl_audit_log(array_merge(zhl_audit_actor($session), [
+                'action' => 'handover.checked',
+                'entity_type' => 'handover',
+                'entity_id' => $resourceId ? (string)$resourceId : null,
+                'reference_number' => $ref !== '' ? $ref : null,
+                'detail' => ['type' => $type, 'condition' => $overall, 'token' => $token !== '' ? $token : null],
+            ]));
         } catch (Throwable $e) {
             $pdo->rollBack();
             throw $e;

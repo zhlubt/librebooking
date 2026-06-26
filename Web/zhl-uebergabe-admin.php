@@ -5,7 +5,7 @@
  * Pflegt pro Gerät die Bereitstellungs-/Einweisungs-Regeln (Tabelle zhl_uebergabe):
  *   - Übergabe-Modus: persönliche Abholung (Termin Pflicht) | am Ablageort abholen | nicht nötig
  *   - Einweisung: keine | möglich | notwendig
- *   - Hausdienst-Transport als Alternative erlaubt (nur bei persönlicher Abholung wirksam)
+ *   - Hauspost-Versand erlaubt (eigenständiges Flag, unabhängig vom Übergabe-Modus)
  *   - Abhol- und Rückgabeort (Freitext)
  *
  * Steuert direkt den Buchungspfad: „persönliche Abholung" erzwingt einen Abholtermin
@@ -20,6 +20,7 @@ declare(strict_types=1);
 define('ROOT_DIR', '../');
 require_once(ROOT_DIR . 'Pages/SecurePage.php');
 require_once(__DIR__ . '/zhl-handover-lib.php');
+require_once(__DIR__ . '/zhl-audit-lib.php');
 
 class ZhlUebergabeAdminPage extends SecurePage
 {
@@ -92,6 +93,11 @@ class ZhlUebergabeAdminPage extends SecurePage
                 }
                 $pdo->commit();
                 $flash = $n . ' Geräte gespeichert.';
+                zhl_audit_log(array_merge(zhl_audit_actor($session), [
+                    'action' => 'uebergabe.save',
+                    'entity_type' => 'config',
+                    'detail' => ['devices' => $n],
+                ]));
             } catch (Throwable $ex) {
                 $pdo->rollBack();
                 $flashErr = 'Speichern fehlgeschlagen: ' . $ex->getMessage();
@@ -152,7 +158,10 @@ class ZhlUebergabeAdminPage extends SecurePage
     <h1 class="h5 mb-0"><i class="bi bi-truck text-success"></i> Übergabe-Matrix
       <span class="text-muted fs-6 fw-normal">· <?= $configured ?>/<?= $total ?> Geräte konfiguriert</span>
     </h1>
-    <button class="btn btn-success btn-sm" type="submit"><i class="bi bi-save"></i> Alle Änderungen speichern</button>
+    <div class="d-flex gap-2">
+      <a class="btn btn-outline-secondary btn-sm" href="zhl-audit.php"><i class="bi bi-journal-text"></i> Audit-Log</a>
+      <button class="btn btn-success btn-sm" type="submit"><i class="bi bi-save"></i> Alle Änderungen speichern</button>
+    </div>
   </div>
 </div>
 
@@ -171,7 +180,7 @@ class ZhlUebergabeAdminPage extends SecurePage
       <li><b>Übergabe-Modus</b> <code>Persönliche Abholung</code> = beim Buchen ist ein <b>Abholtermin Pflicht</b> (Terminplaner). <code>Am Ablageort</code> / <code>Nicht nötig</code> = kein Termin.</li>
       <li><b>Sichere Vorgabe:</b> Geräte ohne Eintrag gelten als <b>Abholung Pflicht</b>, bis Sie sie hier bewusst lockern.</li>
       <li><b>Einweisung</b> <code>Notwendig</code> = ohne Zertifikat/Einführungstermin keine Buchung möglich.</li>
-      <li><b>Hausdienst-Transport</b> bietet (zusätzlich zur persönlichen Abholung) den Hauspost-Versand an.</li>
+      <li><b>Hauspost-Versand</b> = dieses Gerät darf per Hauspost verschickt werden. Der Haken entscheidet allein, <b>unabhängig vom Übergabe-Modus</b> (auch bei „Am Ablageort" oder „Nicht nötig").</li>
     </ul>
   </div>
 
@@ -188,7 +197,7 @@ class ZhlUebergabeAdminPage extends SecurePage
               <th style="min-width:200px">Gerät</th>
               <th>Übergabe-Modus</th>
               <th>Einweisung</th>
-              <th class="text-center">Hausdienst</th>
+              <th class="text-center">Hauspost</th>
               <th>Abholort</th>
               <th>Rückgabeort</th>
             </tr>

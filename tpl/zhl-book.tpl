@@ -151,7 +151,7 @@
 							<div class="zhl-uplabel">Wie möchtest du das Material erhalten?</div>
 							<label class="zhl-attr-check">
 								<input type="radio" name="fulfillment" value="pickup" class="zhl-ff-radio"{if $Fulfillment != 'hauspost'} checked{/if}>
-								<span>📦 Persönlich abholen</span>
+								<span>{if $Abholung == 'ablageort'}📍 Am Ablageort abholen{elseif $Abholung == 'nicht_noetig'}📍 Selbst abholen (vor Ort){else}📦 Persönlich abholen{/if}</span>
 							</label>
 							<label class="zhl-attr-check">
 								<input type="radio" name="fulfillment" value="hauspost" class="zhl-ff-radio"{if $Fulfillment == 'hauspost'} checked{/if}>

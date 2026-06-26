@@ -140,7 +140,16 @@
 						data-einf-active="{if $EinfActive}1{else}0{/if}"
 						data-sel-pickup="{$SelPickupSlot|escape}"
 						data-sel-einf="{$SelEinfSlot|escape}">
-						<p id="zhl-slot-hint" class="zhl-muted zhl-small" style="margin-top:16px;">⤴ Wähle oben den Aufnahme-Zeitraum — dann erscheinen hier die möglichen <strong>Abhol-</strong>{if $EinfActive} und <strong>Einführungs-</strong>{/if}termine.</p>
+						{if $CombineEligible}
+<div class="zhl-handovermode" style="margin-bottom:8px;">
+<div class="zhl-uplabel">Einführung und Abholung</div>
+<label class="zhl-attr-check"><input type="radio" name="handover_mode" value="zusammen" class="zhl-hm-radio"{if $HandoverMode != 'getrennt'} checked{/if}><span>🤝 Zusammen <span class="zhl-muted zhl-small">— ein gemeinsamer Termin für Einführung und Abholung</span></span></label>
+<label class="zhl-attr-check"><input type="radio" name="handover_mode" value="getrennt" class="zhl-hm-radio"{if $HandoverMode == 'getrennt'} checked{/if}><span>📅 Getrennt <span class="zhl-muted zhl-small">— Einführung und Abholung an zwei verschiedenen Terminen</span></span></label>
+</div>
+{else}
+<input type="hidden" name="handover_mode" value="getrennt">
+{/if}
+<p id="zhl-slot-hint" class="zhl-muted zhl-small" style="margin-top:16px;">⤴ Wähle oben den Aufnahme-Zeitraum — dann erscheinen hier die möglichen <strong>Abhol-</strong>{if $EinfActive} und <strong>Einführungs-</strong>{/if}termine.</p>
 						<div id="zhl-pickup-wrap"></div>
 						<div id="zhl-einf-wrap"></div>
 					</div>
@@ -209,6 +218,23 @@
 	var hint = document.getElementById('zhl-slot-hint');
 	var pickupWrap = document.getElementById('zhl-pickup-wrap');
 	var einfWrap = document.getElementById('zhl-einf-wrap');
+	var hmRadios = document.querySelectorAll('.zhl-hm-radio');
+	var lastVm = null;
+	function curMode() { var v = 'zusammen'; hmRadios.forEach(function (r) { if (r.checked) { v = r.value; } }); return v; }
+	function combinedActive() { return hmRadios && hmRadios.length > 0 && curMode() === 'zusammen' && slotBox && slotBox.getAttribute('data-einf-active') === '1' && slotBox.getAttribute('data-pickup-active') === '1'; }
+	function applyMode() {
+		var combined = combinedActive();
+		var pBlock = false;
+		if (combined) { if (pickupWrap) { pickupWrap.innerHTML = ''; } }
+		else { pBlock = renderPickup(lastVm ? lastVm.pickup : null); }
+		var eBlock = renderEinf(lastVm ? lastVm.einf : null, combined);
+		var needEinf = slotBox && slotBox.getAttribute('data-einf-active') === '1';
+		var needPickup = !combined && slotBox && slotBox.getAttribute('data-pickup-mandatory') === '1';
+		if (eBlock && needEinf) { setSubmitBlocked(true, 'Kein Einführungstermin verfügbar — bitte anderen Zeitraum wählen.'); }
+		else if (pBlock && needPickup) { setSubmitBlocked(true, 'Kein Abholtermin verfügbar — bitte anderen Zeitraum wählen.'); }
+		else { setSubmitBlocked(false); }
+	}
+	hmRadios.forEach(function (r) { r.addEventListener('change', applyMode); });
 	function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]; }); }
 
 	// --- Termine (Abholung/Einführung) per AJAX zum gewählten Start laden — ohne Reload. ---
@@ -246,7 +272,7 @@
 		pickupWrap.innerHTML = h;
 		return false;
 	}
-	function renderEinf(vm) {
+	function renderEinf(vm, combined) {
 		if (!einfWrap) { return false; }
 		if (!vm || vm.certified) { einfWrap.innerHTML = ''; return false; }
 		if (!vm.slots || !vm.slots.length) {
@@ -255,8 +281,9 @@
 			return true; // Einführung ist Pflicht → ohne Termin keine Buchung
 		}
 		var sel = slotBox.getAttribute('data-sel-einf') || '';
-		var h = '<div class="zhl-uplabel" style="margin-top:16px;">Einführung</div><div class="zhl-einf-pick">' +
-			'<div class="zhl-einf-head">Einführungstermin wählen <span class="zhl-req">*</span></div>';
+		var note = combined ? '<div class="zhl-ueb-item ok" style="margin:8px 0;"><strong>✓ Ein Termin genügt</strong> <span class="zhl-muted zhl-small">Dieser Termin ist zugleich der Abholtermin — du bekommst die Geräte direkt im Anschluss.</span></div>' : '';
+		var h = '<div class="zhl-uplabel" style="margin-top:16px;">Einführung' + (combined ? ' &amp; Abholung' : '') + '</div>' + note + '<div class="zhl-einf-pick">' +
+			'<div class="zhl-einf-head">' + (combined ? 'Termin für Einführung + Abholung' : 'Einführungstermin wählen') + ' <span class="zhl-req">*</span></div>';
 		vm.slots.forEach(function (s) { h += '<label class="zhl-slot"><input type="radio" name="einf_slot" value="' + esc(s.slot_id) + '" required' + (s.slot_id === sel ? ' checked' : '') + '><span>' + esc(s.label) + '</span></label>'; });
 		h += '</div>';
 		einfWrap.innerHTML = h;
@@ -278,11 +305,8 @@
 				if (token !== fetchToken) { return; } // veraltete Antwort verwerfen
 				if (!j || j.error) { throw new Error(j && j.error ? j.error : 'data'); }
 				if (hint) { hint.style.display = 'none'; }
-				var pBlock = renderPickup(j.pickup);
-				var eBlock = renderEinf(j.einf);
-				if (pBlock) { setSubmitBlocked(true, 'Kein Abholtermin verfügbar — bitte anderen Zeitraum wählen.'); }
-				else if (eBlock) { setSubmitBlocked(true, 'Kein Einführungstermin verfügbar — bitte anderen Zeitraum wählen.'); }
-				else { setSubmitBlocked(false); }
+				lastVm = j;
+				applyMode(); // rendert Abholung/Einführung je nach „zusammen/getrennt" + setzt Submit-Zustand
 			})
 			.catch(function () {
 				if (token !== fetchToken) { return; }

@@ -270,9 +270,15 @@ class ZhlBundleBookPresenter
         }
 
         // --- 5. Abholung VALIDIEREN + Slot serverseitig auflösen (NOCH NICHT buchen). ---
+        // „Zusammen" (Nutzer-Wahl 2026-06-26): EIN gemeinsamer Termin (der Einführungs-Slot) deckt
+        // Einführung UND Abholung ab → KEIN separater Abholtermin. Nur möglich, wenn beides ansteht
+        // (Einführung gewählt + persönliche Abholung greift). Default „zusammen" (Bundle-Einführung ist Pflicht).
+        $handoverMode = ($this->post('handover_mode') === 'getrennt') ? 'getrennt' : 'zusammen';
         $pickupPlan = null;
         $pickupNeed = $this->firstResourceNeedingPickup($db, $mainResourceIds);
-        if ($pickupNeed !== null) {
+        $combined = ($handoverMode === 'zusammen') && $einfPlan !== null
+            && $pickupNeed !== null && $this->pickupApplies($pickupNeed);
+        if ($pickupNeed !== null && !$combined) {
             $mandatory = $this->pickupApplies($pickupNeed) && !$user->IsAdmin;
             $pickupSlot = $this->post('pickup_slot');
             if ($mandatory && $pickupSlot === '') {
@@ -315,6 +321,15 @@ class ZhlBundleBookPresenter
                 $reservBeginDate = $pickupDay;
                 $pbnds = $this->scheduleDayBounds($user, $mainScheduleId, $pickupDay);
                 $reservBeginTime = $pbnds['begin'];
+            }
+        }
+        // „Zusammen": der gemeinsame Termin (= Einführungs-Slot) ist zugleich der Übergabetag.
+        if ($combined && $pickupPlan === null && $einfPlan !== null && !empty($einfPlan['start_utc'])) {
+            $einfDay = Date::Parse($einfPlan['start_utc'], 'UTC')->ToTimezone($tz)->Format('Y-m-d');
+            if (strcmp($einfDay, $dayStartRaw) < 0) {
+                $reservBeginDate = $einfDay;
+                $ebnds = $this->scheduleDayBounds($user, $mainScheduleId, $einfDay);
+                $reservBeginTime = $ebnds['begin'];
             }
         }
         $reservBeginUtc = Date::Parse($reservBeginDate . ' ' . $reservBeginTime, $tz);
@@ -419,6 +434,23 @@ class ZhlBundleBookPresenter
                     $einfBookingId = isset($book['booking_id']) ? (string)$book['booking_id'] : null;
                     $this->persistEinfuehrung($db, $mainRef, (int)$einfPlan['resourceId'], (int)$einfPlan['member_id'], $einfBookingId, $einfPlan['start_utc'], $einfPlan['end_utc']);
                     $this->createCertConfirmation($db, (int)$user->UserId, $einfPlan['resourceId']);
+                    // „Zusammen": der gebuchte Einführungstermin ist zugleich der Übergabetermin →
+                    // Übergabe-Zeilen (pickup + return) aus dem Einführungs-Slot ableiten, geschlüsselt
+                    // auf das Übergabe-Repräsentativ-Gerät (wie der normale Pickup). KEIN separater Abhol-Slot.
+                    if ($combined) {
+                        $loanEndUtc = $mainEndUtc->ToTimezone('UTC')->Format('Y-m-d H:i:s');
+                        $combToken = bin2hex(random_bytes(16));
+                        // Auf das Einführungs-Gerät schlüsseln: dessen resourceId wird im Pool-Fallback (6b)
+                        // auf die final reservierte Einheit nachgezogen ($pickupNeed wäre dort veraltet).
+                        $combResId = (int)$einfPlan['resourceId'];
+                        $combOk = $this->persistHandover($db, $combToken, (int)$user->UserId, $combResId, $einfBookingId, (int)$einfPlan['member_id'], $einfPlan['start_utc'], $einfPlan['end_utc'], $loanEndUtc);
+                        if ($combOk) {
+                            $this->backfillHandoverReference($db, $combToken, $mainRef);
+                        } else {
+                            Log::Error('ZHL-Bundle Zusammen: Übergabe-Zeilen (aus Einführung) nicht gespeichert (token=%s, res=%s)', $combToken, $combResId);
+                            $postWarnings[] = 'Der gemeinsame Termin ist gebucht, aber die Übergabe konnte intern nicht hinterlegt werden — bitte beim ZHL-Team melden.';
+                        }
+                    }
                 } catch (Throwable $e) {
                     Log::Error('ZHL-Bundle Einführung-Nachbereitung fehlgeschlagen (ref=%s, res=%s): %s', $mainRef, (int)$einfPlan['resourceId'], $e);
                     $postWarnings[] = 'Die Aufnahme ist gebucht, der Einführungstermin reserviert — die Nachbereitung (Bestätigung/Hinterlegung) konnte aber nicht abgeschlossen werden. Bitte beim ZHL-Team melden.';
@@ -616,6 +648,9 @@ class ZhlBundleBookPresenter
             'pickupMandatory' => $pickupMandatory,
             'einfActive' => $einfActive,
             'einfCertified' => $einfCertified,
+            // „Zusammen oder getrennt": nur sinnvoll, wenn Einführung UND Abholung anstehen. Default „zusammen".
+            'combineEligible' => ($pickupActive && $einfActive),
+            'handoverMode' => ($this->post('handover_mode') === 'getrennt') ? 'getrennt' : 'zusammen',
             'selStart' => $this->postedStart,
             'selEnd' => $this->postedEnd,
             'selPickupSlot' => $this->postedPickupSlot,

@@ -110,9 +110,8 @@
 							{csrf_token}
 							<input type="hidden" name="action" value="grant">
 							<input type="hidden" name="type_id" value="{$t.id}">
-							<div class="col-7"><input class="form-control form-control-sm" name="user_ref" placeholder="E-Mail / Benutzername / ID" required></div>
-							<div class="col-3"><input class="form-control form-control-sm" type="date" name="expires_at" title="Ablauf (leer = unbegrenzt)"></div>
-							<div class="col-2"><button class="btn btn-primary btn-sm w-100">+</button></div>
+							<div class="col-9"><input class="form-control form-control-sm" name="user_ref" placeholder="E-Mail / Benutzername / ID" required></div>
+														<div class="col-3"><button class="btn btn-primary btn-sm w-100" title="Zertifikat zuweisen (gilt 1 Jahr)">Zuweisen</button></div>
 						</form>
 					</div>
 				</div>

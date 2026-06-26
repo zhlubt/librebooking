@@ -31,11 +31,13 @@ class ZhlDashboardPresenter
     {
         $tz = $user->Timezone;
 
-        $startStr = $this->readDate('start', $tz);
+        // Standard-Startdatum = heute + 7 Tage: die meisten Geräte sind „heute" wegen Vorlauf/laufenden
+        // Ausleihen nicht frei — ab einer Woche sieht das Raster deutlich freundlicher (mehr Verfügbarkeit) aus.
+        $startStr = $this->readDate('start', $tz, 7);
         // „days" = Vorschau-Zeitraum des Rasters (nicht die Ausleihdauer — die wählt man beim Buchen).
         // Mindestens 7 Tage Vorschau, damit man sieht, WANN ein Gerät frei wird (Vorlauf gelb → frei grün).
         $days = max(7, $this->readInt('days', 14, 1, 31));
-        $scheduleId = $this->readInt('schedule', 0, 0, PHP_INT_MAX);
+        $cat = trim((string)$this->readRaw('cat'));
         $search = trim((string)$this->readRaw('q'));
 
         $start = Date::Parse($startStr, $tz);
@@ -56,28 +58,86 @@ class ZhlDashboardPresenter
             $db,
             $typeAttributeId
         );
-        $grid = $service->BuildGrid($user, $start, $days, $scheduleId, $search);
+        // Immer ALLE Geräte holen (schedule-Filter aus); die Filterung läuft jetzt über kuratierte
+        // ZHL-Kategorien (Geräte-Typ-Gruppen), nicht mehr über Schedules.
+        $grid = $service->BuildGrid($user, $start, $days, 0, $search);
 
-        // Bundles leben jetzt im Assistenten („Bundles buchen"), nicht mehr im Geräte-Raster.
+        // Kategorien = kuratierte ZHL-Gruppen (fest definiert), gemappt auf Geräte-Typen.
+        $map = $this->categoryMap();
+        $covered = [];
+        foreach ($map as $c) {
+            foreach ($c['types'] as $t) {
+                $covered[$t] = true;
+            }
+        }
 
-        // Kategorien = Schedules, nur solche mit sichtbaren Geräten.
-        $schedules = (new ScheduleRepository())->GetAll();
+        $rows = $grid['rows'];
+        $counts = [];
+        $otherCount = 0;
+        foreach ($rows as $r) {
+            $t = $r->type;
+            $key = null;
+            if ($t !== null) {
+                foreach ($map as $c) {
+                    if (in_array($t, $c['types'], true)) {
+                        $key = $c['key'];
+                        break;
+                    }
+                }
+            }
+            if ($key !== null) {
+                $counts[$key] = ($counts[$key] ?? 0) + 1;
+            } else {
+                $otherCount++;
+            }
+        }
+
         $categories = [];
-        foreach ($schedules as $s) {
-            $sid = (int)$s->GetId();
-            $count = $grid['categoryCounts'][$sid] ?? 0;
-            if ($count === 0) {
+        foreach ($map as $c) {
+            $n = $counts[$c['key']] ?? 0;
+            if ($n === 0) {
                 continue;
             }
-            $categories[] = ['id' => $sid, 'name' => (string)$s->GetName(), 'count' => $count];
+            $categories[] = ['key' => $c['key'], 'name' => $c['label'], 'count' => $n, 'note' => $c['note']];
         }
+        if ($otherCount > 0) {
+            $categories[] = ['key' => 'weitere', 'name' => 'Weitere Geräte', 'count' => $otherCount, 'note' => ''];
+        }
+
+        // Aktive Kategorie gegen die FESTEN Kategorie-Schlüssel validieren (nicht gegen die aktuellen
+        // Trefferzahlen) — sonst würde eine Kategorie bei leerer Suche aus der Liste fallen und die
+        // Ansicht ungewollt auf „Alle" (inkl. Milchglas) zurückspringen.
+        $validKeys = array_column($map, 'key');
+        $validKeys[] = 'weitere';
+        $activeCat = in_array($cat, $validKeys, true) ? $cat : '';
+        $activeName = '';
+        $activeNote = '';
+        if ($activeCat === 'weitere') {
+            $rows = array_values(array_filter($rows, fn($r) => $r->type === null || !isset($covered[$r->type])));
+            $activeName = 'Weitere Geräte';
+        } elseif ($activeCat !== '') {
+            foreach ($map as $c) {
+                if ($c['key'] === $activeCat) {
+                    $rows = array_values(array_filter($rows, fn($r) => $r->type !== null && in_array($r->type, $c['types'], true)));
+                    $activeName = $c['label'];
+                    $activeNote = $c['note'];
+                    break;
+                }
+            }
+        }
+
+        // Beim ersten Öffnen / Ansicht „Alle" werden alle Geräte angezeigt, aber hinter Milchglas
+        // (Hinweis: erst eine Kategorie wählen). Ein Klick aufs Milchglas gibt alles frei.
+        $frosted = ($activeCat === '');
 
         $end = $start->AddDays($days);
         $this->page->BindDashboard([
             'categories' => $categories,
-            'rows' => $grid['rows'],
-            'pools' => $grid['pools'],
-            'activeSchedule' => $scheduleId,
+            'rows' => $rows,
+            'activeCat' => $activeCat,
+            'activeName' => $activeName,
+            'activeNote' => $activeNote,
+            'frosted' => $frosted,
             'search' => $search,
             'startInput' => $start->Format('Y-m-d'),
             'days' => $days,
@@ -86,6 +146,29 @@ class ZhlDashboardPresenter
                 . $end->AddDays(-1)->ToTimezone($tz)->Format('d.m.Y'),
             'totalVisible' => $grid['totalVisible'],
         ]);
+    }
+
+    /**
+     * Kuratierte ZHL-Kategorien für die „Geräte einzeln"-Seite (fest im Code, ZHL-Entscheidung
+     * 2026-06-26). Jede Kategorie mappt auf einen oder mehrere Geräte-Typen (custom_attribute
+     * „Geräte-Typ"). Nicht abgedeckte Typen (z. B. Podcast-Mikrofon) landen in „Weitere Geräte".
+     */
+    private function categoryMap(): array
+    {
+        return [
+            ['key' => 'funk', 'label' => 'Funkmikrofon', 'types' => ['Funkmikrofon (mit zwei Sendern)'],
+                'note' => 'Mehrere Sets verfügbar – wählen Sie einfach einen freien Zeitraum, ein freies Set wird automatisch zugeordnet.'],
+            ['key' => 'smartphone', 'label' => 'Smartphone-Video-Kit', 'types' => ['Smartphone-Video-Kit'],
+                'note' => 'Mehrere Kits verfügbar – ein freies Kit wird automatisch zugeordnet.'],
+            ['key' => 'kamera', 'label' => 'Kameras & Zubehör',
+                'types' => ['Profi-Kamera', 'Einfache Allround-Kamera', 'Objektiv', 'Gimbal', 'Stativ', 'Kleines Kamerastativ', 'Richtmikrofon'], 'note' => ''],
+            ['key' => 'videostudio', 'label' => 'Videostudio', 'types' => ['Videostudio'], 'note' => ''],
+            ['key' => 'schnitt', 'label' => 'Schnittcomputer', 'types' => ['Schnitt-/VR-PC'], 'note' => ''],
+            ['key' => 'moderation', 'label' => 'Moderationsmaterial', 'types' => ['Moderationsmaterial'], 'note' => ''],
+            ['key' => 'immersive', 'label' => 'Immersive Medien (VR / AR / 3D)',
+                'types' => ['VR-Brille', 'AR-Brille', '360-Grad-Kamera', 'Teleskopstange (360°-Kamera)'], 'note' => ''],
+            ['key' => 'drohne', 'label' => 'Drohne', 'types' => ['Drohne'], 'note' => ''],
+        ];
     }
 
     private function lookupTypeAttributeId($db)
@@ -122,12 +205,12 @@ class ZhlDashboardPresenter
         return $n;
     }
 
-    private function readDate($key, $tz)
+    private function readDate($key, $tz, int $defaultOffsetDays = 0)
     {
         $v = $this->readRaw($key);
         if (preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $v, $m) && checkdate((int)$m[2], (int)$m[3], (int)$m[1])) {
             return $v;
         }
-        return Date::Now()->ToTimezone($tz)->Format('Y-m-d');
+        return Date::Now()->AddDays($defaultOffsetDays)->ToTimezone($tz)->Format('Y-m-d');
     }
 }

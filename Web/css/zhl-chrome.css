@@ -1,0 +1,165 @@
+/* =====================================================================
+ * zhl-chrome.css — ZHL-Optik NUR für globale Navbar + Footer.
+ * STRIKT gescoped: alle Selektoren hängen an `.zhl-navbar` oder `.zhl-footer`
+ * (plus `#button-up` für die Druck-Regel). Custom-Props mit `--zhl-chrome-*`.
+ * KEINE generischen Selektoren (.wrap/.logo/.card/.btn/.row), kein --green.
+ * Ladeordnung: Bootstrap -> librebooking.css -> zhl-theme.css -> DIESE Datei.
+ * Markenfarbe UBT-Grün #009260; explizite Farben (unabhängig von data-bs-theme).
+ * ===================================================================== */
+:root {
+  --zhl-chrome-green: #009260;
+  --zhl-chrome-green-dark: #007a50;
+  --zhl-chrome-foot: #1f2733;
+}
+
+/* ---------- Navbar (native <nav> bekommt Zusatzklasse .zhl-navbar) ---------- */
+/* Optik 1:1 an die öffentliche Startseite (zhl-start.php) angeglichen:
+ * gleicher Grün-Verlauf, gleiche System-Schrift, gleich weißes Logo. */
+.zhl-navbar {
+  background: linear-gradient(135deg, var(--zhl-chrome-green) 0%, var(--zhl-chrome-green-dark) 100%) !important;
+  box-shadow: 0 2px 14px rgba(0, 80, 52, 0.18) !important;
+  border-bottom: none !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+}
+
+/* Markenkopf-Logo: rein weiß (wie auf zhl-start), damit der Monogramm-Kopf
+ * nicht dunkel auf dem Grün „verschwimmt". */
+.zhl-navbar-brand .zhl-chrome-logo {
+  height: 34px;
+  width: auto;
+  filter: brightness(0) invert(1);
+}
+
+/* Nav-Links + Brand weiß */
+.zhl-navbar .navbar-brand,
+.zhl-navbar .nav-link {
+  color: #fff !important;
+  font-weight: 500;
+}
+.zhl-navbar .navbar-brand {
+  font-weight: 700;
+}
+.zhl-navbar .nav-link:hover,
+.zhl-navbar .nav-link:focus {
+  color: rgba(255, 255, 255, 0.85) !important;
+  background-color: rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+}
+.zhl-navbar .nav-link.active,
+.zhl-navbar .nav-item.active > .nav-link {
+  color: #fff !important;
+  background-color: rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+  font-weight: 600;
+}
+.zhl-navbar .dropdown-toggle::after {
+  color: #fff;
+}
+
+/* Dropdown-Menüs: weiß mit dunklem Text (lesbar) */
+.zhl-navbar .dropdown-menu {
+  background-color: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
+}
+.zhl-navbar .dropdown-item {
+  color: #2d3748;
+}
+.zhl-navbar .dropdown-item:hover,
+.zhl-navbar .dropdown-item:focus {
+  background-color: #f0fdf4;
+  color: var(--zhl-chrome-green-dark);
+}
+.zhl-navbar .dropdown-item:active,
+.zhl-navbar .dropdown-item.active {
+  background-color: var(--zhl-chrome-green);
+  color: #fff;
+}
+.zhl-navbar .dropdown-divider {
+  border-top-color: #e2e8f0;
+}
+
+/* Mobiler Hamburger: hell sichtbar auf Grün */
+.zhl-navbar .navbar-toggler {
+  border-color: rgba(255, 255, 255, 0.55);
+  color: #fff;
+}
+.zhl-navbar .navbar-toggler:focus {
+  box-shadow: 0 0 0 0.2rem rgba(255, 255, 255, 0.25);
+}
+.zhl-navbar .navbar-toggler-icon {
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='rgba%28255,255,255,0.9%29' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e");
+}
+
+/* Sprach-/Gear-Icons im Kopf weiß */
+.zhl-navbar .nav-link .bi {
+  color: #fff;
+}
+
+/* Sprach-Umschalter als Pille (EN/DE) – identisch zur Startseite (.lang-btn) */
+.zhl-navbar .zhl-lang-toggle {
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  color: #fff;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+  padding: 7px 12px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.zhl-navbar .zhl-lang-toggle:hover,
+.zhl-navbar .zhl-lang-toggle:focus {
+  background: rgba(255, 255, 255, 0.24);
+  color: #fff;
+}
+
+/* An-/Abmelden rechts als helle Pille (wie der „Anmelden"-Button auf zhl-start) */
+.zhl-navbar #navSignOut .nav-link,
+.zhl-navbar #navLogIn .nav-link {
+  background: #fff;
+  color: var(--zhl-chrome-green-dark) !important;
+  font-weight: 600;
+  padding: 7px 16px !important;
+  border-radius: 10px;
+  margin-left: 6px;
+  transition: transform 0.12s ease, box-shadow 0.15s ease;
+}
+.zhl-navbar #navSignOut .nav-link:hover,
+.zhl-navbar #navLogIn .nav-link:hover,
+.zhl-navbar #navSignOut .nav-link:focus,
+.zhl-navbar #navLogIn .nav-link:focus {
+  background: #fff;
+  color: var(--zhl-chrome-green) !important;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(0, 40, 25, 0.25);
+}
+
+/* ---------- Footer (dunkel) ---------- */
+.zhl-footer {
+  background-color: var(--zhl-chrome-foot) !important;
+  border-top: none !important;
+  color: #aab8b1 !important;
+}
+.zhl-footer a {
+  color: #cbd5dd !important;
+}
+.zhl-footer a:hover {
+  color: #fff !important;
+}
+.zhl-footer .zhl-footer-muted {
+  color: #7a8a83 !important;
+  font-size: 13px;
+}
+
+/* ---------- Druck: kein Chrome ---------- */
+@media print {
+  .zhl-navbar,
+  .zhl-footer,
+  #button-up {
+    display: none !important;
+  }
+}

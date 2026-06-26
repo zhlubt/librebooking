@@ -82,13 +82,14 @@
 				{* Positionen *}
 				<h6 class="text-muted">Positionen</h6>
 				<table class="table table-sm align-middle">
-					<thead><tr><th>Typ</th><th>Menge</th><th>Pflicht</th><th>Hinweis</th><th></th></tr></thead>
+					<thead><tr><th>Typ (Nutzer-Begriff)</th><th>Menge</th><th>Pflicht</th><th>Verknüpfte Geräte (intern)</th><th>Hinweis</th><th></th></tr></thead>
 					<tbody>
 						{foreach from=$bundle.items item=item}
 							<tr>
 								<td>{$item.type_label|escape}</td>
 								<td>{$item.quantity}×</td>
 								<td>{if $item.required}<span class="badge bg-primary">Pflicht</span>{else}<span class="badge bg-light text-dark">optional</span>{/if}</td>
+									<td class="small">{if $item.resolvedKind == 'specific'}<span class="badge bg-success">konkret</span> {$item.resolvedLabel|escape}{elseif $item.resolvedKind == 'packlist'}<span class="badge bg-light text-dark">Packliste</span> <span class="text-muted">kein buchbares Gerät</span>{elseif $item.resolvedKind == 'none'}<span class="badge bg-danger">⚠ kein Gerät</span> <span class="text-muted">Typ deckt aktuell nichts ab</span>{else}<span class="text-muted">{$item.resolvedCount}×:</span> {$item.resolvedLabel|escape}{/if}</td>
 								<td class="text-muted small">{$item.note|escape}</td>
 								<td class="text-end">
 									<form method="post" action="{$Path}zhl-bundles-admin.php" onsubmit="return confirm('Position entfernen?');" class="d-inline">
@@ -100,7 +101,7 @@
 								</td>
 							</tr>
 						{foreachelse}
-							<tr><td colspan="5" class="text-muted">Noch keine Positionen.</td></tr>
+							<tr><td colspan="6" class="text-muted">Noch keine Positionen.</td></tr>
 						{/foreach}
 					</tbody>
 				</table>
@@ -111,7 +112,7 @@
 					<input type="hidden" name="action" value="add_item">
 					<input type="hidden" name="bundle_id" value="{$bundle.id}">
 					<div class="col-md-4"><label class="form-label">Typ</label>
-						<input class="form-control" name="type_label" list="zhl-types" placeholder="z. B. Funkmikrofon" required>
+						<select class="form-select" name="type_label" required><option value="">– Geräte-Typ wählen –</option>{foreach from=$KnownTypes item=t}<option value="{$t|escape}">{$t|escape}</option>{/foreach}</select>
 					</div>
 					<div class="col-md-2"><label class="form-label">Menge</label><input class="form-control" type="number" name="quantity" value="1" min="1"></div>
 					<div class="col-md-2"><div class="form-check mt-4"><input class="form-check-input" type="checkbox" name="required" value="1" id="req{$bundle.id}" checked><label class="form-check-label" for="req{$bundle.id}">Pflicht</label></div></div>

@@ -86,6 +86,9 @@ class ZhlHandoverAdminPage extends SecurePage
             <td><?= $r['has_check'] ? '<span class="text-success"><i class="bi bi-check-circle"></i></span>' : '<span class="text-muted">—</span>' ?></td>
             <td class="text-end">
               <a class="btn btn-sm btn-outline-secondary" href="zhl-handover-check.php?<?= $h($qs) ?>"><i class="bi bi-clipboard-check"></i> Protokoll</a>
+              <?php if ((int)$r['resource_id'] > 0): ?>
+                <a class="btn btn-sm btn-outline-secondary" title="Stabilen Geräte-QR drucken" href="zhl-resource-qr.php?resource=<?= (int)$r['resource_id'] ?>"><i class="bi bi-printer"></i> Geräte-QR</a>
+              <?php endif; ?>
               <a class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse" href="#qr<?= (int)$r['id'] ?>"><i class="bi bi-qr-code"></i></a>
               <div class="collapse" id="qr<?= (int)$r['id'] ?>">
                 <img class="qr-pop mt-2" alt="QR" src="zhl-handover-qr.php?<?= $h($qs) ?>">

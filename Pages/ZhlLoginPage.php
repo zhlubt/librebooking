@@ -16,6 +16,9 @@ class ZhlLoginPage extends LoginPage
     {
         // Presenter füllt alle Login-Variablen (Prompts, Register-/Reset-URL, Fehler).
         $this->presenter->PageLoad();
+        // Vom Aktivierungslink umgeleitet (Token bereits verbraucht, z. B. Outlook-Vorab-Abruf):
+        // freundlicher Hinweis statt Fehlerseite. Siehe Pages/ZhlActivationPage.php.
+        $this->Set('ReactivatedNotice', isset($_GET['reaktiviert']) && $_GET['reaktiviert'] === '1');
         $this->Display('zhl-login.tpl');
     }
 }

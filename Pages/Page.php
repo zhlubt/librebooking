@@ -182,10 +182,15 @@ abstract class Page implements IPage
         );
     }
 
-    public function RedirectToError($errorMessageId = ErrorMessages::UNKNOWN_ERROR, $lastPage = '')
+    public function RedirectToError($errorMessageId = ErrorMessages::UNKNOWN_ERROR, $lastPage = '', $detail = '')
     {
         $errorMessageKey = ErrorMessages::Instance()->GetResourceKey($errorMessageId);
         $this->Set('ErrorMessage', $errorMessageKey);
+        // Zeitstempel als Referenz, damit Nutzer einen gemeldeten Fehler im Log
+        // wiederfinden lassen können; technisches Detail nur, wenn der Handler es
+        // (Admin/app.debug) übergeben hat.
+        $this->Set('ErrorReference', gmdate('Y-m-d H:i:s') . ' UTC');
+        $this->Set('ErrorDetail', $detail);
         $this->Set('TitleKey', 'Error');
         $this->Display('error.tpl');
         die();

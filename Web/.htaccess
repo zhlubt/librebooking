@@ -1,0 +1,4 @@
+# ZHL: Die öffentliche Startseite (zhl-start.php) ist die Standard-Landingpage für /Web/ (und damit
+# über den Root-Redirect auch für media.zhl-ubt.de/). index.php (Login) bleibt explizit erreichbar
+# und wird als Fallback genutzt, falls zhl-start.php einmal fehlt.
+DirectoryIndex zhl-start.php index.php

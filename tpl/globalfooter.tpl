@@ -1,20 +1,26 @@
 	</div><!-- close main-->
-	<div id="button-up" class="bg-primary rounded-circle text-white">
-		<i class="bi bi-chevron-double-up" aria-hidden="true"></i>
-	</div>
-	<footer class="bg-light border-top text-center py-1" role="contentinfo">
-		{if $CompanyName neq ''}
-			<div class="mb-2"><a class="link-primary" href="{$CompanyUrl}">{$CompanyName}</a></div>
-		{/if}
-		<div><a class="link-primary" href="https://github.com/LibreBooking/librebooking">LibreBooking - GPLv3 -
-				{$DisplayVersion}</a></div>
-	</footer>
+	{if !isset($HideNavBar) || $HideNavBar == false}
+		<div id="button-up" class="bg-primary rounded-circle text-white">
+			<i class="bi bi-chevron-double-up" aria-hidden="true"></i>
+		</div>
+		<footer class="zhl-footer border-top text-center py-3" role="contentinfo">
+			{if $CompanyName neq ''}
+				<div class="mb-1"><a href="{$CompanyUrl}">{$CompanyName}</a></div>
+			{/if}
+			<div class="zhl-footer-muted">© 2026 · Zentrum für Hochschullehre · Universität Bayreuth</div>
+			<div class="zhl-footer-muted"><a href="https://github.com/LibreBooking/librebooking">LibreBooking - GPLv3 -
+					{$DisplayVersion}</a></div>
+		</footer>
+	{/if}
 
 	<script type="text/javascript">
-		init();
+		// init() stammt aus phpscheduleit.js; die ZHL-Seiten laden dieses Bundle
+		// nicht, daher defensiv aufrufen (sonst ReferenceError, der den Rest des
+		// Blocks – z. B. den Sprachumschalter – abbricht).
+		if (typeof init === 'function') { init(); }
 
 		{if isset($LoggedIn) && $LoggedIn && count($AvailableLanguages) > 1}
-			$('#languageDropdownMenu').on('click', 'a[data-lang-code]', function(e) {
+			$(document).on('click', '[data-lang-code]', function(e) {
 				e.preventDefault();
 				var langCode = $(this).data('lang-code');
 				var csrfToken = '{$CSRFToken|escape:'javascript'}';

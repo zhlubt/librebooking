@@ -17,4 +17,8 @@ return [
 
     // Timeout (Sekunden) für HTTP-Aufrufe an terminplaner.
     'http_timeout' => 6,
+
+    // Label des Terminplaner-Termintyps für die Medien-Abholung (type_id 35).
+    // Wird vom inline Abhol-Slot-Picker (C1) an lesson_slots.php/book_slot.php übergeben.
+    'handover_type_label' => 'Übergabe Medien',
 ];

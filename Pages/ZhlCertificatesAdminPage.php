@@ -34,7 +34,7 @@ class ZhlCertificatesAdminPage extends SecurePage implements IZhlCertificatesAdm
 
         $this->presenter->Load();
         $this->Set('Message', $this->GetQuerystring('msg'));
-        $this->Set('HideNavBar', true);
+        $this->Set('HideNavBar', false);
         $this->Display('zhl-certificates-admin.tpl');
     }
 

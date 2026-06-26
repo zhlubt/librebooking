@@ -26,6 +26,8 @@ class ZhlReservationFacade implements IReservationSavePage
     private $endTime;     // 'H:i'
     /** @var object[] je Element ->Id (int) und ->Value (string) — Reservierungs-Custom-Attribute */
     private $attributeValues = [];
+    /** @var int[] Zusatz-Ressourcen-IDs (Multi-Resource-Buchung); Primär-ID wird in GetResources entfernt */
+    private $additionalResourceIds = [];
 
     // Ergebnis (von Handler/Presenter zurückgeschrieben)
     private $saved = false;
@@ -34,7 +36,7 @@ class ZhlReservationFacade implements IReservationSavePage
     private $referenceNumber = '';
     private $requiresApproval = false;
 
-    public function __construct($userId, $resourceId, $title, $description, $beginDate, $beginTime, $endDate, $endTime, array $attributeValues = [])
+    public function __construct($userId, $resourceId, $title, $description, $beginDate, $beginTime, $endDate, $endTime, array $attributeValues = [], array $additionalResourceIds = [])
     {
         $this->userId = (int)$userId;
         $this->resourceId = (int)$resourceId;
@@ -45,6 +47,7 @@ class ZhlReservationFacade implements IReservationSavePage
         $this->endDate = (string)$endDate;
         $this->endTime = (string)$endTime;
         $this->attributeValues = $attributeValues;
+        $this->additionalResourceIds = $additionalResourceIds;
     }
 
     // --- Eingabe (IReservationSavePage) ---
@@ -80,9 +83,24 @@ class ZhlReservationFacade implements IReservationSavePage
     {
         return $this->endTime;
     }
+    /**
+     * Zusatz-Ressourcen für die Multi-Resource-Buchung. Der native Save-Pfad
+     * (ReservationSavePresenter::BuildReservation) erwartet hier eine list<int> von Ressourcen-IDs
+     * und überspringt die Primär-ID beim AddResource-Loop. Wir normalisieren defensiv: int-Cast,
+     * Primär-ID raus, <=0 raus, dedupe, re-indexiert (array_values).
+     * @return int[]
+     */
     public function GetResources()
     {
-        return [];
+        $out = [];
+        foreach ($this->additionalResourceIds as $rid) {
+            $rid = (int)$rid;
+            if ($rid <= 0 || $rid === $this->resourceId) {
+                continue;
+            }
+            $out[$rid] = $rid;
+        }
+        return array_values($out);
     }
     public function GetParticipants()
     {

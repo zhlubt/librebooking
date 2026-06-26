@@ -43,8 +43,8 @@ class ZhlAvailabilityService
     /** @var int  custom_attribute_id des „Geräte-Typ" (0 = nicht vorhanden → ohne Tags/Pools) */
     private $typeAttributeId;
 
-    /** ISO-Wochentag (1=Mo … 7=So) → deutsches Kürzel */
-    private const WEEKDAYS = ['', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
+    /** @var string[]|null lokalisierte Wochentags-Kürzel (0=So … 6=Sa) der aktuellen Sprache; lazy gecacht */
+    private $weekdayAbbr = null;
 
     public function __construct(IResourceService $resourceService, IResourceAvailabilityStrategy $availability, $db, int $typeAttributeId)
     {
@@ -144,7 +144,7 @@ class ZhlAvailabilityService
                 $state = $busy ? 'busy' : ($vorlauf ? 'vorlauf' : 'free');
                 $free = ($state === 'free');
 
-                $weekday = self::WEEKDAYS[(int)$localDay->Format('N')] ?? '';
+                $weekday = $this->weekdayLabel((int)$localDay->Format('N'));
                 $row->days[] = [
                     'label' => $localDay->Format('d.m.'),
                     'weekday' => $weekday,
@@ -250,5 +250,18 @@ class ZhlAvailabilityService
         }
         $reader->Free();
         return $map;
+    }
+
+    /**
+     * Lokalisiertes Wochentags-Kürzel der aktuellen Sprache (DE „Mo", EN „Mon").
+     * @param int $isoDay ISO-Wochentag 1=Mo … 7=So (aus Date::Format('N'))
+     */
+    private function weekdayLabel(int $isoDay): string
+    {
+        if ($this->weekdayAbbr === null) {
+            // GetDays('abbr') liefert 0=So … 6=Sa → Index = ISO-Tag modulo 7 (So: 7 % 7 = 0).
+            $this->weekdayAbbr = Resources::GetInstance()->GetDays('abbr');
+        }
+        return $this->weekdayAbbr[$isoDay % 7] ?? '';
     }
 }

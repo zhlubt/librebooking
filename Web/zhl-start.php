@@ -33,6 +33,116 @@ try {
 
 /** Zahl deutsch formatiert, mit Fallback "–". */
 function num(?int $n): string { return $n === null ? '–' : number_format($n, 0, ',', '.'); }
+
+/** HTML-Escape (UTF-8). */
+function e(?string $s): string { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); }
+
+/** Schwierigkeits-Label DE/EN. */
+function diffLabel(string $d): string { return ['einfach' => 'Einfach', 'fortgeschritten' => 'Fortgeschritten', 'profi' => 'Profi'][$d] ?? ucfirst($d); }
+function diffLabelEn(string $d): string { return ['einfach' => 'Easy', 'fortgeschritten' => 'Advanced', 'profi' => 'Pro'][$d] ?? ucfirst($d); }
+
+/** Einweisungs-Label DE/EN (leer = keine). */
+function einwLabel(string $l): string { return ['empfehlenswert' => 'Einführung empfehlenswert', 'zwingend' => 'Einführung zwingend', 'beratung' => 'Beratung vorab'][$l] ?? ''; }
+function einwLabelEn(string $l): string { return ['empfehlenswert' => 'Briefing recommended', 'zwingend' => 'Briefing required', 'beratung' => 'Prior consultation'][$l] ?? ''; }
+
+/**
+ * Modell-Basisname: blendet Durchnummerierungen aus, damit baugleiche Geräte zu
+ * "Modell ×N" zusammenfallen (z. B. "Meta Quest 2_1/_2/_3" → "Meta Quest 2").
+ */
+function modelBase(string $n): string {
+    $b = $n;
+    $b = preg_replace('/\s*[-–]\s*Version\s*\d+\s*$/iu', '', $b);
+    $b = preg_replace('/\s*Nr\.?\s*\d+\s*$/iu', '', $b);
+    $b = preg_replace('/[\s_]+\d+\s*$/u', '', $b);
+    $b = trim($b);
+    return $b === '' ? trim($n) : $b;
+}
+
+/** Linien-Icon (SVG) je Geräte-Typ; robust per Schlüsselwort, mit Fallback. */
+function typeIcon(string $t): string {
+    $k = mb_strtolower($t, 'UTF-8');
+    $w = static fn(string $inner): string => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">' . $inner . '</svg>';
+    $has = static fn(string $needle): bool => mb_strpos($k, $needle) !== false;
+    if ($has('360') || $has('teleskop')) {
+        return $w('<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>');
+    }
+    if ($has('brille')) {
+        return $w('<rect x="2" y="8" width="20" height="8" rx="4"/><path d="M12 8v8"/>');
+    }
+    if ($has('drohne')) {
+        return $w('<circle cx="6" cy="6" r="3"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="18" r="3"/><path d="M8.5 8.5l7 7M15.5 8.5l-7 7"/>');
+    }
+    if ($has('stativ')) {
+        return $w('<rect x="8" y="2" width="8" height="4" rx="1"/><path d="M12 6v6M12 12l-6 9M12 12l6 9M9 21h6"/>');
+    }
+    if ($has('gimbal')) {
+        return $w('<rect x="9" y="2" width="6" height="5" rx="1"/><path d="M12 7v5M8 12h8M10 12v8M14 12v8"/>');
+    }
+    if ($has('objektiv')) {
+        return $w('<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/><path d="M12 3v6M21 12h-6M12 21v-6M3 12h6"/>');
+    }
+    if ($has('mikrofon') || $has('mic')) {
+        return $w('<rect x="9" y="2" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3M8 21h8"/>');
+    }
+    if ($has('moderation')) {
+        return $w('<rect x="3" y="4" width="18" height="12" rx="1"/><path d="M12 16v5M8 21h8"/>');
+    }
+    if ($has('pc') || $has('schnitt')) {
+        return $w('<rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>');
+    }
+    if ($has('smartphone') || $has('handy')) {
+        return $w('<rect x="6" y="2" width="12" height="20" rx="2"/><path d="M11 18h2"/>');
+    }
+    if ($has('studio')) {
+        return $w('<polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/>');
+    }
+    if ($has('kamera')) {
+        return $w('<path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/>');
+    }
+    return $w('<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/>');
+}
+
+// Katalog-Daten (Bundles + Geräte nach Typ), rein lesend & self-updating aus der DB.
+// Degradiert still zu leeren Listen, falls die DB nicht erreichbar ist.
+$bundles = [];
+$mediaTypes = [];
+try {
+    if (!isset($pdo)) {
+        $pdo = new PDO(
+            sprintf('mysql:host=%s;dbname=%s;charset=utf8mb4', $db['hostspec'] ?? '127.0.0.1', $db['name'] ?? ''),
+            $db['user'] ?? '',
+            $db['password'] ?? '',
+            [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]
+        );
+    }
+    $bRows = $pdo->query('SELECT id, name, use_case, difficulty, hint, einweisung_level FROM zhl_bundle WHERE active = 1 ORDER BY sort_order, id')->fetchAll(PDO::FETCH_ASSOC);
+    if ($bRows) {
+        $ids = implode(',', array_map('intval', array_column($bRows, 'id')));
+        $items = $pdo->query("SELECT bundle_id, type_label, quantity, required, note, meta FROM zhl_bundle_item WHERE bundle_id IN ($ids) ORDER BY bundle_id, sort_order, id")->fetchAll(PDO::FETCH_ASSOC);
+        $byBundle = [];
+        foreach ($items as $it) { $byBundle[$it['bundle_id']][] = $it; }
+        foreach ($bRows as &$b) { $b['items'] = $byBundle[$b['id']] ?? []; }
+        unset($b);
+        $bundles = $bRows;
+    }
+
+    $mRows = $pdo->query("SELECT cav.attribute_value AS typ, r.name AS name
+        FROM custom_attribute_values cav
+        JOIN custom_attributes ca ON ca.custom_attribute_id = cav.custom_attribute_id AND ca.display_label = 'Geräte-Typ'
+        JOIN resources r ON r.resource_id = cav.entity_id
+        WHERE r.status_id = 1
+        ORDER BY cav.attribute_value, r.sort_order, r.name")->fetchAll(PDO::FETCH_ASSOC);
+    $grouped = [];
+    foreach ($mRows as $r) { $grouped[$r['typ']][] = $r['name']; }
+    foreach ($grouped as $typ => $names) {
+        $models = [];
+        foreach ($names as $n) { $base = modelBase($n); $models[$base] = ($models[$base] ?? 0) + 1; }
+        $mediaTypes[] = ['typ' => $typ, 'count' => count($names), 'models' => $models];
+    }
+    usort($mediaTypes, static fn($a, $b) => $b['count'] <=> $a['count'] ?: strcmp($a['typ'], $b['typ']));
+} catch (Throwable $e) {
+    // Katalog bleibt leer; die Seite zeigt dann nur die statischen Abschnitte.
+}
 ?>
 <!DOCTYPE html>
 <html lang="de">
@@ -186,6 +296,43 @@ function num(?int $n): string { return $n === null ? '–' : number_format($n, 0
   .foot-contact .row { display:flex; align-items:flex-start; gap:10px; margin-bottom:10px; }
   .foot-contact .row svg { width:16px; height:16px; color:var(--green); flex:none; margin-top:3px; }
   .foot-bottom { border-top:1px solid rgba(255,255,255,.08); padding:20px 0; text-align:center; font-size:13px; color:#7a8a83; }
+
+  /* Katalog: Bundles */
+  .btn-primary { border:none; cursor:pointer; background:var(--grad); color:#fff; font-weight:600; box-shadow:0 6px 16px rgba(0,146,96,.28); }
+  .btn-primary:hover { transform:translateY(-1px); box-shadow:0 10px 22px rgba(0,146,96,.36); }
+  .sets-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:20px; }
+  .set-card { position:relative; background:var(--card); border:1px solid var(--line); border-radius:var(--r-lg); padding:24px; box-shadow:var(--shadow); display:flex; flex-direction:column; transition:transform .12s var(--ease),box-shadow .15s var(--ease); }
+  .set-card:hover { transform:translateY(-3px); box-shadow:var(--shadow-lg); }
+  .set-card h3 { font-size:18px; margin:0 0 4px; padding-right:96px; }
+  .set-card .uc { color:var(--muted); font-size:14px; margin:0 0 16px; }
+  .badge { position:absolute; top:22px; right:22px; font-size:11px; font-weight:700; letter-spacing:.03em; padding:4px 10px; border-radius:999px; text-transform:uppercase; }
+  .badge.einfach { background:#e6f7ef; color:#067a4b; }
+  .badge.fortgeschritten { background:#fff4e0; color:#a86a12; }
+  .badge.profi { background:#fde8e8; color:#b3261e; }
+  .set-card .contains { font-size:11.5px; font-weight:700; color:var(--ink); letter-spacing:.05em; text-transform:uppercase; margin:2px 0 10px; }
+  .set-card ul.items { list-style:none; margin:0 0 16px; padding:0; display:flex; flex-direction:column; gap:8px; }
+  .set-card ul.items li { display:flex; gap:9px; align-items:flex-start; font-size:14px; color:var(--ink-2); }
+  .set-card ul.items li svg { width:16px; height:16px; stroke:var(--green); flex:none; margin-top:2px; }
+  .set-card ul.items li.muted { color:var(--muted); }
+  .set-card ul.items li.muted svg { stroke:var(--muted); }
+  .set-card ul.items li .q { color:var(--muted); font-weight:600; }
+  .set-card .hint { font-size:13px; color:var(--muted); margin:auto 0 0; padding-top:14px; border-top:1px solid var(--line); }
+  .set-card .einw { display:inline-flex; align-items:center; gap:7px; font-size:12.5px; font-weight:600; padding:6px 11px; border-radius:999px; background:var(--bg-soft); color:var(--ink-2); margin-top:14px; align-self:flex-start; }
+  .set-card .einw svg { width:15px; height:15px; flex:none; }
+  .set-card .einw.zwingend { background:#fde8e8; color:#b3261e; }
+  .set-card .einw.empfehlenswert, .set-card .einw.beratung { background:#fff4e0; color:#a86a12; }
+
+  /* Katalog: Geräte-Typen */
+  .types-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(244px,1fr)); gap:16px; }
+  .type-card { background:var(--card); border:1px solid var(--line); border-radius:var(--r); padding:18px; box-shadow:var(--shadow); transition:transform .12s var(--ease),box-shadow .15s var(--ease); }
+  .type-card:hover { transform:translateY(-2px); box-shadow:var(--shadow-lg); }
+  .type-card .th { display:flex; align-items:center; gap:12px; margin-bottom:11px; }
+  .type-card .ti { width:42px; height:42px; border-radius:11px; background:var(--bg-soft); display:flex; align-items:center; justify-content:center; flex:none; }
+  .type-card .ti svg { width:22px; height:22px; stroke:var(--green-dark); }
+  .type-card h3 { font-size:15px; line-height:1.22; }
+  .type-card .cnt { font-size:12.5px; font-weight:700; color:var(--green-dark); background:#e6f7ef; padding:3px 9px; border-radius:999px; margin-left:auto; flex:none; white-space:nowrap; }
+  .type-card .models { font-size:13px; color:var(--muted); line-height:1.5; }
+  .type-card .models .q { color:var(--ink-2); font-weight:600; }
 </style>
 </head>
 <body>
@@ -196,9 +343,9 @@ function num(?int $n): string { return $n === null ? '–' : number_format($n, 0
     <nav class="nav-links">
       <a href="#top" class="active" data-en="Home">Start</a>
       <a href="#buchen" data-en="Book">Buchen</a>
-      <a href="#ablauf" data-en="How it works">Ablauf</a>
+      <a href="#sets" data-en="Bundles">Bundles</a>
       <a href="#kategorien" data-en="Equipment">Ausstattung</a>
-      <a href="#" data-en="Video studio">Videostudio</a>
+      <a href="#ablauf" data-en="How it works">Ablauf</a>
     </nav>
     <a class="nav-cta" href="zhl-login.php" data-en="Sign in">Anmelden</a>
     <button class="lang-btn" data-lang-btn onclick="toggleLang()">EN</button>
@@ -253,7 +400,7 @@ function num(?int $n): string { return $n === null ? '–' : number_format($n, 0
           <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> <span data-en="Nothing important forgotten">Nichts Wichtiges vergessen</span></li>
           <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> <span data-en="Ready to go quickly">Schnell startklar</span></li>
         </ul>
-        <a class="go" href="zhl-book.php">
+        <a class="go" href="#sets">
           <span data-en="View bundles">Bundles ansehen</span>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
         </a>
@@ -269,7 +416,7 @@ function num(?int $n): string { return $n === null ? '–' : number_format($n, 0
           <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> <span data-en="Availability at a glance">Verfügbarkeit auf einen Blick</span></li>
           <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> <span data-en="Full freedom of choice">Volle Freiheit bei der Auswahl</span></li>
         </ul>
-        <a class="go" href="zhl-dashboard.php">
+        <a class="go" href="#kategorien">
           <span data-en="Browse devices">Geräte durchsuchen</span>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
         </a>
@@ -284,6 +431,57 @@ function num(?int $n): string { return $n === null ? '–' : number_format($n, 0
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
       </a>
     </div>
+  </div>
+</section>
+
+<section class="block" id="sets" style="background:var(--bg-soft)">
+  <div class="wrap">
+    <div class="sec-head">
+      <p class="eyebrow" data-en="Ready-made sets">Fertige Sets</p>
+      <h2 data-en="Our bundles at a glance">Unsere Bundles im Überblick</h2>
+      <p class="lead" data-en="Coordinated complete sets for typical projects — everything that belongs together, in a single booking. Browsing needs no account.">Abgestimmte Komplett-Sets für typische Vorhaben — alles, was zusammengehört, in einer Buchung. Zum Stöbern ist kein Konto nötig.</p>
+    </div>
+    <?php if ($bundles): ?>
+    <div class="sets-grid">
+      <?php foreach ($bundles as $b): ?>
+      <div class="set-card">
+        <span class="badge <?= e($b['difficulty']) ?>" data-en="<?= e(diffLabelEn($b['difficulty'])) ?>"><?= e(diffLabel($b['difficulty'])) ?></span>
+        <h3><?= e($b['name']) ?></h3>
+        <?php if (!empty($b['use_case'])): ?><p class="uc"><?= e($b['use_case']) ?></p><?php endif; ?>
+        <p class="contains" data-en="Includes">Enthält</p>
+        <ul class="items">
+          <?php foreach ($b['items'] as $it):
+              $qty = (int)$it['quantity'];
+              $isAccessory = ($qty === 0);
+              $isOptional = ((int)$it['required'] === 0) && !$isAccessory;
+              $muted = $isAccessory || $isOptional;
+              $extra = trim((string)($it['note'] !== '' && $it['note'] !== null ? $it['note'] : ($it['meta'] ?? '')));
+          ?>
+          <li class="<?= $muted ? 'muted' : '' ?>">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            <span><?php if ($qty > 1): ?><span class="q"><?= $qty ?>×</span> <?php endif; ?><?= e($it['type_label']) ?><?php if ($isOptional): ?> <span class="q" data-en="(optional)">(optional)</span><?php endif; ?><?php if ($extra !== ''): ?> <span class="q">– <?= e($extra) ?></span><?php endif; ?></span>
+          </li>
+          <?php endforeach; ?>
+        </ul>
+        <?php $lvl = (string)$b['einweisung_level']; if ($lvl !== '' && $lvl !== 'keine' && einwLabel($lvl) !== ''): ?>
+        <span class="einw <?= e($lvl) ?>">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+          <span data-en="<?= e(einwLabelEn($lvl)) ?>"><?= e(einwLabel($lvl)) ?></span>
+        </span>
+        <?php endif; ?>
+        <?php if (!empty($b['hint'])): ?><p class="hint"><?= e($b['hint']) ?></p><?php endif; ?>
+      </div>
+      <?php endforeach; ?>
+    </div>
+    <div style="text-align:center; margin-top:28px">
+      <a class="btn btn-primary" href="zhl-assistant.php">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/></svg>
+        <span data-en="Configure &amp; book a set (sign-in required)">Set konfigurieren &amp; buchen (Anmeldung nötig)</span>
+      </a>
+    </div>
+    <?php else: ?>
+    <p class="lead" style="text-align:center" data-en="The bundle overview is currently unavailable.">Die Bundle-Übersicht ist gerade nicht verfügbar.</p>
+    <?php endif; ?>
   </div>
 </section>
 
@@ -358,41 +556,31 @@ function num(?int $n): string { return $n === null ? '–' : number_format($n, 0
   <div class="wrap">
     <div class="sec-head">
       <p class="eyebrow" data-en="Equipment">Ausstattung</p>
-      <h2 data-en="What can you borrow?">Was können Sie ausleihen?</h2>
-      <p class="lead" data-en="From wireless mics to VR headsets, tailored to teaching and research.">Vom Funkmikrofon bis zur VR-Brille, abgestimmt auf Lehre und Forschung.</p>
+      <h2 data-en="All devices for individual booking">Alle Geräte einzeln buchbar</h2>
+      <p class="lead" data-en="Every device type the ZHL lends — always up to date, straight from our inventory. Browsing needs no account.">Alle Geräte-Typen, die das ZHL verleiht — immer aktuell, direkt aus unserem Bestand. Zum Stöbern ist kein Konto nötig.</p>
     </div>
-    <div class="cats">
-      <div class="cat">
-        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12a10 10 0 0 0 20 0 10 10 0 0 0-20 0z"/><path d="M2 12h20M12 2a15 15 0 0 1 0 20M12 2a15 15 0 0 0 0 20"/></svg></div>
-        <h3 data-en="Immersive media">Immersive Medien</h3>
-        <p data-en="VR &amp; AR headsets, 360° cameras for immersive learning scenarios.">VR- &amp; AR-Brillen, 360-Grad-Kameras für immersive Lernszenarien.</p>
-        <span class="count" data-en="20 devices">20 Geräte</span>
+    <?php if ($mediaTypes): ?>
+    <div class="types-grid">
+      <?php foreach ($mediaTypes as $t): ?>
+      <div class="type-card">
+        <div class="th">
+          <span class="ti"><?= typeIcon($t['typ']) ?></span>
+          <h3><?= e($t['typ']) ?></h3>
+          <span class="cnt"><?= (int)$t['count'] ?>&nbsp;<span data-en="<?= $t['count'] === 1 ? 'item' : 'items' ?>"><?= $t['count'] === 1 ? 'Gerät' : 'Stück' ?></span></span>
+        </div>
+        <?php
+          $parts = [];
+          foreach ($t['models'] as $model => $c) {
+              $parts[] = e($model) . ($c > 1 ? ' <span class="q">×' . (int)$c . '</span>' : '');
+          }
+        ?>
+        <div class="models"><?= implode(' · ', $parts) ?></div>
       </div>
-      <div class="cat">
-        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="14" height="12" rx="2"/><path d="M16 9l5-3v12l-5-3"/></svg></div>
-        <h3 data-en="Media equipment">Medientechnik-Verleih</h3>
-        <p data-en="Cameras, lenses, microphones, gimbals, editing PCs and more.">Kameras, Objektive, Mikrofone, Gimbals, Schnitt-PCs und mehr.</p>
-        <span class="count" data-en="26 devices">26 Geräte</span>
-      </div>
-      <div class="cat">
-        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4h18v12H3z"/><line x1="12" y1="16" x2="12" y2="21"/><line x1="8" y1="21" x2="16" y2="21"/></svg></div>
-        <h3 data-en="Facilitation materials">Analoge Moderation</h3>
-        <p data-en="Facilitation materials and tools for workshops and seminars.">Moderationsmaterial und Werkzeuge für Workshops und Seminare.</p>
-        <span class="count" data-en="7 devices">7 Geräte</span>
-      </div>
-      <div class="cat">
-        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="18" r="3"/><path d="M8.5 8.5l7 7M15.5 8.5l-7 7"/></svg></div>
-        <h3 data-en="Drone">Drohne</h3>
-        <p data-en="Aerial footage for research and teaching videos.">Luftaufnahmen für Forschung und Lehrvideos.</p>
-        <span class="count" data-en="1 device">1 Gerät</span>
-      </div>
-      <div class="cat">
-        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg></div>
-        <h3 data-en="Video studio">Videostudio</h3>
-        <p data-en="Greenscreen, teleprompter and livestreaming, set up on site.">Greenscreen, Teleprompter und Livestreaming, fertig eingerichtet vor Ort.</p>
-        <span class="count" data-en="1 studio">1 Studio</span>
-      </div>
+      <?php endforeach; ?>
     </div>
+    <?php else: ?>
+    <p class="lead" style="text-align:center" data-en="The device overview is currently unavailable.">Die Geräte-Übersicht ist gerade nicht verfügbar.</p>
+    <?php endif; ?>
   </div>
 </section>
 
@@ -417,7 +605,7 @@ function num(?int $n): string { return $n === null ? '–' : number_format($n, 0
     <div>
       <h4 data-en="Quick links">Schnellzugriff</h4>
       <div class="foot-links">
-        <a href="zhl-book.php"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg> <span data-en="Book bundles">Bundles buchen</span></a>
+        <a href="zhl-assistant.php"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg> <span data-en="Book bundles">Bundles buchen</span></a>
         <a href="zhl-dashboard.php"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg> <span data-en="Individual devices">Geräte einzeln</span></a>
         <a href="zhl-dashboard.php?view=meine"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> <span data-en="My bookings">Meine Buchungen</span></a>
         <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg> <span data-en="Video studio">Videostudio</span></a>

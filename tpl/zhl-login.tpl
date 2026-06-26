@@ -133,6 +133,13 @@
         <h2 data-en="Welcome back">Willkommen zurück</h2>
         <p class="sub" data-en="Sign in with your account.">Melden Sie sich mit Ihrem Konto an.</p>
 
+        {if $ReactivatedNotice}
+          <div class="callout" style="background:#ecfdf5;border-color:#a7f3d0;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#047857" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            <p style="color:#065f46;" data-en="Your account is active. If you registered, your account is <b>already active</b> — please simply sign in below.">Ihr Konto ist aktiv. Falls Sie sich registriert haben, ist Ihr Konto <b>bereits aktiv</b> — bitte melden Sie sich einfach unten an.</p>
+          </div>
+        {/if}
+
         {if $ShowLoginError}
           <div class="alert-err">
             <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>

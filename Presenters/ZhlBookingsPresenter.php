@@ -1,0 +1,212 @@
+<?php
+
+require_once(ROOT_DIR . 'lib/Config/namespace.php');
+require_once(ROOT_DIR . 'lib/Common/namespace.php');
+require_once(ROOT_DIR . 'lib/Database/namespace.php');
+require_once(ROOT_DIR . 'Domain/namespace.php');
+require_once(ROOT_DIR . 'Domain/Access/namespace.php');
+
+/**
+ * Presenter „Meine Buchungen". Liest die eigenen Reservierungen des angemeldeten
+ * Nutzers über dieselbe permissionsichere Quelle wie der persönliche Kalender
+ * (ReservationViewRepository::GetReservations mit userLevel OWNER), konsolidiert
+ * mehrteilige Buchungen nach reference_number und gruppiert sie nach Zeitbezug.
+ * Read-only — keine Schreibzugriffe.
+ */
+class ZhlBookingsPresenter
+{
+    private const WINDOW_PAST_DAYS = 365;
+    private const WINDOW_FUTURE_DAYS = 365;
+
+    /** @var IZhlBookingsPage */
+    private $page;
+
+    /** @var IReservationViewRepository */
+    private $repository;
+
+    public function __construct(IZhlBookingsPage $page, ?IReservationViewRepository $repository = null)
+    {
+        $this->page = $page;
+        $this->repository = $repository ?? new ReservationViewRepository();
+    }
+
+    public function PageLoad(UserSession $user)
+    {
+        $tz = $user->Timezone;
+        $now = Date::Now();
+        $start = $now->AddDays(-self::WINDOW_PAST_DAYS);
+        $end = $now->AddDays(self::WINDOW_FUTURE_DAYS);
+
+        // Gleiche Quelle wie PersonalCalendarPresenter::BindEvents: OWNER-Sicht,
+        // nach reference_number konsolidiert (mehrere Geräte einer Buchung = eine Zeile).
+        $reservations = $this->repository->GetReservations(
+            $start,
+            $end,
+            $user->UserId,
+            ReservationUserLevel::OWNER,
+            ReservationViewRepository::ALL_SCHEDULES,
+            ReservationViewRepository::ALL_RESOURCES,
+            true
+        );
+
+        $current = [];
+        $upcoming = [];
+        $past = [];
+
+        // Abholzeiten (falls leicht verfügbar) je reference_number aus dem Übergabe-Modul.
+        $pickups = $this->loadPickupTimes($reservations, $tz);
+
+        foreach ($reservations as $r) {
+            $row = $this->toRow($r, $tz, $now, $pickups);
+            if ($row['group'] === 'current') {
+                $current[] = $row;
+            } elseif ($row['group'] === 'upcoming') {
+                $upcoming[] = $row;
+            } else {
+                $past[] = $row;
+            }
+        }
+
+        // Anstehend aufsteigend, Laufend aufsteigend, Vergangen absteigend (neueste zuerst).
+        usort($current, fn($a, $b) => strcmp($a['startSort'], $b['startSort']));
+        usort($upcoming, fn($a, $b) => strcmp($a['startSort'], $b['startSort']));
+        usort($past, fn($a, $b) => strcmp($b['startSort'], $a['startSort']));
+
+        // Standard-Tab = erste nicht-leere Gruppe: Laufende sind selten, die
+        // meisten eigenen Buchungen liegen in „Anstehend". Sonst öffnet die Seite
+        // auf einem leeren „Aktuell"-Tab und wirkt leer, obwohl Buchungen da sind.
+        if (count($current) > 0) {
+            $defaultGroup = 'current';
+        } elseif (count($upcoming) > 0) {
+            $defaultGroup = 'upcoming';
+        } else {
+            $defaultGroup = 'past';
+        }
+
+        $this->page->BindBookings([
+            'current' => $current,
+            'upcoming' => $upcoming,
+            'past' => $past,
+            'currentCount' => count($current),
+            'upcomingCount' => count($upcoming),
+            'pastCount' => count($past),
+            'defaultGroup' => $defaultGroup,
+            'hasAny' => (count($current) + count($upcoming) + count($past)) > 0,
+        ]);
+    }
+
+    /**
+     * @param ReservationItemView $r
+     * @return array
+     */
+    private function toRow($r, $tz, Date $now, array $pickups): array
+    {
+        $startLocal = $r->StartDate->ToTimezone($tz);
+        $endLocal = $r->EndDate->ToTimezone($tz);
+
+        // Gruppe nach Zeitbezug bestimmen.
+        if ($r->EndDate->LessThan($now)) {
+            $group = 'past';
+            $state = 'muted';
+            $label = 'Abgeschlossen';
+        } elseif ($r->StartDate->GreaterThan($now)) {
+            $group = 'upcoming';
+            $state = 'ok';
+            $label = 'Bestätigt';
+        } else {
+            $group = 'current';
+            $state = 'warn';
+            $label = 'Läuft';
+        }
+
+        // Gerätezahl/-namen: bei konsolidierten Buchungen liegen mehrere Namen vor.
+        $resourceNames = [];
+        if (is_array($r->ResourceNames) && count($r->ResourceNames) > 0) {
+            $resourceNames = $r->ResourceNames;
+        } elseif (!empty($r->ResourceName)) {
+            $resourceNames = [$r->ResourceName];
+        }
+        $deviceCount = count($resourceNames);
+        if ($deviceCount <= 1) {
+            $itemsLabel = 'Einzelgerät';
+            $kind = 'device';
+        } else {
+            $itemsLabel = $deviceCount . ' Geräte';
+            $kind = 'bundle';
+        }
+
+        // Titel: Reservierungstitel, sonst erstes Gerät.
+        $title = trim((string)$r->Title);
+        if ($title === '') {
+            $title = $deviceCount > 0 ? $resourceNames[0] : 'Buchung';
+        }
+
+        // Datumsbereich (Sie-Form, deutsch).
+        if ($startLocal->Format('Y-m-d') === $endLocal->Format('Y-m-d')) {
+            $range = $startLocal->Format('d.m.Y') . ', ' . $startLocal->Format('H:i') . '–' . $endLocal->Format('H:i') . ' Uhr';
+        } else {
+            $range = $startLocal->Format('d.m.') . ' – ' . $endLocal->Format('d.m.Y');
+        }
+
+        $ref = (string)$r->ReferenceNumber;
+        $pickup = $pickups[$ref] ?? '';
+
+        return [
+            'ref' => $ref,
+            'kind' => $kind,
+            'title' => $title,
+            'range' => $range,
+            'items' => $itemsLabel,
+            'deviceCount' => $deviceCount,
+            'pickup' => $pickup,
+            'state' => $state,
+            'label' => $label,
+            'group' => $group,
+            'startSort' => $startLocal->Format('Y-m-d H:i:s'),
+        ];
+    }
+
+    /**
+     * Abholzeiten je reference_number aus zhl_booking_handover (pickup-Zeile), falls vorhanden.
+     * Best effort: fehlt die Tabelle/Spalte, wird leer zurückgegeben (kein Fehler).
+     * @param ReservationItemView[] $reservations
+     * @return array<string,string> reference_number => Abhol-Label
+     */
+    private function loadPickupTimes(array $reservations, $tz): array
+    {
+        $refs = [];
+        foreach ($reservations as $r) {
+            $ref = trim((string)$r->ReferenceNumber);
+            if ($ref !== '') {
+                $refs[$ref] = true;
+            }
+        }
+        if (empty($refs)) {
+            return [];
+        }
+
+        $out = [];
+        try {
+            $db = ServiceLocator::GetDatabase();
+            foreach (array_keys($refs) as $ref) {
+                $cmd = new AdHocCommand(
+                    'SELECT scheduled_start_utc FROM zhl_booking_handover ' .
+                    "WHERE reference_number = @ref AND type = 'pickup' " .
+                    'ORDER BY id DESC LIMIT 1'
+                );
+                $cmd->AddParameter(new Parameter('@ref', $ref));
+                $reader = $db->Query($cmd);
+                $row = $reader->GetRow();
+                $reader->Free();
+                if ($row && !empty($row['scheduled_start_utc'])) {
+                    $when = Date::Parse((string)$row['scheduled_start_utc'], 'UTC')->ToTimezone($tz);
+                    $out[$ref] = 'Abholung ' . $when->Format('d.m.Y, H:i') . ' Uhr';
+                }
+            }
+        } catch (Exception $e) {
+            // Übergabe-Infos sind optional — ohne sie funktioniert die Übersicht trotzdem.
+            return $out;
+        }
+        return $out;
+    }
+}

@@ -25,6 +25,11 @@ class ZhlBookPage extends SecurePage implements IZhlBookPage
             $this->presenter->HandlePost($user);
             return;
         }
+        // AJAX: Abhol-/Einführungstermine zum gewählten Start nachladen (ohne Reload → Formularzustand bleibt).
+        if (isset($_GET['ajax']) && $_GET['ajax'] === 'slots') {
+            $this->presenter->AjaxSlots($user);
+            return;
+        }
         $this->presenter->PageLoad($user);
     }
 
@@ -34,7 +39,7 @@ class ZhlBookPage extends SecurePage implements IZhlBookPage
             $this->Set(ucfirst($key), $value);
         }
         $this->Set('Mode', 'form');
-        $this->Set('HideNavBar', true);
+        $this->Set('HideNavBar', false);
         $this->Display('zhl-book.tpl');
     }
 
@@ -44,13 +49,17 @@ class ZhlBookPage extends SecurePage implements IZhlBookPage
             $this->Set(ucfirst($key), $value);
         }
         $this->Set('Mode', 'success');
-        $this->Set('HideNavBar', true);
+        $this->Set('HideNavBar', false);
         $this->Display('zhl-book.tpl');
     }
 
-    public function RedirectToSuccess($referenceNumber)
+    public function RedirectToSuccess($referenceNumber, $warning = '')
     {
-        $this->Redirect('zhl-book.php?booked=' . urlencode($referenceNumber));
+        $q = 'zhl-book.php?booked=' . urlencode($referenceNumber);
+        if ($warning !== '') {
+            $q .= '&warn=' . urlencode($warning);
+        }
+        $this->Redirect($q);
     }
 
     public function RedirectToDashboard()
@@ -63,6 +72,6 @@ interface IZhlBookPage
 {
     public function BindBooking(array $vm);
     public function BindSuccess(array $vm);
-    public function RedirectToSuccess($referenceNumber);
+    public function RedirectToSuccess($referenceNumber, $warning = '');
     public function RedirectToDashboard();
 }

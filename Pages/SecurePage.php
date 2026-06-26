@@ -89,9 +89,9 @@ class SecureActionPageDecorator extends ActionPage
         $this->page->Redirect($url);
     }
 
-    public function RedirectToError($errorMessageId = ErrorMessages::UNKNOWN_ERROR, $lastPage = '')
+    public function RedirectToError($errorMessageId = ErrorMessages::UNKNOWN_ERROR, $lastPage = '', $detail = '')
     {
-        $this->page->RedirectToError($errorMessageId, $lastPage);
+        $this->page->RedirectToError($errorMessageId, $lastPage, $detail);
     }
 
     public function GetLastPage($defaultPage = '')
@@ -176,9 +176,9 @@ class SecurePageDecorator extends Page implements IPage
         $this->page->Redirect($url);
     }
 
-    public function RedirectToError($errorMessageId = ErrorMessages::UNKNOWN_ERROR, $lastPage = '')
+    public function RedirectToError($errorMessageId = ErrorMessages::UNKNOWN_ERROR, $lastPage = '', $detail = '')
     {
-        $this->page->RedirectToError($errorMessageId, $lastPage);
+        $this->page->RedirectToError($errorMessageId, $lastPage, $detail);
     }
 
     public function IsPostBack()

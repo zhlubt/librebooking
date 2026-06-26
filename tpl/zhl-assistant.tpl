@@ -14,7 +14,7 @@
 	<nav class="zhl-modenav">
 		<a class="zhl-mode active" href="{$Path}zhl-assistant.php">🎯 Bundles buchen</a>
 		<a class="zhl-mode" href="{$Path}zhl-dashboard.php">🎛 Geräte einzeln buchen</a>
-		<a class="zhl-mode" href="{$Path}my-calendar.php">📅 Meine Buchungen</a>
+		<a class="zhl-mode" href="{$Path}zhl-bookings.php">📅 Meine Buchungen</a>
 		<a class="zhl-mode zhl-mode-logout" href="{$Path}logout.php">Abmelden</a>
 	</nav>
 
@@ -98,8 +98,9 @@
 				{else}
 					<span class="zhl-badge full">nicht komplett frei</span>
 				{/if}
+				<a class="zhl-btn" href="{$Path}zhl-bundle-book.php?bid={$Selected->id}" style="margin-left:auto;">Bundle in einer Reservierung buchen ▸</a>
 			</div>
-			<p class="zhl-note" style="margin-top:10px;">Klick auf eine Position, um die konkreten Geräte zu sehen und einzeln zu buchen. (Sammel-Buchung folgt.)</p>
+			<p class="zhl-note" style="margin-top:10px;">Buche das ganze Bundle in einer Reservierung — oder klick auf eine Position, um die konkreten Geräte einzeln zu buchen.</p>
 
 			{if $Selected->offerSchnitt}
 				<div class="zhl-seq">

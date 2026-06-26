@@ -22,7 +22,7 @@ class ZhlDashboardPage extends SecurePage implements IZhlDashboardPage
     {
         $user = ServiceLocator::GetServer()->GetUserSession();
         $this->presenter->PageLoad($user);
-        $this->Set('HideNavBar', true);
+        $this->Set('HideNavBar', false);
         $this->Display('zhl-dashboard.tpl');
     }
 

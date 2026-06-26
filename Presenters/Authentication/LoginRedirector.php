@@ -9,11 +9,10 @@ class LoginRedirector
     public static function Redirect(ILoginBasePage $page)
     {
         $redirect = $page->GetResumeUrl();
-        $defaultId = ServiceLocator::GetServer()->GetUserSession()->HomepageId;
-        $fallback = Pages::UrlFromId($defaultId);
-        if (empty($fallback)) {
-            $fallback = Pages::UrlFromId(Pages::DEFAULT_HOMEPAGE_ID);
-        }
+        // ZHL: jeder Login landet auf dem ZHL-Dashboard (ID 1 zeigt darauf) — die individuell
+        // gespeicherte HomepageId (z. B. „Zeitplan") wird bewusst ignoriert, damit niemand mehr auf
+        // der alten LibreBooking-Optik (schedule.php) ankommt. Deep-Links (?redirect=) bleiben erhalten.
+        $fallback = Pages::UrlFromId(Pages::DEFAULT_HOMEPAGE_ID);
 
         if (!empty($redirect)) {
             $page->Redirect(RedirectUrlSanitizer::Sanitize(

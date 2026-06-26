@@ -59,7 +59,50 @@ class WebExceptionHandler extends ExceptionHandler
             $errorMessageId = ErrorMessages::DATABASE_NOT_FOUND;
         }
 
-        call_user_func($this->callback, $errorMessageId);
+        // Technische Details auf der Fehlerseite nur für Admins ODER wenn app.debug
+        // aktiv ist — so sehen Entwickler/Staging die echte Ursache, ohne sie
+        // Endnutzern (oder einer späteren Prod-Instanz) preiszugeben.
+        $detail = $this->buildDetail($exception);
+
+        call_user_func($this->callback, $errorMessageId, '', $detail);
+    }
+
+    /**
+     * Baut eine sichtbare Fehlerbeschreibung (Klasse, Meldung, Datei:Zeile) –
+     * aber nur, wenn der aktuelle Nutzer Admin ist oder app.debug aktiviert wurde.
+     * Defensiv: jeder Fehler beim Ermitteln führt zu leerem Detail (kein Leak).
+     */
+    private function buildDetail($exception): string
+    {
+        if (!($exception instanceof Throwable)) {
+            return '';
+        }
+
+        $allowed = false;
+        try {
+            $user = ServiceLocator::GetServer()->GetUserSession();
+            $allowed = ($user !== null && $user->IsAdmin);
+        } catch (Throwable $e) {
+            $allowed = false;
+        }
+        if (!$allowed) {
+            try {
+                $allowed = (bool)Configuration::Instance()->GetKey(ConfigKeys::APP_DEBUG, new BooleanConverter());
+            } catch (Throwable $e) {
+                $allowed = false;
+            }
+        }
+        if (!$allowed) {
+            return '';
+        }
+
+        return sprintf(
+            "%s: %s\n%s:%d",
+            get_class($exception),
+            $exception->getMessage(),
+            $exception->getFile(),
+            $exception->getLine()
+        );
     }
 }
 

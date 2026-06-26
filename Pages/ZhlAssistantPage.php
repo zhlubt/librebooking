@@ -20,7 +20,7 @@ class ZhlAssistantPage extends SecurePage implements IZhlAssistantPage
     {
         $user = ServiceLocator::GetServer()->GetUserSession();
         $this->presenter->PageLoad($user);
-        $this->Set('HideNavBar', true);
+        $this->Set('HideNavBar', false);
         $this->Display('zhl-assistant.tpl');
     }
 

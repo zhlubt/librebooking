@@ -90,6 +90,10 @@ class ZhlBundlesAdminPresenter
                 if (!$bid || $type === '') {
                     return 'Typ fehlt — Position nicht hinzugefügt.';
                 }
+                // Nur echte Geräte-Typen erlauben (kein Freitext) — sonst zeigt die Position ins Leere.
+                if (!in_array($type, $this->knownTypes($db), true)) {
+                    return 'Unbekannter Geräte-Typ „' . $type . '" — bitte einen vorhandenen Typ aus der Liste wählen.';
+                }
                 $cmd = new AdHocCommand('INSERT INTO zhl_bundle_item (bundle_id, type_label, quantity, required, note, sort_order) VALUES (@b,@t,@q,@r,@n,@s)');
                 $cmd->AddParameter(new Parameter('@b', $bid));
                 $cmd->AddParameter(new Parameter('@t', $type));
@@ -124,12 +128,32 @@ class ZhlBundlesAdminPresenter
         }
         $reader->Free();
 
-        $reader = $db->Query(new AdHocCommand('SELECT id, bundle_id, type_label, quantity, required, note, sort_order FROM zhl_bundle_item ORDER BY bundle_id, sort_order, id'));
+        // Auflösungs-Karten: Typ→Geräte und konkrete Gerätenamen (damit der Admin SIEHT, was
+        // hinter jeder Position steckt — keine Rätsel mehr beim Pflegen).
+        $typeToDevices = $this->typeToDevices($db);
+        $resById = $this->resourceNames($db);
+
+        $reader = $db->Query(new AdHocCommand('SELECT id, bundle_id, type_label, quantity, required, note, sort_order, specific_resource_id FROM zhl_bundle_item ORDER BY bundle_id, sort_order, id'));
         while ($row = $reader->GetRow()) {
             $bid = (int)$row['bundle_id'];
-            if (isset($bundles[$bid])) {
-                $bundles[$bid]['items'][] = $row;
+            if (!isset($bundles[$bid])) {
+                continue;
             }
+            // Verknüpfte Geräte ermitteln: konkretes Gerät > Packliste (Menge 0) > Typ-Auflösung.
+            $specificId = (int)($row['specific_resource_id'] ?? 0);
+            if ($specificId > 0) {
+                $row['resolvedKind'] = 'specific';
+                $names = [$resById[$specificId] ?? ('#' . $specificId)];
+            } elseif ((int)$row['quantity'] === 0) {
+                $row['resolvedKind'] = 'packlist';
+                $names = [];
+            } else {
+                $names = $typeToDevices[$row['type_label']] ?? [];
+                $row['resolvedKind'] = empty($names) ? 'none' : 'type';
+            }
+            $row['resolvedCount'] = count($names);
+            $row['resolvedLabel'] = implode(', ', $names); // im Template fertig escapen
+            $bundles[$bid]['items'][] = $row;
         }
         $reader->Free();
 
@@ -154,6 +178,38 @@ class ZhlBundlesAdminPresenter
         }
         $reader->Free();
         return $types;
+    }
+
+    /** @return array<string,string[]> Geräte-Typ-Label → Liste der Gerätenamen (aktive Geräte). */
+    private function typeToDevices($db)
+    {
+        $map = [];
+        $cmd = new AdHocCommand(
+            "SELECT v.attribute_value AS t, r.name AS n FROM custom_attribute_values v " .
+            "JOIN custom_attributes a ON a.custom_attribute_id = v.custom_attribute_id " .
+            "JOIN resources r ON r.resource_id = v.entity_id " .
+            "WHERE a.display_label = @l AND a.attribute_category = 4 AND v.attribute_value <> '' AND r.status_id <> 0 " .
+            "ORDER BY v.attribute_value, r.name"
+        );
+        $cmd->AddParameter(new Parameter('@l', 'Geräte-Typ'));
+        $reader = $db->Query($cmd);
+        while ($row = $reader->GetRow()) {
+            $map[(string)$row['t']][] = (string)$row['n'];
+        }
+        $reader->Free();
+        return $map;
+    }
+
+    /** @return array<int,string> resource_id → Name (aktive Geräte) für die Auflösung konkreter Geräte. */
+    private function resourceNames($db)
+    {
+        $out = [];
+        $reader = $db->Query(new AdHocCommand('SELECT resource_id, name FROM resources WHERE status_id <> 0'));
+        while ($row = $reader->GetRow()) {
+            $out[(int)$row['resource_id']] = (string)$row['name'];
+        }
+        $reader->Free();
+        return $out;
     }
 
     private function post($key)

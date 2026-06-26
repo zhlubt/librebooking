@@ -108,6 +108,8 @@ class ZhlAssistantPresenter
         if (preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $v, $m) && checkdate((int)$m[2], (int)$m[3], (int)$m[1])) {
             return $v;
         }
-        return Date::Now()->ToTimezone($tz)->Format('Y-m-d');
+        // ZHL: Standard-Startdatum = heute + 7 Tage (1 Woche Planungs-Vorlauf,
+        // konsistent mit der Mindest-Vorlaufzeit der Ausleih-Ressourcen).
+        return Date::Now()->ToTimezone($tz)->AddDays(7)->Format('Y-m-d');
     }
 }

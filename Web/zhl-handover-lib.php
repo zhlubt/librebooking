@@ -213,6 +213,135 @@ function zhl_handover_list(?string $status = null): array
     return $stmt->fetchAll();
 }
 
+/**
+ * Ausleihenden-Namen zu einer Übergabe auflösen (Block D, Medienmanager-Tagesseite).
+ *
+ * Bevorzugt die LB-Reservierung über reference_number (zuverlässigste Quelle, da der
+ * Eigentümer der Reservierung der Ausleihende ist):
+ *   reference_number → reservation_instances → reservation_series.owner_id → users.
+ * Fällt auf das handover_token zurück (zhl_handover_token.user_id → users), falls noch
+ * keine reference_number nachgetragen wurde (Token wird beim Buchen vor der Reservierung
+ * gewählt). Gibt einen menschenlesbaren Namen oder '' zurück.
+ */
+function zhl_handover_borrower_name(?string $reference, ?string $token): string
+{
+    $pdo = zhl_handover_db();
+
+    $fmt = static function ($row): string {
+        if (!$row) {
+            return '';
+        }
+        $name = trim(($row['fname'] ?? '') . ' ' . ($row['lname'] ?? ''));
+        if ($name === '') {
+            $name = (string)($row['username'] ?? $row['email'] ?? '');
+        }
+        return $name;
+    };
+
+    if ($reference !== null && $reference !== '') {
+        $stmt = $pdo->prepare(
+            'SELECT u.fname, u.lname, u.username, u.email
+             FROM reservation_instances ri
+             JOIN reservation_series rs ON rs.series_id = ri.series_id
+             JOIN users u ON u.user_id = rs.owner_id
+             WHERE ri.reference_number = ?
+             LIMIT 1'
+        );
+        $stmt->execute([$reference]);
+        $name = $fmt($stmt->fetch());
+        if ($name !== '') {
+            return $name;
+        }
+    }
+
+    if ($token !== null && zhl_handover_valid_token($token)) {
+        $stmt = $pdo->prepare(
+            'SELECT u.fname, u.lname, u.username, u.email
+             FROM zhl_handover_token t
+             JOIN users u ON u.user_id = t.user_id
+             WHERE t.handover_token = ?
+             LIMIT 1'
+        );
+        $stmt->execute([$token]);
+        return $fmt($stmt->fetch());
+    }
+
+    return '';
+}
+
+/** Default-Rückgabeort eines Geräts (zhl_uebergabe.rueckgabeort) oder '' (Block D). */
+function zhl_handover_rueckgabeort(?int $resourceId): string
+{
+    if (!$resourceId) {
+        return '';
+    }
+    $stmt = zhl_handover_db()->prepare('SELECT rueckgabeort FROM zhl_uebergabe WHERE resource_id = ?');
+    $stmt->execute([$resourceId]);
+    $v = $stmt->fetchColumn();
+    return $v === false || $v === null ? '' : (string)$v;
+}
+
+/**
+ * Fällige RÜCKGABEN eines Tages (Block D1, Medienmanager-Tagesseite).
+ *
+ * Alle zhl_booking_handover-Zeilen mit type='return', deren scheduled_end_utc in
+ * das (in UTC umgerechnete) Tagesfenster [$startUtc, $endUtc) fällt. Joint das Gerät
+ * (resources) und den Default-Rückgabeort (zhl_uebergabe). Storno ('cancelled') wird
+ * ausgeblendet. $startUtc/$endUtc sind 'Y-m-d H:i:s'-UTC-Grenzen (halboffenes Intervall).
+ *
+ * @return array<int,array<string,mixed>>
+ */
+function zhl_handover_returns_due(string $startUtc, string $endUtc): array
+{
+    $stmt = zhl_handover_db()->prepare(
+        "SELECT h.id, h.handover_token, h.reference_number, h.resource_id, h.status,
+                h.scheduled_start_utc, h.scheduled_end_utc,
+                r.name AS resource_name,
+                u.rueckgabeort
+         FROM zhl_booking_handover h
+         LEFT JOIN resources r ON r.resource_id = h.resource_id
+         LEFT JOIN zhl_uebergabe u ON u.resource_id = h.resource_id
+         WHERE h.type = 'return'
+           AND h.status <> 'cancelled'
+           AND h.scheduled_end_utc >= ?
+           AND h.scheduled_end_utc < ?
+         ORDER BY u.rueckgabeort IS NULL, u.rueckgabeort, h.scheduled_end_utc, h.id"
+    );
+    $stmt->execute([$startUtc, $endUtc]);
+    return $stmt->fetchAll();
+}
+
+/**
+ * Aktuell offene Rückgabe eines Geräts (Block D3, Material-QR-Scan-Ziel).
+ * = type='return', status IN ('requested','confirmed'), älteste Soll-Rückgabe zuerst.
+ * Gibt die Zeile (inkl. resource_name + rueckgabeort) oder null zurück.
+ *
+ * @return array<string,mixed>|null
+ */
+function zhl_handover_open_return_for_resource(int $resourceId): ?array
+{
+    if ($resourceId <= 0) {
+        return null;
+    }
+    $stmt = zhl_handover_db()->prepare(
+        "SELECT h.id, h.handover_token, h.reference_number, h.resource_id, h.status,
+                h.scheduled_start_utc, h.scheduled_end_utc,
+                r.name AS resource_name,
+                u.rueckgabeort
+         FROM zhl_booking_handover h
+         LEFT JOIN resources r ON r.resource_id = h.resource_id
+         LEFT JOIN zhl_uebergabe u ON u.resource_id = h.resource_id
+         WHERE h.resource_id = ?
+           AND h.type = 'return'
+           AND h.status IN ('requested','confirmed')
+         ORDER BY h.scheduled_end_utc IS NULL, h.scheduled_end_utc, h.id
+         LIMIT 1"
+    );
+    $stmt->execute([$resourceId]);
+    $row = $stmt->fetch();
+    return $row ?: null;
+}
+
 /** Aktueller Bestätigungsstatus eines Tokens aus der DB (ohne terminplaner-Aufruf). */
 function zhl_handover_status(string $token): array
 {

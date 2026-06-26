@@ -255,19 +255,66 @@
 /* v-book — Wochen-Raster (Slot-Range-Picker, Studio-Style) */
 .zhl-dash .zhl-week-nav { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
 .zhl-dash .zhl-week-label { font-weight: 600; color: var(--text); }
-.zhl-dash .zhl-grid-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: 10px; }
-.zhl-dash .zhl-weekgrid { border-collapse: collapse; width: 100%; min-width: 720px; font-size: 12px; }
-.zhl-dash .zhl-weekgrid th { font-weight: 600; color: var(--muted); padding: 6px 4px; text-align: center; white-space: nowrap; }
-.zhl-dash .zhl-weekgrid thead th { border-bottom: 1px solid var(--border); position: sticky; top: 0; background: #fff; }
-.zhl-dash .zhl-wg-day { text-align: right; padding-right: 10px; color: var(--text); white-space: nowrap; }
-.zhl-dash .zhl-wg-day span { color: var(--muted); font-weight: 400; }
-.zhl-dash .zhl-wg-cell { width: 46px; height: 34px; border: 1px solid #eef1f4; }
-.zhl-dash .zhl-wg-cell.s-free { background: repeating-linear-gradient(45deg,#f0fdf4,#f0fdf4 5px,#dcfce7 5px,#dcfce7 10px); cursor: pointer; }
-.zhl-dash .zhl-wg-cell.s-free:hover { background: #bbf7d0; }
-.zhl-dash .zhl-wg-cell.s-busy { background: repeating-linear-gradient(45deg,#fef2f2,#fef2f2 5px,#fecaca 5px,#fecaca 10px); }
-.zhl-dash .zhl-wg-cell.s-past { background: repeating-linear-gradient(45deg,#f8fafc,#f8fafc 5px,#eef1f4 5px,#eef1f4 10px); }
-.zhl-dash .zhl-wg-cell.sel { background: var(--zg) !important; border-color: var(--zg-d); }
+.zhl-dash .zhl-grid-scroll { overflow-x: auto; border: 1px solid #e2e8f0; border-radius: 10px; -webkit-overflow-scrolling: touch; }
+.zhl-dash .zhl-weekgrid { border-collapse: collapse; width: 100%; min-width: 720px; font-size: 12px; background: #fff; }
+.zhl-dash .zhl-weekgrid th { font-weight: 600; color: #4a5568; padding: 10px 4px; text-align: center; white-space: nowrap; }
+.zhl-dash .zhl-weekgrid thead th { background: #f7fafc; border-bottom: 2px solid #e2e8f0; position: sticky; top: 0; z-index: 1; font-size: 11px; }
+.zhl-dash .zhl-weekgrid thead th:first-child { background: #edf2f7; }
+.zhl-dash .zhl-wg-day { text-align: right; padding: 8px 12px; color: #4a5568; white-space: nowrap; background: #fafbfc; border-right: 1px solid #e2e8f0; border-bottom: 1px solid #edf2f7; }
+.zhl-dash .zhl-wg-day span { color: #718096; font-weight: 400; font-size: 11px; }
+.zhl-dash .zhl-wg-cell { height: 40px; border-bottom: 1px solid #edf2f7; border-right: 1px solid #edf2f7; transition: background .12s ease; }
+.zhl-dash .zhl-wg-cell.s-free { background: #f0fff4; cursor: pointer; }
+.zhl-dash .zhl-wg-cell.s-free:hover { background: #c6f6d5; }
+.zhl-dash .zhl-wg-cell.s-busy { background: #fee2e2; }
+.zhl-dash .zhl-wg-cell.s-past { background: #fafbfc; background-image: repeating-linear-gradient(45deg, transparent, transparent 6px, rgba(45,55,72,.04) 6px, rgba(45,55,72,.04) 7px); }
+.zhl-dash .zhl-wg-cell.s-closed { background: #f1f3f5; cursor: not-allowed; }
+.zhl-dash .zhl-wg-cell.sel { background: #009260 !important; border-color: #007a50; }
+.zhl-dash .zhl-wg-weekend .zhl-wg-day { color: #007a50; }
+.zhl-dash .zhl-wg-tp { font-size: .85em; }
 .zhl-dash .zhl-wg-legend { display: flex; align-items: center; gap: 14px; margin-top: 10px; flex-wrap: wrap; }
-.zhl-dash .zhl-wg-legend .lg { display: inline-block; width: 13px; height: 13px; border-radius: 3px; vertical-align: -2px; margin-right: 4px; }
-.zhl-dash .lg-free { background: #dcfce7; } .zhl-dash .lg-busy { background: #fecaca; }
-.zhl-dash .lg-past { background: #eef1f4; } .zhl-dash .lg-sel { background: var(--zg); }
+.zhl-dash .zhl-wg-legend .lg { display: inline-block; width: 13px; height: 13px; border-radius: 3px; vertical-align: -2px; margin-right: 4px; border: 1px solid rgba(0,0,0,.06); }
+.zhl-dash .lg-free { background: #f0fff4; } .zhl-dash .lg-busy { background: #fee2e2; }
+.zhl-dash .lg-past { background: #eef1f4; } .zhl-dash .lg-sel { background: #009260; }
+
+/* Monats-Kalender (Tagesmodus) — Studio-Look wie das Wochen-Raster. */
+.zhl-dash .zhl-monthgrid { border-collapse: separate; border-spacing: 0; width: 100%; max-width: 380px; background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; overflow: hidden; font-size: 13px; table-layout: fixed; }
+.zhl-dash .zhl-monthgrid thead th { font-weight: 600; font-size: 11px; color: #4a5568; background: #f7fafc; border-bottom: 2px solid #e2e8f0; padding: 8px 0; text-align: center; }
+.zhl-dash .zhl-monthgrid thead th.wknd { color: #007a50; }
+.zhl-dash .zhl-mg-cell { height: 40px; text-align: center; vertical-align: middle; color: var(--text); border-bottom: 1px solid #edf2f7; border-right: 1px solid #edf2f7; transition: background .12s ease; user-select: none; }
+.zhl-dash .zhl-mg-cell:nth-child(7n) { border-right: none; }
+.zhl-dash .zhl-monthgrid tbody tr:last-child .zhl-mg-cell { border-bottom: none; }
+.zhl-dash .zhl-mg-cell.s-free { background: #f0fff4; cursor: pointer; }
+.zhl-dash .zhl-mg-cell.s-free:hover { background: #c6f6d5; }
+.zhl-dash .zhl-mg-cell.s-busy { background: #fee2e2; color: #b91c1c; }
+.zhl-dash .zhl-mg-cell.s-past { background: #fafbfc; color: #cbd5e0; background-image: repeating-linear-gradient(45deg, transparent, transparent 6px, rgba(45,55,72,.04) 6px, rgba(45,55,72,.04) 7px); }
+.zhl-dash .zhl-mg-cell.s-closed { background: #f1f3f5; color: #cbd5e0; cursor: not-allowed; }
+.zhl-dash .zhl-mg-cell.out { color: #cbd5e0; }
+.zhl-dash .zhl-mg-cell.out.s-free { background: #f8fdfa; }
+.zhl-dash .zhl-mg-cell.wknd:not(.sel) { color: #007a50; }
+.zhl-dash .zhl-mg-cell.sel { background: #009260 !important; color: #fff !important; font-weight: 600; }
+
+/* Kompakter Abhol-Picker: Tag-Chips + scrollbare Zeit-Pills. */
+.zhl-dash .zhl-pickup-daybar { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.zhl-dash .zhl-pickup-day { border: 1px solid var(--border); border-radius: 9px; padding: 6px 11px; font-size: 13px; cursor: pointer; background: #fff; color: var(--text); font-weight: 500; }
+.zhl-dash .zhl-pickup-day:hover { border-color: var(--zg); }
+.zhl-dash .zhl-pickup-day.active { background: var(--grad); color: #fff; border-color: transparent; }
+.zhl-dash .zhl-pickup-times { display: flex; flex-wrap: wrap; gap: 6px; max-height: 160px; overflow: auto; padding: 2px; }
+.zhl-dash .zhl-pickup-pill { display: inline-flex; align-items: center; border: 1px solid var(--border); border-radius: 8px; padding: 5px 10px; font-size: 13px; cursor: pointer; background: #fff; }
+.zhl-dash .zhl-pickup-pill:hover { border-color: var(--zg); }
+.zhl-dash .zhl-pickup-pill input { position: absolute; opacity: 0; width: 0; height: 0; }
+.zhl-dash .zhl-pickup-pill:has(input:checked) { background: var(--grad); color: #fff; border-color: transparent; }
+
+/* --- Task 4: kuratierte Kategorien + Milchglas-Overlay --- */
+.zhl-dash .zhl-navlabel { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.zhl-dash .zhl-cat-tag { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .3px; color: var(--zg-d); background: #dcfce7; border-radius: 20px; padding: 1px 7px; }
+.zhl-dash .zhl-cat-note { display: flex; align-items: flex-start; gap: 8px; background: #f0fdf4; border: 1px solid #bbf7d0; color: #14633f; border-radius: 12px; padding: 10px 14px; margin: 0 0 16px; font-size: 14px; line-height: 1.5; }
+
+.zhl-dash .zhl-gridwrap { position: relative; }
+.zhl-dash .zhl-gridwrap.is-frosted .zhl-grid { filter: blur(6px); pointer-events: none; user-select: none; opacity: .85; }
+.zhl-dash .zhl-frost { position: absolute; inset: -6px; display: flex; align-items: flex-start; justify-content: center; padding-top: 56px; cursor: pointer; z-index: 5; background: rgba(247, 250, 252, .35); border-radius: 16px; }
+.zhl-dash .zhl-frost-card { max-width: 430px; text-align: center; background: #fff; border: 1px solid var(--border); border-radius: 16px; box-shadow: 0 18px 50px rgba(0, 116, 76, .16); padding: 24px 26px; transition: transform .12s ease, box-shadow .12s ease; }
+.zhl-dash .zhl-frost:hover .zhl-frost-card { transform: translateY(-2px); box-shadow: 0 22px 60px rgba(0, 116, 76, .22); }
+.zhl-dash .zhl-frost-arrow { display: inline-block; font-size: 30px; line-height: 1; color: var(--zg); margin-bottom: 8px; animation: zhl-nudge 1.3s ease-in-out infinite; }
+@keyframes zhl-nudge { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(-7px); } }
+.zhl-dash .zhl-frost-title { font-size: 17px; font-weight: 600; color: var(--text); margin-bottom: 6px; }
+.zhl-dash .zhl-frost-text { font-size: 14px; color: var(--text2); line-height: 1.5; }

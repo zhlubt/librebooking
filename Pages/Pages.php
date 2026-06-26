@@ -44,9 +44,10 @@ class Pages
     public const VIEW_CALENDAR = 'view-calendar.php';
     public const VIEW_RESERVATION = 'view-reservation.php';
     public const VIEW_SCHEDULE = 'view-schedule.php';
+    public const ZHL_DASHBOARD = 'zhl-dashboard.php';
 
     private static $_pages = [
-        1 => ['url' => Pages::DASHBOARD, 'name' => 'Dashboard'],
+        1 => ['url' => Pages::ZHL_DASHBOARD, 'name' => 'Dashboard'],
         2 => ['url' => Pages::SCHEDULE, 'name' => 'Schedule'],
         3 => ['url' => Pages::MY_CALENDAR, 'name' => 'MyCalendar'],
         4 => ['url' => Pages::CALENDAR, 'name' => 'ResourceCalendar'],
@@ -59,11 +60,19 @@ class Pages
 
     public static function UrlFromId($pageId)
     {
+        if (!isset(self::$_pages[$pageId])) {
+            return '';
+        }
+
         return self::$_pages[$pageId]['url'];
     }
 
     public static function NameFromId($pageId)
     {
+        if (!isset(self::$_pages[$pageId])) {
+            return '';
+        }
+
         return self::$_pages[$pageId]['name'];
     }
 

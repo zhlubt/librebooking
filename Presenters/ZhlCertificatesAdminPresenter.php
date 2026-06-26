@@ -108,8 +108,11 @@ class ZhlCertificatesAdminPresenter
                 if (!$uid) {
                     return 'Nutzer „' . $userRef . '" nicht gefunden (E-Mail, Benutzername oder ID).';
                 }
-                $expires = $this->normalizeExpiry($this->post('expires_at'));
-                $now = gmdate('Y-m-d H:i:s');
+                // Jede Einführung gilt standardmäßig 1 Jahr (kein manuelles Ablaufdatum mehr).
+                // Durchgängig UTC rechnen (konsistent mit granted_at), kein Default-TZ/DST-Drift.
+                $nowDt = new DateTime('now', new DateTimeZone('UTC'));
+                $now = $nowDt->format('Y-m-d H:i:s');
+                $expires = $nowDt->modify('+1 year')->format('Y-m-d H:i:s');
                 $cmd = new AdHocCommand('INSERT INTO zhl_cert_grant (user_id, cert_type_id, granted_at, expires_at, granted_by) VALUES (@u,@t,@g,@e,@by) ON DUPLICATE KEY UPDATE expires_at=VALUES(expires_at), granted_at=VALUES(granted_at)');
                 $cmd->AddParameter(new Parameter('@u', $uid));
                 $cmd->AddParameter(new Parameter('@t', $tid));
@@ -244,19 +247,6 @@ class ZhlCertificatesAdminPresenter
         $row = $reader->GetRow();
         $reader->Free();
         return $row ? (int)$row['user_id'] : 0;
-    }
-
-    /** 'YYYY-MM-DD' → 'YYYY-MM-DD 23:59:59' (UTC-naiv); leer → NULL (unbegrenzt). */
-    private function normalizeExpiry($v)
-    {
-        $v = trim((string)$v);
-        if ($v === '') {
-            return null;
-        }
-        if (preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $v, $m) && checkdate((int)$m[2], (int)$m[3], (int)$m[1])) {
-            return $v . ' 23:59:59';
-        }
-        return null;
     }
 
     private function post($key)

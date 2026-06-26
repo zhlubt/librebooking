@@ -98,6 +98,7 @@
     {if isset($CssExtensionFile) && $CssExtensionFile neq ''}
         {cssfile src=$CssExtensionFile}
     {/if}
+    {cssfile src='css/zhl-chrome.css'}
 
     {if isset($printCssFiles) && $printCssFiles neq ''}
         {assign var='PrintCssFileList' value=$printCssFiles|split:','}
@@ -118,19 +119,11 @@
     </noscript>
 
     {if !isset($HideNavBar) || $HideNavBar == false}
-        <div class="d-flex align-items-center gap-2 m-2">
-            <a class="navbar-brand" href="{$HomeUrl}">
-                <img src="{$Path}img/{$LogoUrl}?{$Version}" alt="{$Title}" class="logo">
-            </a>
-            <div class="border-start ps-2 d-flex flex-column">
-                {if $CompanyName neq ''}
-                    <h5 class="mb-0"><a class="link-primary" href="{$CompanyUrl}">{$CompanyName}</a></h5>
-                {/if}
-                <h5 class="mb-0"><a class="link-primary" href="{$HomeUrl}">{$AppTitle}</a></h5>
-            </div>
-        </div>
-        <nav class="navbar navbar-expand-lg bg-light shadow-sm py-2 sticky-top">
+        <nav class="navbar navbar-expand-lg zhl-navbar shadow-sm py-2 sticky-top zhl-navbar-brand-wrap">
             <div class="container-fluid">
+                <a class="navbar-brand zhl-navbar-brand d-flex align-items-center" href="{$Path}zhl-dashboard.php">
+                    <img src="{$Path}img/ZHL-Logo-Text_Side-Green-Background.png" alt="Medienausleihe ZHL" class="zhl-chrome-logo">
+                </a>
                 <button type="button" class="navbar-toggler" data-bs-toggle="collapse"
                     data-bs-target="#librebooking-navigation" aria-controls="librebooking-navigation" aria-expanded="false"
                     aria-label="{translate key=ShowHideNavigation}">
@@ -139,71 +132,12 @@
                 <div class="collapse navbar-collapse" id="librebooking-navigation">
                     <ul class="navbar-nav me-auto mb-2 mb-lg-0">
                         {if isset($LoggedIn) && $LoggedIn}
-                            <li class="nav-item" id="navDashboard"><a class="nav-link link-primary"
-                                    href="{$Path}{Pages::DASHBOARD}">{translate key="Dashboard"}</a></li>
-                            <li class="nav-item dropdown" id="navMyAccountDropdown">
-                                <a href="#" class="nav-link  link-primary dropdown-toggle" role="button"
-                                    data-bs-toggle="dropdown">{translate key="MyAccount"}</a>
-                                <ul class="dropdown-menu">
-                                    <li id="navProfile"><a class="dropdown-item"
-                                            href="{$Path}{Pages::PROFILE}">{translate key="Profile"}</a></li>
-                                    <li id="navPassword"><a class="dropdown-item"
-                                            href="{$Path}{Pages::PASSWORD}">{translate key="ChangePassword"}</a></li>
-                                    <li id="navNotification">
-                                        <a class="dropdown-item"
-                                            href="{$Path}{Pages::NOTIFICATION_PREFERENCES}">{translate key="NotificationPreferences"}</a>
-                                    </li>
-                                    {if isset($ShowParticipation) && $ShowParticipation}
-                                        <li id="navInvitations">
-                                            <a class="dropdown-item"
-                                                href="{$Path}{Pages::PARTICIPATION}">{translate key="OpenInvitations"}</a>
-                                        </li>
-                                    {/if}
-                                    {if isset($CreditsEnabled) && $CreditsEnabled}
-                                        <li id="navUserCredits">
-                                            <a class="dropdown-item" href="{$Path}{Pages::CREDITS}">{translate key="Credits"}</a>
-                                        </li>
-                                    {/if}
-                                </ul>
-                            </li>
-                            <li class="nav-item dropdown" id="navScheduleDropdown">
-                                <a href="#" class="nav-link link-primary dropdown-toggle" role="button"
-                                    data-bs-toggle="dropdown">{translate key="Schedule"}</a>
-                                <ul class="dropdown-menu">
-                                    <li id="navBookings"><a class="dropdown-item"
-                                            href="{$Path}{Pages::SCHEDULE}">{translate key="Bookings"}</a>
-                                    </li>
-                                    <li>
-                                        <hr class="dropdown-divider">
-                                    </li>
-                                    <li id="navMyCalendar"><a class="dropdown-item"
-                                            href="{$Path}{Pages::MY_CALENDAR}">{translate key="MyCalendar"}</a></li>
-                                    <li id="navResourceCalendar"><a class="dropdown-item"
-                                            href="{$Path}{Pages::CALENDAR}">{translate key="ResourceCalendar"}</a></li>
-                                    <!--<li class="menuitem"><a href="#">{translate key="Current Status"}</a></li>-->
-                                    <li>
-                                        <hr class="dropdown-divider">
-                                    </li>
-                                    <li id="navFindATime"><a class="dropdown-item"
-                                            href="{$Path}{Pages::OPENINGS}">{translate key="FindATime"}</a>
-                                    </li>
-                                    <li id="navFindATime"><a class="dropdown-item"
-                                            href="{$Path}{Pages::SEARCH_RESERVATIONS}">{translate key="SearchReservations"}</a>
-                                    </li>
-                                </ul>
-                            </li>
-                            <li class="nav-item dropdown" id="navReportsDropdown">
-                                <a href="#" class="nav-link link-primary dropdown-toggle" role="button"
-                                    data-bs-toggle="dropdown">{translate key="Check"}</a>
-                                <ul class="dropdown-menu">
-                                    <li id="CheckResources"><a class="dropdown-item"
-                                            href="{$Path}view_resources.php">{translate key=Resources}</a>
-                                    </li>
-                                    <li id="CheckSchedules"><a class="dropdown-item"
-                                            href="{$Path}view_schedules.php">{translate key=Schedules}</a>
-                                    </li>
-                                </ul>
-                            </li>
+                            <li class="nav-item" id="navDashboard"><a class="nav-link"
+                                    href="{$Path}zhl-dashboard.php">{translate key="ZhlDevices"}</a></li>
+                            <li class="nav-item" id="navMyBookings"><a class="nav-link"
+                                    href="{$Path}zhl-bookings.php">{translate key="ZhlMyBookings"}</a></li>
+                            <li class="nav-item" id="navAccount"><a class="nav-link"
+                                    href="{$Path}zhl-account.php">{translate key="ZhlNavAccount"}</a></li>
                             {if isset($CanViewAdmin) && $CanViewAdmin}
                                 <li class="nav-item dropdown" id="navApplicationManagementDropdown">
                                     <a href="#" class="nav-link link-primary dropdown-toggle" role="button"
@@ -251,6 +185,18 @@
                                         {/if}
                                         <li id="navManageAttributes"><a class="dropdown-item"
                                                 href="{$Path}admin/manage_attributes.php">{translate key="CustomAttributes"}</a>
+                                        </li>
+                                        <li>
+                                            <hr class="dropdown-divider">
+                                        </li>
+                                        <li id="navZhlCertificates"><a class="dropdown-item"
+                                                href="{$Path}zhl-certificates-admin.php">{translate key="ZhlNavCertificates"}</a>
+                                        </li>
+                                        <li id="navZhlBundles"><a class="dropdown-item"
+                                                href="{$Path}zhl-bundles-admin.php">{translate key="ZhlNavBundles"}</a>
+                                        </li>
+                                        <li id="navZhlHandover"><a class="dropdown-item"
+                                                href="{$Path}zhl-handover-admin.php">{translate key="ZhlNavHandovers"}</a>
                                         </li>
                                     </ul>
                                 </li>
@@ -383,43 +329,22 @@
                                 </ul>
                             </li>
                         {/if}
+                        {* ZHL: Sprachwahl als schlichte EN/DE-Pille (wie auf zhl-start.php),
+                           statt Globus-Dropdown. Bei genau 2 Sprachen erscheint genau ein
+                           Knopf, der auf die jeweils andere Sprache umschaltet. *}
                         {if isset($LoggedIn) && $LoggedIn && count($AvailableLanguages) > 1}
-                            <li class="nav-item dropdown" id="navLanguageDropdown">
-                                <a href="#" class="nav-link link-primary dropdown-toggle" role="button"
-                                    data-bs-toggle="dropdown" aria-label="{translate key=ChangeLanguage}"
-                                    title="{translate key=ChangeLanguage}">
-                                    <span class="visually-hidden">{translate key=ChangeLanguage}</span>
-                                    <i class="bi bi-globe-americas" aria-hidden="true"></i>
-                                </a>
-                                <ul class="dropdown-menu dropdown-menu-end" id="languageDropdownMenu"
-                                    style="max-height: 70vh; overflow-y: auto; min-width: 14rem;">
-                                    {foreach from=$AvailableLanguages item=lang}
-                                        <li>
-                                            <a class="dropdown-item {if $CurrentLanguage == $lang->GetLanguageCode()}active{/if}"
-                                                href="#" data-lang-code="{$lang->GetLanguageCode()}">
-                                                {$lang->GetDisplayName()}
-                                            </a>
-                                        </li>
-                                    {/foreach}
-                                </ul>
+                            <li class="nav-item d-flex align-items-center" id="navLanguageToggle">
+                                {foreach from=$AvailableLanguages item=lang}
+                                    {if $CurrentLanguage != $lang->GetLanguageCode()}
+                                        <button type="button" class="zhl-lang-toggle"
+                                            data-lang-code="{$lang->GetLanguageCode()}"
+                                            aria-label="{$lang->GetDisplayName()}"
+                                            title="{$lang->GetDisplayName()}">{$lang->GetLanguageCode()|truncate:2:'':true|upper}</button>
+                                    {/if}
+                                {/foreach}
                             </li>
                         {/if}
-                        <li class="nav-item dropdown" id="navHelpDropdown">
-                            <a href="#" class="nav-link link-primary dropdown-toggle" role="button"
-                                data-bs-toggle="dropdown">{translate key="Help"}</a>
-                            <ul class="dropdown-menu  dropdown-menu-end">
-                                <li id="navHelp"><a class="dropdown-item"
-                                        href="https://github.com/LibreBooking/librebooking/wiki">{translate key=Help}</a>
-                                </li>
-                                {if isset($CanViewAdmin) && $CanViewAdmin}
-                                    <li id="navHelpAdmin"><a class="dropdown-item"
-                                            href="https://github.com/LibreBooking/librebooking/wiki/Administration">{translate key=Administration}</a>
-                                    </li>
-                                {/if}
-                                <li id="navAbout"><a class="dropdown-item"
-                                        href="{$Path}help.php?ht=about">{translate key=About}</a></li>
-                            </ul>
-                        </li>
+                        {* ZHL: natives Help-Dropdown (LibreBooking-Wiki) entfernt — nicht gewünscht. *}
                         {if isset($LoggedIn) && $LoggedIn}
                             <li class="nav-item" id="navSignOut"><a class="nav-link link-primary"
                                     href="{$Path}logout.php">{translate key="SignOut"}</a></li>

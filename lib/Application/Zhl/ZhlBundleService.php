@@ -1,5 +1,7 @@
 <?php
 
+require_once(ROOT_DIR . 'lib/Application/Zhl/ZhlTypeInfo.php');
+
 /**
  * ZHL-Bundle-Service (Dashboard v2b) — lädt den Bundle-Katalog (zhl_bundle/_item) und berechnet
  * je Bundle die Live-Verfügbarkeit aus dem Pool je Geräte-Typ (US-9/US-12/US-14).
@@ -19,6 +21,8 @@ class ZhlBundleItemView
     public $altGroup = null;   // Alternativ-Gruppe (Auto-Prio); null = normale Position
     /** @var string[] Options-Labels der Gruppe in Prioritäts-Reihenfolge (nur bei altGroup) */
     public $altOptions = [];
+    public $infoUrl = '';      // D2: Info-Material-Link des Geräte-Typs (kleines (i) am Bundle)
+    public $infoText = '';     // D2: optionaler Info-Text
 }
 
 class ZhlBundleView
@@ -148,6 +152,19 @@ class ZhlBundleService
                 if ($item->altGroup !== null && $item->required && !$item->ok) {
                     $b->available = false;
                     $b->blockers[] = $item->quantity . '× ' . implode(' / ', $item->altOptions) . ' (keine Option frei)';
+                }
+            }
+        }
+
+        // D2: Info-Material je Geräte-Typ an die Positionen hängen (kleines (i) am Bundle).
+        $infoMap = ZhlTypeInfo::Map($this->db);
+        if (!empty($infoMap)) {
+            foreach ($bundles as $b) {
+                foreach ($b->items as $item) {
+                    if (isset($infoMap[$item->type])) {
+                        $item->infoUrl = $infoMap[$item->type]['url'];
+                        $item->infoText = $infoMap[$item->type]['text'];
+                    }
                 }
             }
         }

@@ -18,6 +18,7 @@
 			{if $AfterWarning}
 				<div class="zhl-book-errors" style="margin-top:12px;"><strong>Hinweis:</strong> {$AfterWarning|escape}</div>
 			{/if}
+			{include file='zhl-mediainfo.tpl' MediaInfos=$MediaInfos}
 			<div class="zhl-book-actions" style="display:flex; gap:10px; flex-wrap:wrap; margin-top:14px;">
 				<a class="zhl-btn" href="{$Path}zhl-bookings.php">📅 Meine Buchungen</a>
 				<a class="zhl-btn zhl-btn-ghost" href="{$Path}zhl-assistant.php">Weiteres Bundle buchen</a>

@@ -11,6 +11,8 @@ require_once(ROOT_DIR . 'lib/Application/Reservation/namespace.php');
 require_once(ROOT_DIR . 'lib/Application/Zhl/ZhlBundleResolver.php');
 require_once(ROOT_DIR . 'Presenters/Reservation/ReservationPresenterFactory.php');
 require_once(ROOT_DIR . 'Presenters/ZhlReservationFacade.php');
+require_once(ROOT_DIR . 'Presenters/ZhlMediaInfoEmail.php');
+require_once(ROOT_DIR . 'lib/Application/Zhl/ZhlTypeInfo.php');
 require_once(ROOT_DIR . 'Web/zhl-audit-lib.php');
 
 /**
@@ -44,11 +46,19 @@ class ZhlBundleBookPresenter
     public function PageLoad(UserSession $user)
     {
         if (isset($_GET['booked'])) {
+            $mainRef = trim((string)$_GET['booked']);
+            $afterRef = isset($_GET['after']) ? trim((string)$_GET['after']) : '';
+            $db = ServiceLocator::GetDatabase();
+            $mediaInfos = ZhlTypeInfo::ForReference($db, $mainRef);
+            if ($afterRef !== '') {
+                $mediaInfos = array_merge($mediaInfos, ZhlTypeInfo::ForReference($db, $afterRef));
+            }
             $this->page->BindSuccess([
-                'mainReference' => isset($_GET['booked']) ? trim((string)$_GET['booked']) : '',
-                'afterReference' => isset($_GET['after']) ? trim((string)$_GET['after']) : '',
+                'mainReference' => $mainRef,
+                'afterReference' => $afterRef,
                 'afterWarning' => isset($_GET['warn']) ? trim((string)$_GET['warn']) : '',
                 'pickupInfo' => isset($_GET['pickup']) ? trim((string)$_GET['pickup']) : '',
+                'mediaInfos' => $mediaInfos,
             ]);
             return;
         }
@@ -524,7 +534,48 @@ class ZhlBundleBookPresenter
             ],
         ]));
 
+        // D2: Begleit-Mail mit Info-Material zu den gebuchten Medien (main + after), try/catch.
+        $this->sendMediaInfoMail($db, $user, $mainRef, $afterRef);
+
         $this->redirectSuccess($mainRef, $afterRef, implode(' · ', $allWarnings), $pickupInfo);
+    }
+
+    /**
+     * D2: Begleit-Mail mit Info-Material zu den gebuchten Medien an den Ausleihenden. Deckt Main- und
+     * (falls vorhanden) After-Reservierung ab. Nur wenn mind. ein gebuchter Geräte-Typ einen Info-Link
+     * hat. Kapselt alles in try/catch — die Buchung darf nie kippen.
+     */
+    private function sendMediaInfoMail($db, UserSession $user, string $mainRef, string $afterRef): void
+    {
+        try {
+            if (trim((string)$user->Email) === '') {
+                return;
+            }
+            $infos = ZhlTypeInfo::ForReference($db, $mainRef);
+            if (trim($afterRef) !== '') {
+                $infos = array_merge($infos, ZhlTypeInfo::ForReference($db, $afterRef));
+            }
+            $block = ZhlTypeInfo::EmailBlock($infos);
+            if ($block === '') {
+                return;
+            }
+            $name = trim($user->FirstName . ' ' . $user->LastName);
+            $lines = [
+                ($name !== '' ? 'Hallo ' . $name . ',' : 'Hallo,'),
+                '',
+                'vielen Dank für deine Bundle-Buchung (Buchungsnummer ' . $mainRef . ').',
+                '',
+                $block,
+                '',
+                'Viele Grüße',
+                'ZHL Medienausleihe',
+            ];
+            $to = [new EmailAddress($user->Email, $name !== '' ? $name : $user->Email)];
+            $lang = !empty($user->LanguageCode) ? $user->LanguageCode : null;
+            ServiceLocator::GetEmailService()->Send(new ZhlMediaInfoEmail($to, $mainRef, implode("\n", $lines), $lang));
+        } catch (Throwable $e) {
+            Log::Error('ZHL-D2: Bundle-Info-Mail nach Buchung fehlgeschlagen (ref=%s): %s', $mainRef, $e);
+        }
     }
 
     /**

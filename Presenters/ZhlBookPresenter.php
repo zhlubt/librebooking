@@ -11,6 +11,8 @@ require_once(ROOT_DIR . 'lib/Application/Reservation/namespace.php');
 require_once(ROOT_DIR . 'Presenters/Reservation/ReservationPresenterFactory.php');
 require_once(ROOT_DIR . 'Presenters/ZhlReservationFacade.php');
 require_once(ROOT_DIR . 'Presenters/ZhlHauspostEmail.php');
+require_once(ROOT_DIR . 'Presenters/ZhlMediaInfoEmail.php');
+require_once(ROOT_DIR . 'lib/Application/Zhl/ZhlTypeInfo.php');
 require_once(ROOT_DIR . 'Web/zhl-audit-lib.php');
 
 /**
@@ -39,7 +41,11 @@ class ZhlBookPresenter
     {
         $booked = isset($_GET['booked']) ? trim((string)$_GET['booked']) : '';
         if ($booked !== '') {
-            $this->page->BindSuccess(['referenceNumber' => $booked, 'warning' => isset($_GET['warn']) ? trim((string)$_GET['warn']) : '']);
+            $this->page->BindSuccess([
+                'referenceNumber' => $booked,
+                'warning' => isset($_GET['warn']) ? trim((string)$_GET['warn']) : '',
+                'mediaInfos' => ZhlTypeInfo::ForReference(ServiceLocator::GetDatabase(), $booked),
+            ]);
             return;
         }
 
@@ -505,6 +511,10 @@ class ZhlBookPresenter
                 'warnings' => $warnings,
             ],
         ]));
+
+        // D2: Begleit-Mail mit Info-Material zu den gebuchten Medien (nur wenn ein Info-Link da ist).
+        // Darf die erfolgreiche Buchung nie kippen → try/catch.
+        $this->sendMediaInfoMail($db, $user, $ref);
 
         $this->page->RedirectToSuccess($ref, implode(' · ', $warnings));
     }
@@ -1311,6 +1321,41 @@ class ZhlBookPresenter
             }
         }
         return $d->Format('Y-m-d');
+    }
+
+    /**
+     * D2: Begleit-Mail mit Info-Material zu den gebuchten Medien an den Ausleihenden.
+     * Nur wenn der Nutzer eine Mail-Adresse hat UND mindestens ein gebuchter Geräte-Typ einen
+     * Info-Link gepflegt hat. Kapselt alles in try/catch — die Buchung darf nie kippen.
+     */
+    private function sendMediaInfoMail($db, UserSession $user, string $ref): void
+    {
+        try {
+            if (trim((string)$user->Email) === '') {
+                return;
+            }
+            $infos = ZhlTypeInfo::ForReference($db, $ref);
+            $block = ZhlTypeInfo::EmailBlock($infos);
+            if ($block === '') {
+                return;
+            }
+            $name = trim($user->FirstName . ' ' . $user->LastName);
+            $lines = [
+                ($name !== '' ? 'Hallo ' . $name . ',' : 'Hallo,'),
+                '',
+                'vielen Dank für deine Buchung (Buchungsnummer ' . $ref . ').',
+                '',
+                $block,
+                '',
+                'Viele Grüße',
+                'ZHL Medienausleihe',
+            ];
+            $to = [new EmailAddress($user->Email, $name !== '' ? $name : $user->Email)];
+            $lang = !empty($user->LanguageCode) ? $user->LanguageCode : null;
+            ServiceLocator::GetEmailService()->Send(new ZhlMediaInfoEmail($to, $ref, implode("\n", $lines), $lang));
+        } catch (Throwable $e) {
+            Log::Error('ZHL-D2: Info-Mail nach Buchung fehlgeschlagen (ref=%s): %s', $ref, $e);
+        }
     }
 
     /**

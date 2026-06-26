@@ -14,6 +14,7 @@
 			<p class="zhl-sub">Deine Reservierung ist angelegt.</p>
 			{if $ReferenceNumber}<p>Buchungsnummer: <strong>{$ReferenceNumber|escape}</strong></p>{/if}
 			{if $Warning}<div class="zhl-ueb-item req" style="margin:10px 0;"><strong>⚠ Bitte beachten</strong> <span class="zhl-muted zhl-small">{$Warning|escape}</span></div>{/if}
+			{include file='zhl-mediainfo.tpl' MediaInfos=$MediaInfos}
 			<div class="zhl-book-actions" style="display:flex; gap:10px; flex-wrap:wrap;">
 				<a class="zhl-btn" href="{$Path}zhl-bookings.php">📅 Meine Buchungen</a>
 				<a class="zhl-btn zhl-btn-ghost" href="{$Path}zhl-dashboard.php">Weiteres Gerät buchen</a>

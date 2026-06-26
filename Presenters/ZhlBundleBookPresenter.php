@@ -1148,6 +1148,7 @@ class ZhlBundleBookPresenter
             $out['memberId'] = $out['memberId'] ?? (isset($mem['member_id']) ? (int)$mem['member_id'] : null);
             foreach ($mem['slots'] ?? [] as $s) {
                 $startUtc = $s['start_utc'] ?? null;
+                $endUtc = $s['end_utc'] ?? null;
                 if (!$startUtc) {
                     continue;
                 }
@@ -1160,6 +1161,10 @@ class ZhlBundleBookPresenter
                 $out['slots'][] = [
                     'slot_id' => (string)$s['slot_id'],
                     'label' => (string)($s['label'] ?? $startUtc),
+                    // start_utc/end_utc mitführen, sonst bricht persistEinfuehrung mit
+                    // „startUtc === null" ab → es entsteht KEINE einf-Zeile (Termin nicht gespeichert).
+                    'start_utc' => (string)$startUtc,
+                    'end_utc' => $endUtc !== null ? (string)$endUtc : null,
                     'type_id' => isset($mem['type_id']) ? (int)$mem['type_id'] : null,
                     'member_id' => isset($mem['member_id']) ? (int)$mem['member_id'] : null,
                 ];

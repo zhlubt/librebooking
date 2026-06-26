@@ -120,9 +120,10 @@ class ZhlBookingDetailPresenter
             'periodLabel' => $startLocal->Format('d.m.Y, H:i') . ' – ' . $endLocal->Format('d.m.Y, H:i') . ' Uhr',
             'createdLabel' => $createdLabel,
             'devices' => $devices,
+            'einfApptLabel' => $handover['einf'],
             'pickupLabel' => $handover['pickup'],
             'returnLabel' => $handover['return'],
-            'hasHandover' => ($handover['pickup'] !== '' || $handover['return'] !== ''),
+            'hasHandover' => ($handover['pickup'] !== '' || $handover['return'] !== '' || $handover['einf'] !== ''),
             'canCancel' => $canCancel,
             'flashError' => $flashError,
         ]);
@@ -438,7 +439,7 @@ class ZhlBookingDetailPresenter
      */
     private function loadHandover(string $ref, $tz): array
     {
-        $out = ['pickup' => '', 'return' => ''];
+        $out = ['einf' => '', 'pickup' => '', 'return' => ''];
         try {
             $db = ServiceLocator::GetDatabase();
             $cmd = new AdHocCommand(
@@ -447,6 +448,7 @@ class ZhlBookingDetailPresenter
             );
             $cmd->AddParameter(new Parameter('@ref', $ref));
             $reader = $db->Query($cmd);
+            $einfTimes = []; // mehrere Einführungstermine möglich (Bundle) → eindeutig sammeln
             while ($row = $reader->GetRow()) {
                 if (empty($row['scheduled_start_utc'])) {
                     continue;
@@ -456,9 +458,12 @@ class ZhlBookingDetailPresenter
                     $out['pickup'] = $when;
                 } elseif ((string)$row['type'] === 'return') {
                     $out['return'] = $when;
+                } elseif ((string)$row['type'] === 'einf') {
+                    $einfTimes[$when] = true;
                 }
             }
             $reader->Free();
+            $out['einf'] = implode(' · ', array_keys($einfTimes));
         } catch (Exception $e) {
             // Übergabe-Modul optional.
             return $out;

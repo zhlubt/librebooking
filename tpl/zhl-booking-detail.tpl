@@ -59,6 +59,7 @@
         <div class="card-body">
           {if $HasHandover}
             <dl class="dl">
+              {if $EinfApptLabel != ''}<div><dt>Einführung in die Geräte</dt><dd>{$EinfApptLabel|escape}</dd></div>{/if}
               {if $PickupLabel != ''}<div><dt>Abholung</dt><dd>{$PickupLabel|escape}</dd></div>{/if}
               <div class="last"><dt>Rückgabe{if $ReturnLabel == ''} bis{/if}</dt><dd>{if $ReturnLabel != ''}{$ReturnLabel|escape}{else}Ende des Buchungszeitraums{/if}</dd></div>
             </dl>

@@ -145,6 +145,27 @@
 						<div class="zhl-ueb-item"><strong>📦 Abholung</strong>{if $Abholort} <span class="zhl-muted zhl-small">Ort: {$Abholort|escape}</span>{/if}</div>
 					{/if}
 
+					{* „Zusammen oder getrennt" — nur wenn eine Einführung ansteht UND eine Abholung greift.
+					   Zusammen = ein Termin (der Einführungs-Slot) deckt Einführung + Abholung ab. *}
+					{if $CombineEligible}
+						<div class="zhl-handovermode" style="margin:14px 0;">
+							<div class="zhl-uplabel">Einführung und Abholung</div>
+							<label class="zhl-attr-check">
+								<input type="radio" name="handover_mode" value="zusammen" class="zhl-hm-radio"{if $HandoverMode != 'getrennt'} checked{/if}>
+								<span>🤝 Zusammen <span class="zhl-muted zhl-small">— ein gemeinsamer Termin für Einführung und Abholung</span></span>
+							</label>
+							<label class="zhl-attr-check">
+								<input type="radio" name="handover_mode" value="getrennt" class="zhl-hm-radio"{if $HandoverMode == 'getrennt'} checked{/if}>
+								<span>📅 Getrennt <span class="zhl-muted zhl-small">— Einführung und Abholung an zwei verschiedenen Terminen</span></span>
+							</label>
+							<div class="zhl-combined-note zhl-ueb-item ok" style="display:none; margin-top:8px;">
+								<strong>✓ Ein Termin genügt</strong> <span class="zhl-muted zhl-small">Der unten gewählte Einführungstermin ist zugleich der Abholtermin — du bekommst das Gerät direkt im Anschluss.</span>
+							</div>
+						</div>
+					{else}
+						<input type="hidden" name="handover_mode" value="getrennt">
+					{/if}
+
 					{* Fulfillment-Wahl (C2): persönliche Abholung vs. Hauspost — nur wenn das Gerät Hauspost erlaubt. *}
 					{if $Hauspost && $Hauspost.allowed}
 						<div class="zhl-fulfillment" style="margin:14px 0;">
@@ -303,7 +324,7 @@
 	function updateSubmitState() {
 		if (slotsLoading) { setSubmitBlocked(true, 'Termine werden geladen …'); return; }
 		if (einfBlocked) { setSubmitBlocked(true, 'Kein Einführungstermin verfügbar — bitte anderen Ausleihstart wählen.'); return; }
-		if (pickupBlocked && curFulfillment() !== 'hauspost') { setSubmitBlocked(true, 'Kein Abholtermin verfügbar — bitte anderen Ausleihstart wählen.'); return; }
+		if (pickupBlocked && curFulfillment() !== 'hauspost' && !combinedActive()) { setSubmitBlocked(true, 'Kein Abholtermin verfügbar — bitte anderen Ausleihstart wählen.'); return; }
 		setSubmitBlocked(false);
 	}
 	function recomputeBlockedFromDom() {
@@ -420,17 +441,35 @@
 		});
 	}
 
-	// --- Fulfillment-Umschalter (C2): persönliche Abholung vs. Hauspost ein-/ausblenden. ---
+	// --- Fulfillment-Umschalter (C2) + „Zusammen/Getrennt"-Umschalter (Einführung+Abholung). ---
 	var ffRadios = document.querySelectorAll('.zhl-ff-radio');
 	var ffPickup = document.querySelector('.zhl-ff-pickup');
 	var ffHauspost = document.querySelector('.zhl-ff-hauspost');
 	var hpTitel = document.querySelector('.zhl-hp-titel');
 	var projTitle = document.querySelector('input[name=projectTitle]');
+	var hmRadios = document.querySelectorAll('.zhl-hm-radio');
+	var combinedNote = document.querySelector('.zhl-combined-note');
+	function curMode() { var v = 'getrennt'; hmRadios.forEach(function (r) { if (r.checked) { v = r.value; } }); return v; }
+	// „Zusammen" aktiv? Dann steckt die Abholung im Einführungs-Slot → separater Abhol-Picker entfällt.
+	function combinedActive() { return hmRadios && hmRadios.length > 0 && curMode() === 'zusammen' && curFulfillment() !== 'hauspost'; }
+	function applyEinfRequired() {
+		if (!einfWrap) { return; }
+		var req = combinedActive() || einfWrap.getAttribute('data-required') === '1';
+		einfWrap.querySelectorAll('input[name=einf_slot]').forEach(function (el) { el.required = req; });
+	}
 	function applyFulfillment() {
 		var isHp = curFulfillment() === 'hauspost';
-		if (ffPickup) { ffPickup.style.display = isHp ? 'none' : ''; ffPickup.querySelectorAll('input[name=pickup_slot]').forEach(function (el) { el.disabled = isHp; }); }
+		var zusammen = combinedActive();
+		var hidePickup = isHp || zusammen;
+		var pMand = pickupWrap && pickupWrap.getAttribute('data-mandatory') === '1';
+		if (ffPickup) {
+			ffPickup.style.display = hidePickup ? 'none' : '';
+			ffPickup.querySelectorAll('input[name=pickup_slot]').forEach(function (el) { el.disabled = hidePickup; el.required = (!hidePickup && pMand); });
+		}
 		if (ffHauspost) { ffHauspost.style.display = isHp ? '' : 'none'; ffHauspost.querySelectorAll('input').forEach(function (el) { el.required = isHp; }); }
 		if (isHp && hpTitel && projTitle && hpTitel.value === '') { hpTitel.value = projTitle.value; }
+		if (combinedNote) { combinedNote.style.display = zusammen ? '' : 'none'; }
+		applyEinfRequired();
 		updateSubmitState();
 	}
 	recomputeBlockedFromDom(); // Anfangszustand aus dem Server-Render übernehmen
@@ -438,7 +477,8 @@
 		ffRadios.forEach(function (r) { r.addEventListener('change', applyFulfillment); });
 		if (projTitle) { projTitle.addEventListener('input', function () { if (hpTitel && hpTitel.value === '') { hpTitel.value = projTitle.value; } }); }
 	}
-	applyFulfillment(); // immer initial (auch wenn kein Hauspost-Umschalter da ist) → Submit-Zustand setzen
+	hmRadios.forEach(function (r) { r.addEventListener('change', applyFulfillment); });
+	applyFulfillment(); // immer initial → Submit-Zustand + Modus-Sichtbarkeit setzen
 
 	// --- Abhol-Picker (AJAX-gerendert): Tag-Chip wählt Zeitliste (Event-Delegation). ---
 	if (pickupWrap) {

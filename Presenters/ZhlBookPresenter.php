@@ -205,19 +205,33 @@ class ZhlBookPresenter
         $einfRequired = ($ueb['einfuehrung'] === 'notwendig') && !$certified;
         $chosenSlot = $this->post('einf_slot');
 
+        // „Zusammen" (Nutzer-Wahl 2026-06-26): EIN Termin deckt Einführung UND Abholung ab. Nur möglich,
+        // wenn eine Einführung ansteht (Gerät verlangt sie, Nutzer nicht zertifiziert) UND eine persönliche
+        // Abholung greift UND kein Hauspost. Dann ist der gewählte Einführungs-Slot zugleich der Übergabe-
+        // termin — es wird KEIN zweiter Terminplaner-Slot gebucht.
+        $handoverMode = ($this->post('handover_mode') === 'zusammen') ? 'zusammen' : 'getrennt';
+        $combined = ($handoverMode === 'zusammen') && ($fulfillment !== 'hauspost')
+            && $this->pickupApplies($ueb) && ($ueb['einfuehrung'] !== 'keine') && !$certified;
+
         // Abhol-Slot (C1) — für Re-Render und ggf. spätere Buchung. type_id/member_id werden NICHT
         // mehr aus dem POST gelesen (Hidden-Inputs entfernt) → serverseitig neu aufgelöst (Phase A).
         $pickupSlot = $this->post('pickup_slot');
 
-        if ($einfRequired && $chosenSlot === '') {
-            $this->bindForm($user, $resource, $beginDate, $beginTime, $endDate, $endTime, $choice, ['Für dieses Gerät ist eine Einführung nötig — bitte wähle zuerst einen Einführungstermin (oder es ist aktuell keiner vor deinem Ausleihstart frei).'], $attrValues, $projectTitle, $pickupSlot, $fulfillment, $hpValues);
+        // Im „Zusammen"-Modus IST der Einführungs-Slot der gemeinsame Termin → Pflicht (auch wenn die
+        // Einführung sonst nur „möglich" wäre).
+        if (($einfRequired || $combined) && $chosenSlot === '') {
+            $msg = $combined
+                ? 'Für „Einführung und Abholung zusammen" bitte einen gemeinsamen Termin wählen (oder es ist aktuell keiner vor deinem Ausleihstart frei).'
+                : 'Für dieses Gerät ist eine Einführung nötig — bitte wähle zuerst einen Einführungstermin (oder es ist aktuell keiner vor deinem Ausleihstart frei).';
+            $this->bindForm($user, $resource, $beginDate, $beginTime, $endDate, $endTime, $choice, [$msg], $attrValues, $projectTitle, $pickupSlot, $fulfillment, $hpValues);
             return;
         }
 
         // Pflicht-Abholung VOR externen Buchungen prüfen (Codex): sonst würde eine Einführung gebucht,
         // obwohl die Buchung mangels Pflicht-Abholtermin ohnehin scheitert.
         // Bei Hauspost (C2) entfällt die persönliche Abholung komplett — kein Abholtermin nötig.
-        $pickupMandatory = ($fulfillment !== 'hauspost') && $this->pickupApplies($ueb) && !$user->IsAdmin;
+        // Im „Zusammen"-Modus entfällt der separate Abholtermin (er steckt im Einführungs-Slot).
+        $pickupMandatory = ($fulfillment !== 'hauspost') && $this->pickupApplies($ueb) && !$user->IsAdmin && !$combined;
         if ($pickupMandatory && $pickupSlot === '') {
             $this->bindForm($user, $resource, $beginDate, $beginTime, $endDate, $endTime, $choice, ['Für dieses Gerät ist eine persönliche Abholung Pflicht — bitte einen Abholtermin wählen.'], $attrValues, $projectTitle, $pickupSlot, $fulfillment, $hpValues);
             return;
@@ -288,9 +302,10 @@ class ZhlBookPresenter
             $einfPlan = ['slot_id' => $chosenSlot, 'member_id' => $einfMemberId, 'type_id' => $einfTypeId, 'start_utc' => $einfStartUtc, 'end_utc' => $einfEndUtc, 'resourceId' => $rid];
         }
 
-        // --- Phase A: Abholung serverseitig auflösen (NICHT buchen). Bei Hauspost entfällt sie komplett. ---
+        // --- Phase A: Abholung serverseitig auflösen (NICHT buchen). Bei Hauspost UND im „Zusammen"-Modus
+        //     entfällt der separate Abholtermin (im Zusammen-Modus steckt er im Einführungs-Slot). ---
         $pickupPlan = null;
-        if (!$hauspostActive && $this->pickupApplies($ueb) && $pickupSlot !== '') {
+        if (!$hauspostActive && !$combined && $this->pickupApplies($ueb) && $pickupSlot !== '') {
             $loanStartUtc = Date::Parse($beginDate . ' ' . $beginTime, $tz)->ToTimezone('UTC')->Format('Y-m-d H:i:s');
             $typeLabel = $this->tpConfig()['handover_type_label'] ?? 'Übergabe Medien';
             $f = $this->fetchHandoverSlots($typeLabel, $ueb['tp_member_id'], $loanStartUtc, $tz);
@@ -330,6 +345,17 @@ class ZhlBookPresenter
                 $pbnds = $this->scheduleDayBounds($user, $resource, $pickupDay);
                 $reservBeginTime = $pbnds['begin'];
                 $desc .= ' · ab Abholtag ' . $pickupDay . ' reserviert (Nutzung ab ' . $beginDate . ')';
+            }
+        }
+        // „Zusammen": der gemeinsame Termin (= Einführungs-Slot) ist auch der Übergabetag → Reservierung
+        // ebenfalls ab diesem Tag blockieren, wenn er vor dem Nutzungsbeginn liegt.
+        if ($combined && $pickupPlan === null && $einfPlan !== null && !empty($einfPlan['start_utc'])) {
+            $einfDay = Date::Parse($einfPlan['start_utc'], 'UTC')->ToTimezone($tz)->Format('Y-m-d');
+            if (strcmp($einfDay, $beginDate) < 0) {
+                $reservBeginDate = $einfDay;
+                $ebnds = $this->scheduleDayBounds($user, $resource, $einfDay);
+                $reservBeginTime = $ebnds['begin'];
+                $desc .= ' · ab gemeinsamem Termin ' . $einfDay . ' reserviert (Nutzung ab ' . $beginDate . ')';
             }
         }
 
@@ -404,6 +430,19 @@ class ZhlBookPresenter
                     $einfBookingId = isset($book['booking_id']) ? (string)$book['booking_id'] : null;
                     $this->persistEinfuehrung($db, $ref, $rid, $einfPlan['member_id'], $einfBookingId, $einfPlan['start_utc'], $einfPlan['end_utc']);
                     $this->createCertConfirmation($db, (int)$user->UserId, $rid);
+                    // „Zusammen": der gebuchte Einführungstermin IST zugleich der Übergabetermin →
+                    // Übergabe-Zeile aus dem Einführungs-Slot ableiten (KEIN separater Abhol-Slot gebucht).
+                    if ($combined) {
+                        $loanEndUtc = Date::Parse($endDate . ' ' . $endTime, $tz)->ToTimezone('UTC')->Format('Y-m-d H:i:s');
+                        $combToken = bin2hex(random_bytes(16));
+                        $combPersisted = $this->persistHandover($db, $combToken, (int)$user->UserId, $rid, $einfBookingId, $einfPlan['member_id'], $einfPlan['start_utc'], $einfPlan['end_utc'], $loanEndUtc);
+                        if ($combPersisted) {
+                            $this->backfillHandoverReference($db, $combToken, $ref);
+                        } else {
+                            Log::Error('ZHL-Zusammen: Übergabe-Zeilen (aus Einführung) konnten nicht gespeichert werden (token=%s, res=%s)', $combToken, $rid);
+                            $warnings[] = 'Der gemeinsame Termin ist gebucht, aber die Übergabe konnte intern nicht hinterlegt werden — bitte beim ZHL-Team melden.';
+                        }
+                    }
                 }
             } catch (Throwable $e) {
                 Log::Error('ZHL-Einführung (Phase C) nach erfolgreicher Buchung fehlgeschlagen (ref=%s, res=%s): %s', $ref, $rid, $e);
@@ -587,6 +626,17 @@ class ZhlBookPresenter
             $picker['cal'] = $this->monthGrid($user, $resource, $requestedDate, $noticeSec);
         }
 
+        // „Zusammen oder getrennt" (Nutzer-Wahl): die Auswahl erscheint nur, wenn eine Einführung ansteht
+        // (nicht zertifiziert) UND eine persönliche Abholung greift. Default: bei Pflicht-Einführung
+        // „zusammen" (ein Termin), sonst „getrennt". Eine gepostete Wahl gewinnt (Re-Render).
+        $combineEligible = ($ueb['einfuehrung'] !== 'keine') && empty($einf['certified']) && $this->pickupApplies($ueb);
+        $postedMode = $this->post('handover_mode');
+        if ($postedMode === 'zusammen' || $postedMode === 'getrennt') {
+            $handoverModeView = $postedMode;
+        } else {
+            $handoverModeView = ($ueb['einfuehrung'] === 'notwendig') ? 'zusammen' : 'getrennt';
+        }
+
         $this->page->BindBooking([
             'resourceId' => $rid,
             'scheduleId' => (int)$resource->ScheduleId,
@@ -610,6 +660,8 @@ class ZhlBookPresenter
             'pickup' => $pickup,
             'hauspost' => $hauspost,
             'fulfillment' => ($fulfillment === 'hauspost') ? 'hauspost' : 'pickup',
+            'combineEligible' => $combineEligible,
+            'handoverMode' => $handoverModeView,
             'picker' => $picker,
             'attributes' => $attributes,
             'errors' => $errors,
@@ -1393,6 +1445,7 @@ class ZhlBookPresenter
             $out['memberId'] = $out['memberId'] ?? (isset($mem['member_id']) ? (int)$mem['member_id'] : null);
             foreach ($mem['slots'] ?? [] as $s) {
                 $startUtc = $s['start_utc'] ?? null;
+                $endUtc = $s['end_utc'] ?? null;
                 if (!$startUtc) {
                     continue;
                 }
@@ -1405,6 +1458,10 @@ class ZhlBookPresenter
                 $out['slots'][] = [
                     'slot_id' => (string)$s['slot_id'],
                     'label' => (string)($s['label'] ?? $startUtc),
+                    // start_utc/end_utc mitführen — im „Zusammen"-Modus ist der Einführungs-Slot
+                    // zugleich der Übergabetermin (persistHandover braucht echte Zeiten).
+                    'start_utc' => (string)$startUtc,
+                    'end_utc' => $endUtc !== null ? (string)$endUtc : null,
                     'type_id' => isset($mem['type_id']) ? (int)$mem['type_id'] : null,
                     'member_id' => isset($mem['member_id']) ? (int)$mem['member_id'] : null,
                 ];

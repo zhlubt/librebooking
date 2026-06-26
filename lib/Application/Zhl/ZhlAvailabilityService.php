@@ -75,7 +75,11 @@ class ZhlAvailabilityService
             $categoryCounts[$sid] = ($categoryCounts[$sid] ?? 0) + 1;
         }
 
-        // Geräte fürs Raster filtern (Kategorie + Suche über Name ODER Typ).
+        // Geräte fürs Raster filtern (Kategorie + Volltextsuche, F25). Die Suche ist mehrwort-fähig
+        // (ALLE Begriffe müssen vorkommen), umlaut-/akzent-unempfindlich und tippfehler-tolerant (fuzzy)
+        // und durchsucht Name + Geräte-Typ + Beschreibung.
+        $searchTerms = $search === '' ? [] : $this->tokenizeSearch($search);
+        $descMap = empty($searchTerms) ? [] : $this->GetDescriptionMap();
         $resources = [];
         $resourceIds = [];
         foreach ($allResources as $r) {
@@ -86,10 +90,13 @@ class ZhlAvailabilityService
                 continue;
             }
             $type = $typeMap[(int)$r->GetId()] ?? '';
-            if ($search !== ''
-                && stripos((string)$r->GetName(), $search) === false
-                && stripos($type, $search) === false) {
-                continue;
+            if (!empty($searchTerms)) {
+                $haystack = $this->normalizeSearch(
+                    (string)$r->GetName() . ' ' . $type . ' ' . ($descMap[(int)$r->GetId()] ?? '')
+                );
+                if (!$this->matchesAllTerms($haystack, $searchTerms)) {
+                    continue;
+                }
             }
             $resources[] = $r;
             $resourceIds[] = $r->GetId();
@@ -250,6 +257,101 @@ class ZhlAvailabilityService
         }
         $reader->Free();
         return $map;
+    }
+
+    /**
+     * resource_id → Beschreibung (Klartext, HTML entfernt) für die Volltextsuche (F25).
+     * @return array<int,string>
+     */
+    private function GetDescriptionMap()
+    {
+        $map = [];
+        $cmd = new AdHocCommand(
+            'SELECT resource_id, description FROM resources WHERE description IS NOT NULL AND description <> @empty'
+        );
+        $cmd->AddParameter(new Parameter('@empty', ''));
+        $reader = $this->db->Query($cmd);
+        while ($row = $reader->GetRow()) {
+            $txt = trim(strip_tags((string)$row['description']));
+            if ($txt !== '') {
+                $map[(int)$row['resource_id']] = $txt;
+            }
+        }
+        $reader->Free();
+        return $map;
+    }
+
+    /**
+     * Normalisiert Text für die Suche: Kleinbuchstaben, deutsche Umlaute/Akzente entschärft,
+     * alles außer a-z0-9 zu Leerzeichen. So matchen „Mikrofon"≈„mikrophone", „Stativ"≈„stativ".
+     */
+    private function normalizeSearch(string $s): string
+    {
+        $s = mb_strtolower($s, 'UTF-8');
+        $s = strtr($s, [
+            'ä' => 'a', 'ö' => 'o', 'ü' => 'u', 'ß' => 'ss',
+            'á' => 'a', 'à' => 'a', 'â' => 'a', 'é' => 'e', 'è' => 'e', 'ê' => 'e',
+            'í' => 'i', 'ì' => 'i', 'ó' => 'o', 'ò' => 'o', 'ô' => 'o',
+            'ú' => 'u', 'ù' => 'u', 'û' => 'u', 'ç' => 'c', 'ñ' => 'n',
+        ]);
+        $s = preg_replace('/[^a-z0-9]+/u', ' ', $s);
+        return trim((string)$s);
+    }
+
+    /**
+     * Zerlegt die Suchanfrage in normalisierte, eindeutige Begriffe.
+     * @return string[]
+     */
+    private function tokenizeSearch(string $search): array
+    {
+        $norm = $this->normalizeSearch($search);
+        if ($norm === '') {
+            return [];
+        }
+        return array_values(array_unique(array_filter(explode(' ', $norm), fn($t) => $t !== '')));
+    }
+
+    /**
+     * Trefferlogik der Volltextsuche (F25): JEDER Begriff muss im (bereits normalisierten) Haystack
+     * vorkommen — als Teilstring ODER tippfehler-tolerant (Levenshtein) gegen ein Haystack-Wort.
+     * Fuzzy nur ab 4 Zeichen (kürzere Begriffe würden zu viel matchen).
+     * @param string[] $terms bereits normalisierte Begriffe
+     */
+    private function matchesAllTerms(string $haystack, array $terms): bool
+    {
+        if ($haystack === '') {
+            return false;
+        }
+        $words = null;
+        foreach ($terms as $term) {
+            if ($term === '') {
+                continue;
+            }
+            if (strpos($haystack, $term) !== false) {
+                continue; // Teilstring-Treffer
+            }
+            if (mb_strlen($term) < 4) {
+                return false; // zu kurz für sinnvolle Fuzzy-Suche
+            }
+            if ($words === null) {
+                $words = array_values(array_filter(explode(' ', $haystack), fn($w) => $w !== ''));
+            }
+            $maxDist = mb_strlen($term) >= 7 ? 2 : 1;
+            $hit = false;
+            foreach ($words as $w) {
+                if (abs(strlen($w) - strlen($term)) > $maxDist) {
+                    continue; // Längen-Vorfilter spart levenshtein-Aufrufe
+                }
+                if (levenshtein($term, $w) <= $maxDist) {
+                    $hit = true;
+                    break;
+                }
+            }
+            if (!$hit) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**

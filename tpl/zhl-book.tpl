@@ -252,15 +252,24 @@
 						<div id="zhl-einf-wrap" data-required="{if $Einfuehrung == 'notwendig'}1{else}0{/if}" data-active="{if !$Einf.certified}1{else}0{/if}">
 						{if $Einf.certified}
 							<div class="zhl-ueb-item ok"><strong>✓ Du bist bereits eingeführt</strong> <span class="zhl-muted zhl-small">Für dieses Gerät liegt ein Einführungs-Nachweis vor — kein Termin nötig.</span></div>
-						{elseif $Einf.slots}
-							<div class="zhl-einf-pick">
+						{elseif $Einf.days}
+							<div class="zhl-einf-pick zhl-pickup">
 								<div class="zhl-einf-head">Einführungstermin wählen{if $Einfuehrung == 'notwendig'} <span class="zhl-req">*</span>{/if}</div>
-								<div class="zhl-muted zhl-small" style="margin-bottom:8px;">Nur Termine <strong>vor</strong> deinem Ausleihstart. Die Termine aktualisieren sich automatisch, sobald du den Start änderst.</div>
-								{foreach from=$Einf.slots item=s}
-									<label class="zhl-slot">
-										<input type="radio" name="einf_slot" value="{$s.slot_id|escape}" {if $Einfuehrung == 'notwendig'}required{/if}>
-										<span>{$s.label|escape}</span>
-									</label>
+								<div class="zhl-muted zhl-small" style="margin-bottom:8px;">Erst Tag, dann Uhrzeit. Nur Termine <strong>vor</strong> deinem Ausleihstart. Die Termine aktualisieren sich automatisch, sobald du den Start änderst.</div>
+								<div class="zhl-pickup-daybar">
+									{foreach from=$Einf.days item=d name=ed}
+										<button type="button" class="zhl-pickup-day{if $smarty.foreach.ed.first} active{/if}" data-day="{$d.date}">{$d.label|escape}</button>
+									{/foreach}
+								</div>
+								{foreach from=$Einf.days item=d name=ed2}
+									<div class="zhl-pickup-times" data-day="{$d.date}"{if !$smarty.foreach.ed2.first} style="display:none;"{/if}>
+										{foreach from=$d.slots item=s}
+											<label class="zhl-pickup-pill">
+												<input type="radio" name="einf_slot" value="{$s.slot_id|escape}" {if $Einfuehrung == 'notwendig'}required{/if}>
+												<span>{$s.timeLabel|escape}</span>
+											</label>
+										{/foreach}
+									</div>
 								{/foreach}
 							</div>
 						{else}
@@ -367,14 +376,20 @@
 			return false;
 		}
 		if (!active || !vm) { return false; }
-		if (!vm.slots || !vm.slots.length) {
+		if (!vm.days || !vm.days.length) {
 			einfWrap.innerHTML = '<div class="zhl-ueb-item req"><strong>⛔ Kein Einführungstermin vor deinem Ausleihstart frei</strong> <span class="zhl-muted zhl-small">' +
 				(vm.earliestLabel ? 'Frühester Termin: ' + esc(vm.earliestLabel) + '. Wähle einen späteren Ausleihstart.' : 'Aktuell ist kein Einführungstermin verfügbar.') + '</span></div>';
 			return required;
 		}
-		var h = '<div class="zhl-einf-pick"><div class="zhl-einf-head">Einführungstermin wählen' + (required ? ' <span class="zhl-req">*</span>' : '') + '</div>' +
-			'<div class="zhl-muted zhl-small" style="margin-bottom:8px;">Nur Termine <strong>vor</strong> deinem Ausleihstart.</div>';
-		vm.slots.forEach(function (s) { h += '<label class="zhl-slot"><input type="radio" name="einf_slot" value="' + esc(s.slot_id) + '"' + (required ? ' required' : '') + '><span>' + esc(s.label) + '</span></label>'; });
+		var h = '<div class="zhl-einf-pick zhl-pickup"><div class="zhl-einf-head">Einführungstermin wählen' + (required ? ' <span class="zhl-req">*</span>' : '') + '</div>' +
+			'<div class="zhl-muted zhl-small" style="margin-bottom:8px;">Erst Tag, dann Uhrzeit. Nur Termine <strong>vor</strong> deinem Ausleihstart.</div><div class="zhl-pickup-daybar">';
+		vm.days.forEach(function (d, i) { h += '<button type="button" class="zhl-pickup-day' + (i === 0 ? ' active' : '') + '" data-day="' + esc(d.date) + '">' + esc(d.label) + '</button>'; });
+		h += '</div>';
+		vm.days.forEach(function (d, i) {
+			h += '<div class="zhl-pickup-times" data-day="' + esc(d.date) + '"' + (i === 0 ? '' : ' style="display:none;"') + '>';
+			(d.slots || []).forEach(function (s) { h += '<label class="zhl-pickup-pill"><input type="radio" name="einf_slot" value="' + esc(s.slot_id) + '"' + (required ? ' required' : '') + '><span>' + esc(s.timeLabel) + '</span></label>'; });
+			h += '</div>';
+		});
 		h += '</div>';
 		einfWrap.innerHTML = h;
 		return false;
@@ -480,15 +495,18 @@
 	hmRadios.forEach(function (r) { r.addEventListener('change', applyFulfillment); });
 	applyFulfillment(); // immer initial → Submit-Zustand + Modus-Sichtbarkeit setzen
 
-	// --- Abhol-Picker (AJAX-gerendert): Tag-Chip wählt Zeitliste (Event-Delegation). ---
-	if (pickupWrap) {
-		pickupWrap.addEventListener('click', function (ev) {
+	// --- Abhol-/Einführungs-Picker (AJAX-gerendert): Tag-Chip wählt Zeitliste (Event-Delegation). ---
+	function bindDayChips(wrap) {
+		if (!wrap) { return; }
+		wrap.addEventListener('click', function (ev) {
 			var btn = ev.target.closest('.zhl-pickup-day'); if (!btn) { return; }
 			var day = btn.getAttribute('data-day');
-			pickupWrap.querySelectorAll('.zhl-pickup-day').forEach(function (b) { b.classList.toggle('active', b === btn); });
-			pickupWrap.querySelectorAll('.zhl-pickup-times').forEach(function (tl) { tl.style.display = (tl.getAttribute('data-day') === day) ? '' : 'none'; });
+			wrap.querySelectorAll('.zhl-pickup-day').forEach(function (b) { b.classList.toggle('active', b === btn); });
+			wrap.querySelectorAll('.zhl-pickup-times').forEach(function (tl) { tl.style.display = (tl.getAttribute('data-day') === day) ? '' : 'none'; });
 		});
 	}
+	bindDayChips(pickupWrap);
+	bindDayChips(einfWrap);
 
 	// --- Wochen-Raster (Slotmodus): freie Zeitspanne anklicken → Termine zum START laden. ---
 	var grid = document.querySelector('.zhl-weekgrid');

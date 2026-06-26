@@ -952,6 +952,7 @@ class ZhlBundleBookPresenter
         return [
             'certified' => false,
             'slots' => $f['slots'],
+            'days' => $this->groupPickupByDay($f['slots'], $tz),
             'typeId' => $f['typeId'],
             'memberId' => $f['memberId'],
             'earliestLabel' => $f['earliestLabel'],

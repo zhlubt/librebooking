@@ -275,16 +275,25 @@
 	function renderEinf(vm, combined) {
 		if (!einfWrap) { return false; }
 		if (!vm || vm.certified) { einfWrap.innerHTML = ''; return false; }
-		if (!vm.slots || !vm.slots.length) {
+		if (!vm.days || !vm.days.length) {
 			einfWrap.innerHTML = '<div class="zhl-ueb-item req" style="margin-top:16px;"><strong>⛔ Kein Einführungstermin verfügbar</strong> <span class="zhl-muted zhl-small">' +
 				(vm.earliestLabel ? 'Frühester Termin: ' + esc(vm.earliestLabel) + '.' : 'Aktuell kein Termin frei.') + '</span></div>';
 			return true; // Einführung ist Pflicht → ohne Termin keine Buchung
 		}
 		var sel = slotBox.getAttribute('data-sel-einf') || '';
+		var selDay = '';
+		vm.days.forEach(function (d) { if ((d.slots || []).some(function (s) { return s.slot_id === sel; })) { selDay = d.date; } });
 		var note = combined ? '<div class="zhl-ueb-item ok" style="margin:8px 0;"><strong>✓ Ein Termin genügt</strong> <span class="zhl-muted zhl-small">Dieser Termin ist zugleich der Abholtermin — du bekommst die Geräte direkt im Anschluss.</span></div>' : '';
-		var h = '<div class="zhl-uplabel" style="margin-top:16px;">Einführung' + (combined ? ' &amp; Abholung' : '') + '</div>' + note + '<div class="zhl-einf-pick">' +
-			'<div class="zhl-einf-head">' + (combined ? 'Termin für Einführung + Abholung' : 'Einführungstermin wählen') + ' <span class="zhl-req">*</span></div>';
-		vm.slots.forEach(function (s) { h += '<label class="zhl-slot"><input type="radio" name="einf_slot" value="' + esc(s.slot_id) + '" required' + (s.slot_id === sel ? ' checked' : '') + '><span>' + esc(s.label) + '</span></label>'; });
+		var h = '<div class="zhl-uplabel" style="margin-top:16px;">Einführung' + (combined ? ' &amp; Abholung' : '') + '</div>' + note + '<div class="zhl-einf-pick zhl-pickup">' +
+			'<div class="zhl-einf-head">' + (combined ? 'Termin für Einführung + Abholung' : 'Einführungstermin wählen') + ' <span class="zhl-req">*</span></div><div class="zhl-pickup-daybar">';
+		vm.days.forEach(function (d, i) { var act = (selDay ? d.date === selDay : i === 0); h += '<button type="button" class="zhl-pickup-day' + (act ? ' active' : '') + '" data-day="' + esc(d.date) + '">' + esc(d.label) + '</button>'; });
+		h += '</div>';
+		vm.days.forEach(function (d, i) {
+			var act = (selDay ? d.date === selDay : i === 0);
+			h += '<div class="zhl-pickup-times" data-day="' + esc(d.date) + '"' + (act ? '' : ' style="display:none;"') + '>';
+			(d.slots || []).forEach(function (s) { h += '<label class="zhl-pickup-pill"><input type="radio" name="einf_slot" value="' + esc(s.slot_id) + '" required' + (s.slot_id === sel ? ' checked' : '') + '><span>' + esc(s.timeLabel) + '</span></label>'; });
+			h += '</div>';
+		});
 		h += '</div>';
 		einfWrap.innerHTML = h;
 		return false;
@@ -352,15 +361,18 @@
 		if (dStart.value) { applyRange(dStart.value, dEnd.value || dStart.value); }
 	}
 
-	// Abhol-Picker (AJAX-gerendert): Tag-Chip wählt die sichtbare Zeitliste (Event-Delegation).
-	if (pickupWrap) {
-		pickupWrap.addEventListener('click', function (ev) {
+	// Abhol-/Einführungs-Picker (AJAX-gerendert): Tag-Chip wählt die sichtbare Zeitliste (Event-Delegation).
+	function bindDayChips(wrap) {
+		if (!wrap) { return; }
+		wrap.addEventListener('click', function (ev) {
 			var btn = ev.target.closest('.zhl-pickup-day'); if (!btn) { return; }
 			var day = btn.getAttribute('data-day');
-			pickupWrap.querySelectorAll('.zhl-pickup-day').forEach(function (b) { b.classList.toggle('active', b === btn); });
-			pickupWrap.querySelectorAll('.zhl-pickup-times').forEach(function (tl) { tl.style.display = (tl.getAttribute('data-day') === day) ? '' : 'none'; });
+			wrap.querySelectorAll('.zhl-pickup-day').forEach(function (b) { b.classList.toggle('active', b === btn); });
+			wrap.querySelectorAll('.zhl-pickup-times').forEach(function (tl) { tl.style.display = (tl.getAttribute('data-day') === day) ? '' : 'none'; });
 		});
 	}
+	bindDayChips(pickupWrap);
+	bindDayChips(einfWrap);
 
 	// Folge-Phase: Dauer-Auswahl ein-/ausblenden.
 	var afterChk = document.getElementById('afterChosen');

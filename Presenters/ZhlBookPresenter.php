@@ -90,7 +90,7 @@ class ZhlBookPresenter
                 $einf = ['certified' => true];
             } else {
                 $f = $this->fetchEinfuehrungSlots($ueb['einfuehrung_typ'], $ueb['tp_member_id'], $loanStartUtc, $tz);
-                $einf = ['certified' => false, 'required' => ($ueb['einfuehrung'] === 'notwendig'), 'slots' => $f['slots'], 'earliestLabel' => $f['earliestLabel']];
+                $einf = ['certified' => false, 'required' => ($ueb['einfuehrung'] === 'notwendig'), 'slots' => $f['slots'], 'days' => $this->groupPickupByDay($f['slots'], $tz), 'earliestLabel' => $f['earliestLabel']];
             }
         }
         $pickup = null;
@@ -558,6 +558,7 @@ class ZhlBookPresenter
             'typLabel' => $ueb['einfuehrung_typ'],
             'certified' => false,
             'slots' => [],
+            'days' => [],
             'earliestLabel' => null,
             'typeId' => null,
             'memberId' => null,
@@ -569,6 +570,7 @@ class ZhlBookPresenter
                 $loanStartUtc = Date::Parse($beginDate . ' ' . $beginTime, $tz)->ToTimezone('UTC')->Format('Y-m-d H:i:s');
                 $f = $this->fetchEinfuehrungSlots($ueb['einfuehrung_typ'], $ueb['tp_member_id'], $loanStartUtc, $tz);
                 $einf['slots'] = $f['slots'];
+                $einf['days'] = $this->groupPickupByDay($f['slots'], $tz);
                 $einf['earliestLabel'] = $f['earliestLabel'];
                 $einf['typeId'] = $f['typeId'];
                 $einf['memberId'] = $f['memberId'];

@@ -98,10 +98,10 @@ class ZhlDashboardPresenter
             if ($n === 0) {
                 continue;
             }
-            $categories[] = ['key' => $c['key'], 'name' => $c['label'], 'count' => $n, 'note' => $c['note']];
+            $categories[] = ['key' => $c['key'], 'name' => $c['label'], 'name_en' => $c['label_en'], 'count' => $n, 'note' => $c['note']];
         }
         if ($otherCount > 0) {
-            $categories[] = ['key' => 'weitere', 'name' => 'Weitere Geräte', 'count' => $otherCount, 'note' => ''];
+            $categories[] = ['key' => 'weitere', 'name' => 'Weitere Geräte', 'name_en' => 'Other devices', 'count' => $otherCount, 'note' => ''];
         }
 
         // Aktive Kategorie gegen die FESTEN Kategorie-Schlüssel validieren (nicht gegen die aktuellen
@@ -163,17 +163,17 @@ class ZhlDashboardPresenter
     private function categoryMap(): array
     {
         return [
-            ['key' => 'mikro', 'label' => 'Mikrofone',
+            ['key' => 'mikro', 'label' => 'Mikrofone', 'label_en' => 'Microphones',
                 'types' => ['Funkmikrofon (mit zwei Sendern)', 'Podcast-Mikrofon'], 'note' => ''],
-            ['key' => 'videostudio', 'label' => 'Videostudio', 'types' => ['Videostudio'], 'note' => ''],
-            ['key' => 'smartphone', 'label' => 'Smartphone-Video-Kit', 'types' => ['Smartphone-Video-Kit'], 'note' => ''],
-            ['key' => 'kamera', 'label' => 'Kameras',
+            ['key' => 'videostudio', 'label' => 'Videostudio', 'label_en' => 'Video studio', 'types' => ['Videostudio'], 'note' => ''],
+            ['key' => 'smartphone', 'label' => 'Smartphone-Video-Kit', 'label_en' => 'Smartphone video kit', 'types' => ['Smartphone-Video-Kit'], 'note' => ''],
+            ['key' => 'kamera', 'label' => 'Kameras', 'label_en' => 'Cameras',
                 'types' => ['Profi-Kamera', 'Einfache Allround-Kamera', 'Objektiv', 'Gimbal', 'Stativ', 'Kleines Kamerastativ', 'Richtmikrofon'], 'note' => ''],
-            ['key' => 'moderation', 'label' => 'Moderationsmaterial', 'types' => ['Moderationsmaterial'], 'note' => ''],
-            ['key' => 'schnitt', 'label' => 'Schnittcomputer', 'types' => ['Schnitt-/VR-PC'], 'note' => ''],
-            ['key' => 'immersive', 'label' => 'Immersive Medien (VR / AR / 3D)',
+            ['key' => 'moderation', 'label' => 'Moderationsmaterial', 'label_en' => 'Facilitation materials', 'types' => ['Moderationsmaterial'], 'note' => ''],
+            ['key' => 'schnitt', 'label' => 'Schnittcomputer', 'label_en' => 'Editing computer', 'types' => ['Schnitt-/VR-PC'], 'note' => ''],
+            ['key' => 'immersive', 'label' => 'Immersive Medien (VR / AR / 3D)', 'label_en' => 'Immersive media (VR / AR / 3D)',
                 'types' => ['VR-Brille', 'AR-Brille', '360-Grad-Kamera', 'Teleskopstange (360°-Kamera)'], 'note' => ''],
-            ['key' => 'drohne', 'label' => 'Drohne', 'types' => ['Drohne'], 'note' => ''],
+            ['key' => 'drohne', 'label' => 'Drohne', 'label_en' => 'Drone', 'types' => ['Drohne'], 'note' => ''],
         ];
     }
 

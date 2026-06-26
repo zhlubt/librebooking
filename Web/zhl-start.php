@@ -43,7 +43,7 @@ function diffLabelEn(string $d): string { return ['einfach' => 'Easy', 'fortgesc
 
 /** Einweisungs-Label DE/EN (leer = keine). */
 function einwLabel(string $l): string { return ['empfehlenswert' => 'Einführung empfehlenswert', 'zwingend' => 'Einführung zwingend', 'beratung' => 'Beratung vorab'][$l] ?? ''; }
-function einwLabelEn(string $l): string { return ['empfehlenswert' => 'Briefing recommended', 'zwingend' => 'Briefing required', 'beratung' => 'Prior consultation'][$l] ?? ''; }
+function einwLabelEn(string $l): string { return ['empfehlenswert' => 'Induction recommended', 'zwingend' => 'Induction required', 'beratung' => 'Prior consultation'][$l] ?? ''; }
 
 /**
  * Modell-Basisname: blendet Durchnummerierungen aus, damit baugleiche Geräte zu
@@ -439,7 +439,7 @@ try {
     <div class="sec-head">
       <p class="eyebrow" data-en="Ready-made sets">Fertige Sets</p>
       <h2 data-en="Our bundles at a glance">Unsere Bundles im Überblick</h2>
-      <p class="lead" data-en="Coordinated complete sets for typical projects — everything that belongs together, in a single booking. Browsing needs no account.">Abgestimmte Komplett-Sets für typische Vorhaben — alles, was zusammengehört, in einer Buchung. Zum Stöbern ist kein Konto nötig.</p>
+      <p class="lead" data-en="Coordinated complete sets for typical projects — everything that belongs together, in a single booking. No account needed to browse.">Abgestimmte Komplett-Sets für typische Vorhaben — alles, was zusammengehört, in einer Buchung. Zum Stöbern ist kein Konto nötig.</p>
     </div>
     <?php if ($bundles): ?>
     <div class="sets-grid">
@@ -557,7 +557,7 @@ try {
     <div class="sec-head">
       <p class="eyebrow" data-en="Equipment">Ausstattung</p>
       <h2 data-en="All devices for individual booking">Alle Geräte einzeln buchbar</h2>
-      <p class="lead" data-en="Every device type the ZHL lends — always up to date, straight from our inventory. Browsing needs no account.">Alle Geräte-Typen, die das ZHL verleiht — immer aktuell, direkt aus unserem Bestand. Zum Stöbern ist kein Konto nötig.</p>
+      <p class="lead" data-en="Every device type the ZHL lends — always up to date, straight from our inventory. No account needed to browse.">Alle Geräte-Typen, die das ZHL verleiht — immer aktuell, direkt aus unserem Bestand. Zum Stöbern ist kein Konto nötig.</p>
     </div>
     <?php if ($mediaTypes): ?>
     <div class="types-grid">

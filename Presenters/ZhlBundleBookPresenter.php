@@ -684,7 +684,7 @@ class ZhlBundleBookPresenter
             'hint' => (string)($row['hint'] ?? ''),
             'items' => [],
         ];
-        $ic = new AdHocCommand('SELECT id, type_label, quantity, required, alt_group, phase, meta, specific_resource_id FROM zhl_bundle_item WHERE bundle_id = @b ORDER BY sort_order, id');
+        $ic = new AdHocCommand('SELECT id, type_label, quantity, required, alt_group, alt_mode, phase, meta, specific_resource_id FROM zhl_bundle_item WHERE bundle_id = @b ORDER BY sort_order, id');
         $ic->AddParameter(new Parameter('@b', $bid));
         $ir = $db->Query($ic);
         while ($r = $ir->GetRow()) {
@@ -694,6 +694,7 @@ class ZhlBundleBookPresenter
                 'quantity' => (int)$r['quantity'],
                 'required' => (int)$r['required'],
                 'alt_group' => $r['alt_group'] !== null && $r['alt_group'] !== '' ? (string)$r['alt_group'] : null,
+                'alt_mode' => (string)($r['alt_mode'] ?? 'choice'),
                 'phase' => (string)($r['phase'] ?? 'main'),
                 'meta' => $r['meta'] !== null && $r['meta'] !== '' ? (string)$r['meta'] : null,
                 'specific_resource_id' => $r['specific_resource_id'] !== null ? (int)$r['specific_resource_id'] : null,
@@ -801,9 +802,22 @@ class ZhlBundleBookPresenter
     /** Alternativ-Gruppen für die Radios: alt_group => {options:[{type, models[]}]}. */
     private function buildAltGroups($db, UserSession $user, array $mainItems): array
     {
+        // Auto-Prioritäts-Gruppen GRUPPENWEIT bestimmen (eine Gruppe ist auto, sobald ein Mitglied
+        // alt_mode='auto' hat) und komplett aus der Nutzer-Auswahl ausblenden — der Resolver wählt
+        // automatisch die erste freie Option nach Priorität (Codex-Fix: nicht nur einzelne auto-Items).
+        $autoGroups = [];
+        foreach ($mainItems as $it) {
+            $g = (isset($it['alt_group']) && $it['alt_group'] !== '') ? (string)$it['alt_group'] : null;
+            if ($g !== null && ($it['alt_mode'] ?? 'choice') === 'auto') {
+                $autoGroups[$g] = true;
+            }
+        }
         $groups = [];
         foreach ($mainItems as $it) {
             if (!isset($it['alt_group']) || $it['alt_group'] === '') {
+                continue;
+            }
+            if (!empty($autoGroups[(string)$it['alt_group']])) {
                 continue;
             }
             $g = (string)$it['alt_group'];

@@ -127,6 +127,56 @@ class ZhlBundleResolver
         // Pro erforderlicher Gruppe genau EINMAL einen Fehler melden, falls die Wahl ungültig/unerfüllbar ist.
         $altGroupFailed = []; // group => true (Fehler bereits gesetzt)
 
+        // Auto-Prioritäts-Gruppen (alt_mode='auto'): eine Gruppe gilt GRUPPENWEIT als auto, sobald EIN
+        // Mitglied alt_mode='auto' trägt (gemischt auto/choice ist nicht vorgesehen — Codex-Fix). Die Option
+        // wird dann NICHT vom Nutzer gewählt, sondern automatisch = die ERSTE Option (in Item-Reihenfolge =
+        // sort_order) mit genug freien, buchbaren Einheiten. $altChoices[group] wird überschrieben; der
+        // restliche Loop behandelt sie wie eine reguläre Wahl.
+        // LIMITATION (Codex): Der Auto-Pick läuft mit noch leerem $used und ohne fixierten Phasen-Schedule.
+        // Belegt ein ANDERES Item denselben Typ vorher / fixiert es einen anderen Schedule, kann die gewählte
+        // Option im Hauptloop scheitern — OHNE automatischen Rück-Fall auf die nächste Priorität. Für
+        // unabhängige Gruppen (Mikrofone mit eigenem Geräte-Typ) tritt das nicht auf.
+        $autoGroups = [];
+        foreach ($items as $row) {
+            $g = (isset($row['alt_group']) && $row['alt_group'] !== '') ? (string)$row['alt_group'] : null;
+            if ($g !== null && (string)($row['alt_mode'] ?? 'choice') === 'auto') {
+                $autoGroups[$g] = true;
+            }
+        }
+        $autoOrder = []; // group => [ ['type'=>label,'qty'=>n], ... ] in Prioritäts-Reihenfolge (alle Mitglieder)
+        foreach ($items as $row) {
+            $g = (isset($row['alt_group']) && $row['alt_group'] !== '') ? (string)$row['alt_group'] : null;
+            if ($g === null || empty($autoGroups[$g])) {
+                continue;
+            }
+            $tl = (string)($row['type_label'] ?? '');
+            if ($tl !== '') {
+                $autoOrder[$g][] = ['type' => $tl, 'qty' => max(1, (int)($row['quantity'] ?? 1))];
+            }
+        }
+        foreach ($autoOrder as $g => $members) {
+            foreach ($members as $m) {
+                $free = 0;
+                foreach ($typeMap as $rid => $tlbl) {
+                    if ($tlbl !== $m['type'] || !isset($allowed[$rid]) || isset($used[$rid])) {
+                        continue;
+                    }
+                    if ($this->isFree($rid, $begin, $end)) {
+                        $free++;
+                        if ($free >= $m['qty']) {
+                            break;
+                        }
+                    }
+                }
+                if ($free >= $m['qty']) {
+                    $altChoices[$g] = $m['type'];
+                    break;
+                }
+            }
+            // Nichts frei in der ganzen Gruppe → $altChoices[$g] bleibt ungesetzt; die required-Prüfung im
+            // Loop meldet dann den Fehler (wie bei einer fehlenden Nutzer-Wahl).
+        }
+
         foreach ($items as $row) {
             $quantity = (int)($row['quantity'] ?? 1);
             $altGroup = isset($row['alt_group']) && $row['alt_group'] !== '' ? (string)$row['alt_group'] : null;

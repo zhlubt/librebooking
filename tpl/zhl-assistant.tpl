@@ -85,6 +85,7 @@
 				{foreach from=$Selected->items item=it}
 					<li class="{if $it->required && !$it->ok}miss{/if}">
 						<a class="zhl-it-link" href="{$Path}zhl-dashboard.php?q={$it->type|escape:'url'}&amp;start={$StartInput}&amp;days={$Days}">{$it->quantity}× {$it->type|escape}</a>
+						{if $it->altGroup && $it->altOptions|@count > 1}<span class="zhl-it-note" data-en="auto choice, otherwise alternative">automatische Auswahl, sonst Alternative</span>{/if}
 						{if !$it->required}<span class="zhl-opt">optional</span>{/if}
 						{if $it->note}<span class="zhl-it-note">{$it->note|escape}</span>{/if}
 						<span class="zhl-it-free {if $it->required && !$it->ok}bad{/if}">{$it->free} frei</span>

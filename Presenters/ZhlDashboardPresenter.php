@@ -164,7 +164,7 @@ class ZhlDashboardPresenter
     {
         return [
             ['key' => 'mikro', 'label' => 'Mikrofone', 'label_en' => 'Microphones',
-                'types' => ['Funkmikrofon (mit zwei Sendern)', 'Podcast-Mikrofon'], 'note' => ''],
+                'types' => ['Funkmikrofon (mit zwei Sendern)', 'Podcast-Mikrofon', 'Podcast-Mikrofon (Shure)', 'Podcast-Mikrofon (Yeti)'], 'note' => ''],
             ['key' => 'videostudio', 'label' => 'Videostudio', 'label_en' => 'Video studio', 'types' => ['Videostudio'], 'note' => ''],
             ['key' => 'smartphone', 'label' => 'Smartphone-Video-Kit', 'label_en' => 'Smartphone video kit', 'types' => ['Smartphone-Video-Kit'], 'note' => ''],
             ['key' => 'kamera', 'label' => 'Kameras', 'label_en' => 'Cameras',

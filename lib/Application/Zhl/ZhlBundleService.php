@@ -16,6 +16,9 @@ class ZhlBundleItemView
     public $note;
     public $free = 0;   // freie Einheiten dieses Typs im Zeitraum
     public $ok = true;  // genügend frei?
+    public $altGroup = null;   // Alternativ-Gruppe (Auto-Prio); null = normale Position
+    /** @var string[] Options-Labels der Gruppe in Prioritäts-Reihenfolge (nur bei altGroup) */
+    public $altOptions = [];
 }
 
 class ZhlBundleView
@@ -77,29 +80,77 @@ class ZhlBundleService
         }
 
         $reader = $this->db->Query(new AdHocCommand(
-            'SELECT bundle_id, type_label, quantity, required, note FROM zhl_bundle_item ORDER BY bundle_id, sort_order, id'
+            'SELECT bundle_id, type_label, quantity, required, alt_group, note FROM zhl_bundle_item ORDER BY bundle_id, sort_order, id'
         ));
+        // Alternativ-Gruppen (Auto-Prio) werden zu EINER Position zusammengefasst: die Gruppe ist
+        // erfüllbar, sobald EINE Option genügend freie Einheiten hat (der Resolver fällt automatisch
+        // auf die nächste Priorität zurück). Sonst würde z. B. ein belegtes Shure-Mikro das Bundle als
+        // „nicht frei" zeigen, obwohl Yeti frei ist (Codex-Fund).
+        $groupIdx = []; // "bid:group" => Index der Sammel-Position in $b->items
         while ($row = $reader->GetRow()) {
             $bid = (int)$row['bundle_id'];
             if (!isset($bundles[$bid])) {
                 continue;
             }
-            $item = new ZhlBundleItemView();
-            $item->type = (string)$row['type_label'];
-            $item->quantity = (int)$row['quantity'];
-            $item->required = ((int)$row['required']) === 1;
-            $item->note = (string)($row['note'] ?? '');
-            $item->free = (int)($typeFreeMap[$item->type] ?? 0);
-            $item->ok = $item->free >= $item->quantity;
-
             $b = $bundles[$bid];
+            $type = (string)$row['type_label'];
+            $qty = (int)$row['quantity'];
+            $req = ((int)$row['required']) === 1;
+            $free = (int)($typeFreeMap[$type] ?? 0);
+            $ok = $free >= $qty;
+            $group = (isset($row['alt_group']) && $row['alt_group'] !== '') ? (string)$row['alt_group'] : null;
+
+            if ($group !== null) {
+                $key = $bid . ':' . $group;
+                if (!isset($groupIdx[$key])) {
+                    // Erste (höchste) Priorität bestimmt Label/Menge/Link der Sammel-Position.
+                    $item = new ZhlBundleItemView();
+                    $item->type = $type;
+                    $item->quantity = $qty;
+                    $item->required = $req;
+                    $item->note = (string)($row['note'] ?? '');
+                    $item->free = $free;
+                    $item->ok = $ok;
+                    $item->altGroup = $group;
+                    $item->altOptions = [$type];
+                    $groupIdx[$key] = count($b->items);
+                    $b->items[] = $item;
+                } else {
+                    $item = $b->items[$groupIdx[$key]];
+                    $item->altOptions[] = $type;
+                    $item->required = $item->required || $req;   // Gruppe required, wenn EINE Option required
+                    $item->ok = $item->ok || $ok;                // Gruppe ok, wenn EINE Option frei
+                    if ($free > $item->free) {
+                        $item->free = $free;                     // beste Option für die Anzeige
+                    }
+                }
+                continue;
+            }
+
+            $item = new ZhlBundleItemView();
+            $item->type = $type;
+            $item->quantity = $qty;
+            $item->required = $req;
+            $item->note = (string)($row['note'] ?? '');
+            $item->free = $free;
+            $item->ok = $ok;
             $b->items[] = $item;
-            if ($item->required && !$item->ok) {
+            if ($req && !$ok) {
                 $b->available = false;
-                $b->blockers[] = $item->quantity . '× ' . $item->type . ' (nur ' . $item->free . ' frei)';
+                $b->blockers[] = $qty . '× ' . $type . ' (nur ' . $free . ' frei)';
             }
         }
         $reader->Free();
+
+        // Verfügbarkeit der Alternativ-Gruppen erst nach dem Sammeln aller Optionen prüfen.
+        foreach ($bundles as $b) {
+            foreach ($b->items as $item) {
+                if ($item->altGroup !== null && $item->required && !$item->ok) {
+                    $b->available = false;
+                    $b->blockers[] = $item->quantity . '× ' . implode(' / ', $item->altOptions) . ' (keine Option frei)';
+                }
+            }
+        }
 
         return array_values($bundles);
     }

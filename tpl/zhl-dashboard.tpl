@@ -135,13 +135,25 @@
 {literal}
 <script>
 (function () {
+	var KEY = 'zhlFrostSeen';
+	function seen() { try { return sessionStorage.getItem(KEY) === '1'; } catch (e) { return false; } }
+	function markSeen() { try { sessionStorage.setItem(KEY, '1'); } catch (e) {} }
+
+	// Sobald der Nutzer eine Kategorie wählt oder sucht, gilt das Milchglas als „gesehen" →
+	// es kommt beim Zurückwechseln auf „Alle" nicht wieder (nur einmal pro Browser-Tab).
+	document.querySelectorAll('.zhl-navlink').forEach(function (a) { a.addEventListener('click', markSeen); });
+	var form = document.querySelector('.zhl-controls');
+	if (form) { form.addEventListener('submit', markSeen); }
+
 	var f = document.querySelector('.zhl-frost');
 	if (!f) { return; }
 	function reveal() {
 		var wrap = f.parentNode;
 		if (wrap) { wrap.classList.remove('is-frosted'); }
 		f.remove();
+		markSeen();
 	}
+	if (seen()) { reveal(); return; }   // schon gesehen → gar nicht erst zeigen
 	f.addEventListener('click', reveal);
 	f.addEventListener('keydown', function (e) {
 		if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); reveal(); }

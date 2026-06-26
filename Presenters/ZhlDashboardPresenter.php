@@ -110,6 +110,12 @@ class ZhlDashboardPresenter
         $validKeys = array_column($map, 'key');
         $validKeys[] = 'weitere';
         $activeCat = in_array($cat, $validKeys, true) ? $cat : '';
+
+        // Eine Suche hebt die Kategorie-Auswahl auf und sucht global — sonst stünde „keine Geräte",
+        // wenn der neue Suchbegriff nicht in die zuvor gewählte Kategorie passt.
+        if ($search !== '') {
+            $activeCat = '';
+        }
         $activeName = '';
         $activeNote = '';
         if ($activeCat === 'weitere') {
@@ -126,9 +132,10 @@ class ZhlDashboardPresenter
             }
         }
 
-        // Beim ersten Öffnen / Ansicht „Alle" werden alle Geräte angezeigt, aber hinter Milchglas
-        // (Hinweis: erst eine Kategorie wählen). Ein Klick aufs Milchglas gibt alles frei.
-        $frosted = ($activeCat === '');
+        // Milchglas nur beim ersten Öffnen der „Alle"-Ansicht OHNE Suche. Bei aktiver Suche oder
+        // gewählter Kategorie wäre es störend. Das „nicht erneut zeigen nach Interaktion" macht das
+        // clientseitige Script (sessionStorage) in zhl-dashboard.tpl.
+        $frosted = ($activeCat === '' && $search === '');
 
         $end = $start->AddDays($days);
         $this->page->BindDashboard([
@@ -156,15 +163,14 @@ class ZhlDashboardPresenter
     private function categoryMap(): array
     {
         return [
-            ['key' => 'funk', 'label' => 'Funkmikrofon', 'types' => ['Funkmikrofon (mit zwei Sendern)'],
-                'note' => 'Mehrere Sets verfügbar – wählen Sie einfach einen freien Zeitraum, ein freies Set wird automatisch zugeordnet.'],
-            ['key' => 'smartphone', 'label' => 'Smartphone-Video-Kit', 'types' => ['Smartphone-Video-Kit'],
-                'note' => 'Mehrere Kits verfügbar – ein freies Kit wird automatisch zugeordnet.'],
-            ['key' => 'kamera', 'label' => 'Kameras & Zubehör',
-                'types' => ['Profi-Kamera', 'Einfache Allround-Kamera', 'Objektiv', 'Gimbal', 'Stativ', 'Kleines Kamerastativ', 'Richtmikrofon'], 'note' => ''],
+            ['key' => 'mikro', 'label' => 'Mikrofone',
+                'types' => ['Funkmikrofon (mit zwei Sendern)', 'Podcast-Mikrofon'], 'note' => ''],
             ['key' => 'videostudio', 'label' => 'Videostudio', 'types' => ['Videostudio'], 'note' => ''],
-            ['key' => 'schnitt', 'label' => 'Schnittcomputer', 'types' => ['Schnitt-/VR-PC'], 'note' => ''],
+            ['key' => 'smartphone', 'label' => 'Smartphone-Video-Kit', 'types' => ['Smartphone-Video-Kit'], 'note' => ''],
+            ['key' => 'kamera', 'label' => 'Kameras',
+                'types' => ['Profi-Kamera', 'Einfache Allround-Kamera', 'Objektiv', 'Gimbal', 'Stativ', 'Kleines Kamerastativ', 'Richtmikrofon'], 'note' => ''],
             ['key' => 'moderation', 'label' => 'Moderationsmaterial', 'types' => ['Moderationsmaterial'], 'note' => ''],
+            ['key' => 'schnitt', 'label' => 'Schnittcomputer', 'types' => ['Schnitt-/VR-PC'], 'note' => ''],
             ['key' => 'immersive', 'label' => 'Immersive Medien (VR / AR / 3D)',
                 'types' => ['VR-Brille', 'AR-Brille', '360-Grad-Kamera', 'Teleskopstange (360°-Kamera)'], 'note' => ''],
             ['key' => 'drohne', 'label' => 'Drohne', 'types' => ['Drohne'], 'note' => ''],

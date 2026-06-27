@@ -5,6 +5,7 @@ require_once(ROOT_DIR . 'lib/Common/namespace.php');
 require_once(ROOT_DIR . 'lib/Database/namespace.php');
 require_once(ROOT_DIR . 'Domain/namespace.php');
 require_once(ROOT_DIR . 'Domain/Access/namespace.php');
+require_once(ROOT_DIR . 'lib/Application/Zhl/ZhlCertTypeInfo.php');
 
 /**
  * Presenter „Konto". Liest die eigenen Profildaten des angemeldeten Nutzers
@@ -126,6 +127,24 @@ class ZhlAccountPresenter
                 }
                 $reader->Free();
             }
+
+            // D3: vertrauliche Zusatz-Infos je Zertifikat — NUR für eigene, GÜLTIGE (nicht abgelaufene)
+            // Grants. ForUser() gated serverseitig; hier zusätzlich gegen das expired-Flag abgesichert.
+            $confidential = ZhlCertTypeInfo::ForUser($db, $userId);
+            foreach ($rows as $typeId => &$r) {
+                if (!$r['expired'] && isset($confidential[$typeId])) {
+                    $c = $confidential[$typeId];
+                    $r['confidential'] = [
+                        'has' => true,
+                        'code' => $c['transponder_code'],
+                        'news' => $c['news_text'],
+                        'docUrl' => (preg_match('#^https?://#i', $c['doc_url']) ? $c['doc_url'] : ''),
+                    ];
+                } else {
+                    $r['confidential'] = ['has' => false, 'code' => '', 'news' => '', 'docUrl' => ''];
+                }
+            }
+            unset($r);
 
             $out = array_values($rows);
         } catch (Exception $e) {

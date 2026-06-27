@@ -49,6 +49,24 @@
 					<div class="col-md-2"><button class="btn btn-outline-primary w-100">Speichern</button></div>
 				</form>
 
+				{* D3: Vertrauliche Zusatz-Infos — nur für Zertifikatsinhaber sichtbar (in „Mein Konto") *}
+				<form method="post" action="{$Path}zhl-certificates-admin.php" class="border rounded p-2 mb-3" style="background:#fff8e6;border-color:#f0d98a!important;">
+					{csrf_token}
+					<input type="hidden" name="action" value="save_info">
+					<input type="hidden" name="type_id" value="{$t.id}">
+					<div class="d-flex align-items-center gap-2 mb-2">
+						<strong class="small" style="color:#8a6d1a">🔒 Vertrauliche Infos für Zertifikatsinhaber</strong>
+						<span class="text-muted small">— erscheinen NUR eingeloggt in „Mein Konto", nie per E-Mail</span>
+						<label class="form-check-label small ms-auto"><input type="checkbox" class="form-check-input me-1" name="info_active" value="1" {if $t.info.active}checked{/if}>aktiv</label>
+					</div>
+					<div class="row g-2 align-items-end">
+						<div class="col-md-4"><label class="form-label small">Transponder-Tresor-Code</label><input class="form-control form-control-sm" name="transponder_code" maxlength="190" value="{$t.info.transponder_code|escape}" placeholder="z. B. 4729#"></div>
+						<div class="col-md-6"><label class="form-label small">Dokument-Link (http/https)</label><input class="form-control form-control-sm" type="url" name="doc_url" maxlength="500" value="{$t.info.doc_url|escape}" placeholder="https://…"></div>
+						<div class="col-md-2"><button class="btn btn-sm btn-outline-secondary w-100">Infos speichern</button></div>
+						<div class="col-12"><label class="form-label small">Wichtige News / Hinweise</label><textarea class="form-control form-control-sm" name="news_text" rows="2" maxlength="4000" placeholder="Wichtige Hinweise zum Studio o. Ä.">{$t.info.news_text|escape}</textarea></div>
+					</div>
+				</form>
+
 				<div class="row">
 					{* Abgedeckte Geräte *}
 					<div class="col-md-6">

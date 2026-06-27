@@ -3,6 +3,7 @@
 require_once(ROOT_DIR . 'lib/Config/namespace.php');
 require_once(ROOT_DIR . 'lib/Common/namespace.php');
 require_once(ROOT_DIR . 'lib/Database/namespace.php');
+require_once(ROOT_DIR . 'lib/Application/Zhl/ZhlCertTypeInfo.php');
 
 /**
  * Admin-Pflege der benannten Zertifikate (v-cert). CRUD über zhl_cert_type / zhl_cert_type_resource /
@@ -53,6 +54,36 @@ class ZhlCertificatesAdminPresenter
                 $cmd->AddParameter(new Parameter('@id', $id));
                 $db->Execute($cmd);
                 return 'Zertifikat gespeichert.';
+
+            case 'save_info':
+                // D3: vertrauliche Zusatz-Infos (Transponder-Code/News/Doc-Link) je Zertifikats-Typ.
+                $id = $this->int($this->post('type_id'), 0, 1, PHP_INT_MAX);
+                if (!$id) {
+                    return 'Ungültige Eingabe.';
+                }
+                $code = mb_substr(trim($this->post('transponder_code')), 0, 190);
+                $news = trim($this->post('news_text'));
+                $news = $news === '' ? null : mb_substr($news, 0, 4000);
+                $doc = trim($this->post('doc_url'));
+                if ($doc !== '' && !preg_match('#^https?://#i', $doc)) {
+                    $doc = ''; // nur http(s) zulassen (kein javascript:/data:)
+                }
+                $doc = mb_substr($doc, 0, 500);
+                $active = $this->post('info_active') ? 1 : 0;
+                $cmd = new AdHocCommand(
+                    'INSERT INTO zhl_cert_type_info (cert_type_id, transponder_code, news_text, doc_url, active, updated_at) ' .
+                    'VALUES (@id,@c,@n,@d,@a,@now) ' .
+                    'ON DUPLICATE KEY UPDATE transponder_code=VALUES(transponder_code), news_text=VALUES(news_text), ' .
+                    'doc_url=VALUES(doc_url), active=VALUES(active), updated_at=VALUES(updated_at)'
+                );
+                $cmd->AddParameter(new Parameter('@id', $id));
+                $cmd->AddParameter(new Parameter('@c', $code));
+                $cmd->AddParameter(new Parameter('@n', $news));
+                $cmd->AddParameter(new Parameter('@d', $doc));
+                $cmd->AddParameter(new Parameter('@a', $active));
+                $cmd->AddParameter(new Parameter('@now', gmdate('Y-m-d H:i:s')));
+                $db->Execute($cmd);
+                return 'Vertrauliche Infos gespeichert.';
 
             case 'toggle_type':
                 $id = $this->int($this->post('type_id'), 0, 1, PHP_INT_MAX);
@@ -160,9 +191,17 @@ class ZhlCertificatesAdminPresenter
         while ($row = $reader->GetRow()) {
             $row['resources'] = [];
             $row['grants'] = [];
+            $row['info'] = ['transponder_code' => '', 'news_text' => '', 'doc_url' => '', 'active' => 1];
             $types[(int)$row['id']] = $row;
         }
         $reader->Free();
+
+        // D3: vertrauliche Zusatz-Infos je Typ (Admin-Sicht, ungated — nur fürs Editieren).
+        foreach (ZhlCertTypeInfo::Map($db) as $tid => $info) {
+            if (isset($types[$tid])) {
+                $types[$tid]['info'] = $info;
+            }
+        }
 
         // Geräte je Zertifikat
         $reader = $db->Query(new AdHocCommand(

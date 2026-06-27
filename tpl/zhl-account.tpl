@@ -72,6 +72,25 @@
                     {if $cert.grantedLabel != ''}<span>{translate key="ZhlAccountCertGranted"} {$cert.grantedLabel|escape}</span>{/if}
                     {if $cert.expiryLabel != ''}<span>{if $cert.expired}{translate key="ZhlAccountCertExpiredOn"}{else}{translate key="ZhlAccountCertValidUntil"}{/if} {$cert.expiryLabel|escape}</span>{else}<span>{translate key="ZhlAccountCertUnlimited"}</span>{/if}
                   </div>
+                  {if !$cert.expired && $cert.confidential.has}
+                    <div class="zc-conf">
+                      <div class="zc-conf-head"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> Vertrauliche Infos <span class="zc-conf-note">— nur für Sie sichtbar</span></div>
+                      {if $cert.confidential.code != ''}
+                        <div class="zc-conf-row">
+                          <span class="zc-conf-label">Transponder-Tresor-Code</span>
+                          <code class="zc-code" data-code="{$cert.confidential.code|escape}">••••••••</code>
+                          <button type="button" class="zc-btn zc-reveal">anzeigen</button>
+                          <button type="button" class="zc-btn zc-copy">kopieren</button>
+                        </div>
+                      {/if}
+                      {if $cert.confidential.news != ''}
+                        <div class="zc-conf-news">{$cert.confidential.news|escape|nl2br}</div>
+                      {/if}
+                      {if $cert.confidential.docUrl != ''}
+                        <a class="zc-conf-doc" href="{$cert.confidential.docUrl|escape}" target="_blank" rel="noopener">Dokument öffnen →</a>
+                      {/if}
+                    </div>
+                  {/if}
                 </div>
                 <span class="badge {if $cert.expired}badge-muted{else}badge-ok{/if}">{if $cert.expired}{translate key="ZhlAccountCertBadgeExpired"}{else}{translate key="ZhlAccountCertBadgeActive"}{/if}</span>
               </div>
@@ -123,5 +142,32 @@
 
   </div>
 </main>
+
+{literal}
+<script>
+(function () {
+  document.addEventListener('click', function (e) {
+    var btn = e.target.closest ? e.target.closest('.zc-reveal, .zc-copy') : null;
+    if (!btn) { return; }
+    var row = btn.closest('.zc-conf-row');
+    var codeEl = row ? row.querySelector('.zc-code') : null;
+    if (!codeEl) { return; }
+    var code = codeEl.getAttribute('data-code') || '';
+    if (btn.classList.contains('zc-reveal')) {
+      var shown = codeEl.classList.toggle('is-shown');
+      codeEl.textContent = shown ? code : '••••••••';
+      btn.textContent = shown ? 'verbergen' : 'anzeigen';
+    } else {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(code).then(function () {
+          var t = btn.textContent; btn.textContent = 'kopiert ✓';
+          setTimeout(function () { btn.textContent = t; }, 1500);
+        });
+      }
+    }
+  });
+})();
+</script>
+{/literal}
 
 {include file='globalfooter.tpl'}

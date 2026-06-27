@@ -1064,16 +1064,24 @@
 							</div>
 						</div>
 
-						<div class="editAutoAssign">
+						{* ZHL HARD-LOCK: Sichtbarkeits-Steuerung über autoassign ist deaktiviert — Geräte
+						   sind immer für alle sichtbar (nur Aktiv/Deaktiviert steuert). Inputs bleiben für
+						   das JS erhalten, sind aber ausgeblendet; serverseitig erzwingt ZhlManageResourcesPage
+						   autoassign=an / clear=nie. *}
+						<div class="alert alert-info py-2 px-3 small">
+							Geräte sind immer für alle Nutzer sichtbar. Zum Ausblenden ein Gerät
+							<b>deaktivieren</b> (Status). Buchen bleibt einweisungspflichtig.
+						</div>
+						<div class="editAutoAssign" style="display:none">
 							<div class="form-check">
 								<input type="checkbox" {formname key=AUTO_ASSIGN} id="autoAssign" value="1"
-									class="form-check-input" />
+									class="form-check-input" checked />
 								<label for="autoAssign"
 									class="form-check-label">{translate key=ResourcePermissionAutoGranted}</label>
 							</div>
 						</div>
 
-						<div class="ms-4" id="autoAssignRemoveAllPermissions">
+						<div class="ms-4" id="autoAssignRemoveAllPermissions" style="display:none">
 							<div class="form-check">
 								<input type="checkbox" {formname key=AUTO_ASSIGN_CLEAR}
 									id="autoAssignRemoveAllPermissionsChk" value="1" class="form-check-input" />

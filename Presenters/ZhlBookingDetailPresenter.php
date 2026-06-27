@@ -286,6 +286,60 @@ class ZhlBookingDetailPresenter
     }
 
     /**
+     * Eckdaten der (noch existierenden) Buchung für die Storno-Historie festhalten — gleiche Felder
+     * wie „Meine Buchungen" rendert: Titel, Gerätenamen, Zeitraum (UTC). Keine DB-Zugriffe.
+     * @param ReservationItemView $match
+     * @return array{title:string,names:string[],deviceCount:int,startUtc:string,endUtc:string}
+     */
+    private function buildCancelSnapshot($match): array
+    {
+        $names = [];
+        if (is_array($match->ResourceNames) && count($match->ResourceNames) > 0) {
+            $names = $match->ResourceNames;
+        } elseif (!empty($match->ResourceName)) {
+            $names = [$match->ResourceName];
+        }
+        $title = trim((string)$match->Title);
+        if ($title === '') {
+            $title = count($names) > 0 ? $names[0] : 'Buchung';
+        }
+        return [
+            'title' => $title,
+            'names' => array_values($names),
+            'deviceCount' => count($names),
+            'startUtc' => $match->StartDate->ToTimezone('UTC')->Format('Y-m-d H:i:s'),
+            'endUtc' => $match->EndDate->ToTimezone('UTC')->Format('Y-m-d H:i:s'),
+        ];
+    }
+
+    /**
+     * Schnappschuss einer stornierten Buchung speichern (Tab „Storniert" in „Meine Buchungen").
+     * Best effort: schlägt der Insert fehl, ist das Storno trotzdem gültig — nur loggen.
+     * @param array{title:string,names:string[],deviceCount:int,startUtc:string,endUtc:string} $snapshot
+     */
+    private function saveCancelSnapshot($db, string $ref, int $userId, array $snapshot, Date $now): void
+    {
+        try {
+            $cmd = new AdHocCommand(
+                'INSERT INTO zhl_cancelled_booking ' .
+                '(reference_number, user_id, title, resource_names, device_count, start_utc, end_utc, cancelled_at) ' .
+                'VALUES (@ref, @uid, @title, @names, @count, @startUtc, @endUtc, @cancelledAt)'
+            );
+            $cmd->AddParameter(new Parameter('@ref', $ref));
+            $cmd->AddParameter(new Parameter('@uid', $userId));
+            $cmd->AddParameter(new Parameter('@title', $snapshot['title']));
+            $cmd->AddParameter(new Parameter('@names', implode("\n", $snapshot['names'])));
+            $cmd->AddParameter(new Parameter('@count', $snapshot['deviceCount']));
+            $cmd->AddParameter(new Parameter('@startUtc', $snapshot['startUtc']));
+            $cmd->AddParameter(new Parameter('@endUtc', $snapshot['endUtc']));
+            $cmd->AddParameter(new Parameter('@cancelledAt', $now->ToTimezone('UTC')->Format('Y-m-d H:i:s')));
+            $db->Execute($cmd);
+        } catch (Exception $e) {
+            Log::Error('ZHL-Storno: Storno-Schnappschuss nicht gespeichert (ref=%s): %s', $ref, $e->getMessage());
+        }
+    }
+
+    /**
      * Übergabe-Zeilen dieser Reservierung als Schnappschuss (vor dem Löschen).
      * @return array[]|null [{id:int, type:string, booking_id:string, resource_id:int}] — null bei DB-Fehler
      *         (Aufrufer bricht dann VOR dem Löschen ab, damit Terminplaner-Termine nicht verwaisen).

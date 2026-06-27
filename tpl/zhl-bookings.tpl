@@ -36,9 +36,10 @@
       <button type="button"{if $DefaultGroup == 'current'} class="active"{/if} data-group="current">Aktuell <span class="cnt">{$CurrentCount}</span></button>
       <button type="button"{if $DefaultGroup == 'upcoming'} class="active"{/if} data-group="upcoming">Anstehend <span class="cnt">{$UpcomingCount}</span></button>
       <button type="button"{if $DefaultGroup == 'past'} class="active"{/if} data-group="past">Vergangen <span class="cnt">{$PastCount}</span></button>
+      <button type="button"{if $DefaultGroup == 'cancelled'} class="active"{/if} data-group="cancelled">Storniert <span class="cnt">{$CancelledCount}</span></button>
     </div>
 
-    {foreach from=['current'=>$Current, 'upcoming'=>$Upcoming, 'past'=>$Past] key=groupKey item=rows}
+    {foreach from=['current'=>$Current, 'upcoming'=>$Upcoming, 'past'=>$Past, 'cancelled'=>$Cancelled] key=groupKey item=rows}
       <div class="zhl-bk-group" data-group="{$groupKey}"{if $groupKey != $DefaultGroup} style="display:none"{/if}>
         {if $rows|@count == 0}
           <div class="info-box">
@@ -65,10 +66,12 @@
               </div>
               <div class="b-right">
                 <span class="badge badge-{$bk.state|escape}">{$bk.label|escape}</span>
+                {if $groupKey != 'cancelled'}
                 <a class="b-link" href="{$Path}zhl-booking-detail.php?id={$bk.ref|escape:'url'}">
                   <span>Details</span>
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
                 </a>
+                {/if}
               </div>
             </div>
           {/foreach}

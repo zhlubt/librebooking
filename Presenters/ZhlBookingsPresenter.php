@@ -67,6 +67,10 @@ class ZhlBookingsPresenter
             }
         }
 
+        // Stornierte Buchungen (eigene Historie) aus zhl_cancelled_booking — die native Reservierung
+        // ist beim Stornieren gelöscht worden, daher separate Quelle. Bereits absteigend (neueste zuerst).
+        $cancelled = $this->loadCancelled($user->UserId, $tz, $now);
+
         // Anstehend aufsteigend, Laufend aufsteigend, Vergangen absteigend (neueste zuerst).
         usort($current, fn($a, $b) => strcmp($a['startSort'], $b['startSort']));
         usort($upcoming, fn($a, $b) => strcmp($a['startSort'], $b['startSort']));
@@ -79,6 +83,10 @@ class ZhlBookingsPresenter
             $defaultGroup = 'current';
         } elseif (count($upcoming) > 0) {
             $defaultGroup = 'upcoming';
+        } elseif (count($past) > 0) {
+            $defaultGroup = 'past';
+        } elseif (count($cancelled) > 0) {
+            $defaultGroup = 'cancelled';
         } else {
             $defaultGroup = 'past';
         }
@@ -87,12 +95,99 @@ class ZhlBookingsPresenter
             'current' => $current,
             'upcoming' => $upcoming,
             'past' => $past,
+            'cancelled' => $cancelled,
             'currentCount' => count($current),
             'upcomingCount' => count($upcoming),
             'pastCount' => count($past),
+            'cancelledCount' => count($cancelled),
             'defaultGroup' => $defaultGroup,
-            'hasAny' => (count($current) + count($upcoming) + count($past)) > 0,
+            'hasAny' => (count($current) + count($upcoming) + count($past) + count($cancelled)) > 0,
         ]);
+    }
+
+    /**
+     * Eigene stornierte Buchungen aus zhl_cancelled_booking, neueste zuerst, gleiche Zeilenform wie toRow.
+     * Fenster wie „Vergangen": nur innerhalb der letzten WINDOW_PAST_DAYS storniert. Best effort —
+     * fehlt die Tabelle, kommt eine leere Liste zurück (Seite funktioniert ohne den Tab weiter).
+     * @return array[]
+     */
+    private function loadCancelled(int $userId, $tz, Date $now): array
+    {
+        $rows = [];
+        $sinceUtc = $now->AddDays(-self::WINDOW_PAST_DAYS)->ToTimezone('UTC')->Format('Y-m-d H:i:s');
+        try {
+            $db = ServiceLocator::GetDatabase();
+            $cmd = new AdHocCommand(
+                'SELECT reference_number, title, resource_names, device_count, start_utc, end_utc, cancelled_at ' .
+                'FROM zhl_cancelled_booking WHERE user_id = @uid AND cancelled_at >= @since ' .
+                'ORDER BY cancelled_at DESC'
+            );
+            $cmd->AddParameter(new Parameter('@uid', $userId));
+            $cmd->AddParameter(new Parameter('@since', $sinceUtc));
+            $reader = $db->Query($cmd);
+            while ($row = $reader->GetRow()) {
+                $rows[] = $this->toCancelledRow($row, $tz);
+            }
+            $reader->Free();
+        } catch (Exception $e) {
+            return [];
+        }
+        return $rows;
+    }
+
+    /**
+     * Eine Zeile aus zhl_cancelled_booking in die Anzeigeform bringen (analog zu toRow).
+     * @param array $row
+     * @return array
+     */
+    private function toCancelledRow(array $row, $tz): array
+    {
+        $deviceCount = (int)($row['device_count'] ?? 0);
+        if ($deviceCount <= 1) {
+            $itemsLabel = 'Einzelgerät';
+            $kind = 'device';
+        } else {
+            $itemsLabel = $deviceCount . ' Geräte';
+            $kind = 'bundle';
+        }
+
+        // Zeitraum aus den gespeicherten UTC-Eckdaten rekonstruieren (gleiches Format wie toRow).
+        $range = '';
+        if (!empty($row['start_utc']) && !empty($row['end_utc'])) {
+            $startLocal = Date::Parse((string)$row['start_utc'], 'UTC')->ToTimezone($tz);
+            $endLocal = Date::Parse((string)$row['end_utc'], 'UTC')->ToTimezone($tz);
+            if ($startLocal->Format('Y-m-d') === $endLocal->Format('Y-m-d')) {
+                $range = $startLocal->Format('d.m.Y') . ', ' . $startLocal->Format('H:i') . '–' . $endLocal->Format('H:i') . ' Uhr';
+            } else {
+                $range = $startLocal->Format('d.m.') . ' – ' . $endLocal->Format('d.m.Y');
+            }
+        }
+
+        // „Storniert am …" als Zusatzinfo (steht an der Stelle, an der sonst die Abholzeit stünde).
+        $cancelledLabel = '';
+        if (!empty($row['cancelled_at'])) {
+            $when = Date::Parse((string)$row['cancelled_at'], 'UTC')->ToTimezone($tz);
+            $cancelledLabel = 'Storniert am ' . $when->Format('d.m.Y');
+        }
+
+        $title = trim((string)($row['title'] ?? ''));
+        if ($title === '') {
+            $title = 'Buchung';
+        }
+
+        return [
+            'ref' => (string)($row['reference_number'] ?? ''),
+            'kind' => $kind,
+            'title' => $title,
+            'range' => $range,
+            'items' => $itemsLabel,
+            'deviceCount' => $deviceCount,
+            'pickup' => $cancelledLabel,
+            'state' => 'err',
+            'label' => 'Storniert',
+            'group' => 'cancelled',
+            'startSort' => (string)($row['cancelled_at'] ?? ''),
+        ];
     }
 
     /**

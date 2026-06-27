@@ -44,6 +44,7 @@ $jobs = [
     'sendseriesend.php',
     'autorelease.php',
     'zhl_overdue.php',   // ZHL Phase C: Overdue-/Rückgabe-Eskalation (F34)
+    'zhl_einfuehrung_report.php',  // ZHL: Wochenreport Einführungs-/Übergabetermine (Guard: Mo 08:00, 1×/Woche)
     // 'sessioncleanup.php', 'deleteolddata.php'  -> seltener, separat planen
 ];
 

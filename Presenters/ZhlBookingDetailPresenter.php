@@ -261,7 +261,7 @@ class ZhlBookingDetailPresenter
         $failedRowIds = [];
         foreach ($handover as $h) {
             if ($h['booking_id'] === '') {
-                continue; // Rückgabe-Zeile: kein Terminplaner-Slot
+                continue; // Zeile ohne Terminplaner-Slot (z. B. Rückgabe = Ausleihende ohne persönlichen Termin)
             }
             $resp = ZhlTerminplaner::Request('POST', '/api/cancel_slot.php', [], [
                 'booking_id' => $h['booking_id'],
@@ -269,7 +269,7 @@ class ZhlBookingDetailPresenter
             ]);
             if (!$resp || (($resp['status'] ?? '') !== 'ok')) {
                 $failedRowIds[] = $h['id'];
-                $label = $h['type'] === 'einf' ? 'Einführungstermin' : 'Abholtermin';
+                $label = $h['type'] === 'einf' ? 'Einführungstermin' : ($h['type'] === 'return' ? 'Rückgabetermin' : 'Abholtermin');
                 $warnings[] = $label . ' konnte nicht automatisch abgesagt werden — das ZHL-Team wird informiert.';
                 Log::Error('ZHL-Storno: Terminplaner-cancel fehlgeschlagen (ref=%s, booking=%s, type=%s)', $ref, $h['booking_id'], $h['type']);
             }

@@ -87,6 +87,11 @@ class ZhlBookPresenter
         if (!preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', $time)) {
             $time = '09:00'; // Tagesmodus: Start-des-Tages-Proxy wie der initiale GET-Render
         }
+        // End-Tag optional (Rückgabe-Floor). Fehlt/ungültig → auf Start zurückfallen (Abwärtskompatibilität).
+        $end = isset($_GET['end']) ? trim((string)$_GET['end']) : '';
+        if (!preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $end, $em) || !checkdate((int)$em[2], (int)$em[3], (int)$em[1]) || strcmp($end, $start) < 0) {
+            $end = $start;
+        }
         $ueb = $this->lookupUebergabe($db, $rid);
         $loanStartUtc = Date::Parse($start . ' ' . $time, $tz)->ToTimezone('UTC')->Format('Y-m-d H:i:s');
 
@@ -105,7 +110,15 @@ class ZhlBookPresenter
             $mandatory = !$user->IsAdmin;
             $pickup = ['mandatory' => $mandatory, 'days' => $this->groupPickupByDay($f['slots'], $tz), 'earliestLabel' => $f['earliestLabel']];
         }
-        echo json_encode(['pickup' => $pickup, 'einf' => $einf], JSON_UNESCAPED_UNICODE);
+        // Rückgabe-Slots (SPEC-RUECKGABE): selber Typ wie Abholung, Floor = max(Endtag-Anfang, Start-Anker).
+        $return = null;
+        if ($this->returnApplies($ueb)) {
+            $floorUtc = $this->returnFloorUtc($start, $time, $end, $tz);
+            $f = $this->fetchReturnSlots($this->tpConfig()['handover_type_label'] ?? 'Übergabe Medien', $ueb['tp_member_id'], $floorUtc, $tz);
+            $mandatory = !$user->IsAdmin;
+            $return = ['mandatory' => $mandatory, 'days' => $this->groupPickupByDay($f['slots'], $tz), 'earliestLabel' => $f['earliestLabel']];
+        }
+        echo json_encode(['pickup' => $pickup, 'einf' => $einf, 'return' => $return], JSON_UNESCAPED_UNICODE);
     }
 
     /** POST: echte Reservierung anlegen. */
@@ -222,6 +235,8 @@ class ZhlBookPresenter
         // Abhol-Slot (C1) — für Re-Render und ggf. spätere Buchung. type_id/member_id werden NICHT
         // mehr aus dem POST gelesen (Hidden-Inputs entfernt) → serverseitig neu aufgelöst (Phase A).
         $pickupSlot = $this->post('pickup_slot');
+        // Rückgabe-Slot (SPEC-RUECKGABE) — analog: nur slot_id aus POST, Rest serverseitig (Phase A).
+        $returnSlot = $this->post('return_slot');
 
         // Im „Zusammen"-Modus IST der Einführungs-Slot der gemeinsame Termin → Pflicht (auch wenn die
         // Einführung sonst nur „möglich" wäre).
@@ -240,6 +255,16 @@ class ZhlBookPresenter
         $pickupMandatory = ($fulfillment !== 'hauspost') && $this->pickupApplies($ueb) && !$user->IsAdmin && !$combined;
         if ($pickupMandatory && $pickupSlot === '') {
             $this->bindForm($user, $resource, $beginDate, $beginTime, $endDate, $endTime, $choice, ['Für dieses Gerät ist eine persönliche Abholung Pflicht — bitte einen Abholtermin wählen.'], $attrValues, $projectTitle, $pickupSlot, $fulfillment, $hpValues);
+            return;
+        }
+
+        // Pflicht-RÜCKGABE (SPEC-RUECKGABE) — isoliert von Abholung/Hauspost/combined gehalten (AK-9):
+        // bei Hauspost entfällt der Rückgabetermin (Rückversand per Post). Der „kein Slot frei"-Fall
+        // ist bewusst NICHT hier verwoben — er greift erst über die leere Slot-Liste (Picker zeigt nichts),
+        // sodass das parallele „Termin anfragen"-Feature dort andocken kann.
+        $returnMandatory = ($fulfillment !== 'hauspost') && $this->returnApplies($ueb) && !$user->IsAdmin;
+        if ($returnMandatory && $returnSlot === '') {
+            $this->bindForm($user, $resource, $beginDate, $beginTime, $endDate, $endTime, $choice, ['Für dieses Gerät ist eine persönliche Rückgabe Pflicht — bitte einen Rückgabetermin wählen.'], $attrValues, $projectTitle, $pickupSlot, $fulfillment, $hpValues);
             return;
         }
 
@@ -338,6 +363,35 @@ class ZhlBookPresenter
             $pickupPlan = ['slot_id' => $pickupSlot, 'member_id' => $pickupMemberId, 'type_id' => $pickupTypeId, 'start_utc' => $pickupStartUtc, 'end_utc' => $pickupEndUtc];
         }
 
+        // --- Phase A: Rückgabe serverseitig auflösen (NICHT buchen). Bei Hauspost entfällt sie. ---
+        $returnPlan = null;
+        if (!$hauspostActive && $this->returnApplies($ueb) && $returnSlot !== '') {
+            $floorUtc = $this->returnFloorUtc($beginDate, $beginTime, $endDate, $tz);
+            $typeLabel = $this->tpConfig()['handover_type_label'] ?? 'Übergabe Medien';
+            $rf = $this->fetchReturnSlots($typeLabel, $ueb['tp_member_id'], $floorUtc, $tz);
+            $rResolved = null;
+            foreach ($rf['slots'] as $s) {
+                if ((string)$s['slot_id'] === (string)$returnSlot) {
+                    $rResolved = $s;
+                    break;
+                }
+            }
+            if ($rResolved === null) {
+                $this->bindForm($user, $resource, $beginDate, $beginTime, $endDate, $endTime, $choice, ['Der gewählte Rückgabetermin ist nicht mehr verfügbar — bitte neu wählen.'], $attrValues, $projectTitle, $pickupSlot, $fulfillment, $hpValues);
+                return;
+            }
+            $returnMemberId = (int)($rResolved['member_id'] ?? $rf['memberId'] ?? 0);
+            $returnTypeId = (int)($rResolved['type_id'] ?? $rf['typeId'] ?? 0);
+            if ($returnMemberId <= 0 || $returnTypeId <= 0) {
+                Log::Error('ZHL-Rückgabe: ungültige Terminplaner-IDs (member=%s, type=%s) für res=%s', $returnMemberId, $returnTypeId, $rid);
+                $this->bindForm($user, $resource, $beginDate, $beginTime, $endDate, $endTime, $choice, ['Der Rückgabetermin konnte nicht aufgelöst werden (Terminplaner-Konfiguration). Bitte beim ZHL-Team melden.'], $attrValues, $projectTitle, $pickupSlot, $fulfillment, $hpValues);
+                return;
+            }
+            $returnStartUtc = Date::Parse($rResolved['start_utc'], 'UTC')->Format('Y-m-d H:i:s');
+            $returnEndUtc = $rResolved['end_utc'] !== null ? Date::Parse($rResolved['end_utc'], 'UTC')->Format('Y-m-d H:i:s') : $returnStartUtc;
+            $returnPlan = ['slot_id' => $returnSlot, 'member_id' => $returnMemberId, 'type_id' => $returnTypeId, 'start_utc' => $returnStartUtc, 'end_utc' => $returnEndUtc];
+        }
+
         // --- Reservierungsbeginn = ABHOLTAG: ab der Übergabe ist das Gerät physisch weg. Liegt der Abholtag
         //     VOR dem Nutzungsbeginn, muss die Reservierung schon ab dem Abholtag blockieren — sonst wäre die
         //     Lücke Abholung→Nutzung „frei", obwohl das Gerät ausgeliehen ist. Die native Verfügbarkeitsprüfung
@@ -365,6 +419,24 @@ class ZhlBookPresenter
             }
         }
 
+        // --- Reservierungs-ENDE = RÜCKGABETAG (SPEC-RUECKGABE): Liegt der Rückgabetag NACH dem
+        //     Nutzungsende, muss die Reservierung bis dahin blockieren — sonst wäre die Lücke
+        //     Nutzungsende→Rückgabe „frei", obwohl das Gerät noch beim Ausleihenden ist. Spiegel der
+        //     Beginn-Verlängerung. $reservEndDate/$reservEndTime sind das *reservierte* Fenster-Ende;
+        //     $endDate/$endTime bleiben die fachliche Nutzungszeit. ---
+        $reservEndDate = $endDate;
+        $reservEndTime = $endTime;
+        if ($returnPlan !== null) {
+            $returnDay = Date::Parse($returnPlan['start_utc'], 'UTC')->ToTimezone($tz)->Format('Y-m-d');
+            if (strcmp($returnDay, $endDate) > 0) {
+                $rbnds = $this->scheduleDayBounds($user, $resource, $returnDay);
+                $reservEndTime = $rbnds['end'];
+                // Endet die Periode um Mitternacht (Ganztags-Layout), liegt das reservierte Ende am Folgetag.
+                $reservEndDate = $rbnds['endNextDay'] ? Date::Parse($returnDay . ' 00:00:00', $tz)->AddDays(1)->Format('Y-m-d') : $returnDay;
+                $desc .= ' · bis Rückgabetag ' . $returnDay . ' reserviert (Nutzung bis ' . $endDate . ')';
+            }
+        }
+
         // --- Pool-Zuteilung (SPEC-POOL-FALLBACK): die angeklickte Einheit kann im gewählten Fenster
         //     belegt sein, während eine gleichtypige Einheit frei ist. Wir reservieren die erste freie
         //     Einheit (Präferenz: die angeklickte). Keine frei → klare Meldung statt nativem Konflikt.
@@ -373,7 +445,7 @@ class ZhlBookPresenter
         $poolIds = $this->poolResourceIds($user, $resource);
         if (count($poolIds) > 1) {
             $winBegin = Date::Parse($reservBeginDate . ' ' . $reservBeginTime, $tz);
-            $winEnd = Date::Parse($endDate . ' ' . $endTime, $tz);
+            $winEnd = Date::Parse($reservEndDate . ' ' . $reservEndTime, $tz);
             $assignedRid = $this->pickFreeUnit($poolIds, $winBegin, $winEnd);
             if ($assignedRid === null) {
                 $this->bindForm($user, $resource, $beginDate, $beginTime, $endDate, $endTime, $choice, ['Im gewählten Zeitraum ist aktuell kein Gerät dieses Typs frei. Bitte einen anderen Zeitraum wählen.'], $attrValues, $projectTitle, $pickupSlot, $fulfillment, $hpValues);
@@ -390,7 +462,7 @@ class ZhlBookPresenter
 
         // --- Phase B: native Reservierung SPEICHERN. Erst NACH Erfolg werden Terminplaner-Slots gebucht
         //     → schlägt das Speichern fehl (Pflichtfeld, Vorlauf, Konflikt), wird KEIN Termin gebucht. ---
-        $facade = new ZhlReservationFacade($user->UserId, $rid, $titel, $desc, $reservBeginDate, $reservBeginTime, $endDate, $endTime, $facadeAttrs);
+        $facade = new ZhlReservationFacade($user->UserId, $rid, $titel, $desc, $reservBeginDate, $reservBeginTime, $reservEndDate, $reservEndTime, $facadeAttrs);
         try {
             $factory = new ReservationPresenterFactory();
             $presenter = $factory->Create($facade, $user);
@@ -417,6 +489,37 @@ class ZhlBookPresenter
         // damit ein Folge-Fehler (DB/HTTP/Mail) die bereits angelegte Buchung NIE in einen 500 kippt —
         // der Nutzer landet immer auf der Erfolgsseite (mit Hinweis), die Buchung bleibt bestehen.
         $warnings = [];
+        $loanEndUtc = Date::Parse($endDate . ' ' . $endTime, $tz)->ToTimezone('UTC')->Format('Y-m-d H:i:s');
+
+        // Rückgabe-Slot (SPEC-RUECKGABE) ZUERST buchen, damit die Terminplaner-Buchungs-ID in die
+        // (gemeinsame) return-Zeile der persistHandover-Aufrufe einfließt. Scheitert die Buchung,
+        // bleibt $returnSlotData null → die return-Zeile fällt sauber auf das Ausleihende zurück.
+        $returnSlotData = null;
+        if ($returnPlan !== null) {
+            try {
+                $rb = $this->tpRequest('POST', '/api/book_slot.php', [], [
+                    'member_id' => $returnPlan['member_id'],
+                    'type_id' => $returnPlan['type_id'],
+                    'slot_id' => $returnPlan['slot_id'],
+                    'name' => trim($user->FirstName . ' ' . $user->LastName),
+                    'email' => $user->Email,
+                    'note' => 'ZHL Rückgabe — ' . $titel,
+                ]);
+                if (!$rb || ($rb['status'] ?? '') !== 'ok') {
+                    $warnings[] = 'Die Ausleihe ist gebucht, aber der Rückgabetermin konnte nicht final reserviert werden — bitte beim ZHL-Team melden.';
+                } else {
+                    $returnSlotData = $returnPlan;
+                    $returnSlotData['booking_id'] = isset($rb['booking_id']) ? (string)$rb['booking_id'] : null;
+                }
+            } catch (Throwable $e) {
+                Log::Error('ZHL-Rückgabe (Phase C) nach erfolgreicher Buchung fehlgeschlagen (ref=%s, res=%s): %s', $ref, $rid, $e);
+                $warnings[] = 'Die Ausleihe ist gebucht, aber der Rückgabetermin konnte nicht final reserviert werden — bitte beim ZHL-Team melden.';
+            }
+        }
+        // Wurde die return-Zeile schon über einen pickup/combined-persistHandover geschrieben? Sonst legt
+        // der Return-only-Zweig unten (Gerät mit persönlicher Rückgabe aber OHNE persönliche Abholung) sie an.
+        $handoverPersisted = false;
+
         if ($einfPlan !== null) {
             try {
                 $book = $this->tpRequest('POST', '/api/book_slot.php', [], [
@@ -439,10 +542,10 @@ class ZhlBookPresenter
                     // „Zusammen": der gebuchte Einführungstermin IST zugleich der Übergabetermin →
                     // Übergabe-Zeile aus dem Einführungs-Slot ableiten (KEIN separater Abhol-Slot gebucht).
                     if ($combined) {
-                        $loanEndUtc = Date::Parse($endDate . ' ' . $endTime, $tz)->ToTimezone('UTC')->Format('Y-m-d H:i:s');
                         $combToken = bin2hex(random_bytes(16));
-                        $combPersisted = $this->persistHandover($db, $combToken, (int)$user->UserId, $rid, $einfBookingId, $einfPlan['member_id'], $einfPlan['start_utc'], $einfPlan['end_utc'], $loanEndUtc);
+                        $combPersisted = $this->persistHandover($db, $combToken, (int)$user->UserId, $rid, $einfBookingId, $einfPlan['member_id'], $einfPlan['start_utc'], $einfPlan['end_utc'], $loanEndUtc, $returnSlotData);
                         if ($combPersisted) {
+                            $handoverPersisted = true;
                             $this->backfillHandoverReference($db, $combToken, $ref);
                         } else {
                             Log::Error('ZHL-Zusammen: Übergabe-Zeilen (aus Einführung) konnten nicht gespeichert werden (token=%s, res=%s)', $combToken, $rid);
@@ -468,11 +571,11 @@ class ZhlBookPresenter
                 if (!$pb || ($pb['status'] ?? '') !== 'ok') {
                     $warnings[] = 'Die Ausleihe ist gebucht, aber der Abholtermin konnte nicht final reserviert werden — bitte beim ZHL-Team melden.';
                 } else {
-                    $loanEndUtc = Date::Parse($endDate . ' ' . $endTime, $tz)->ToTimezone('UTC')->Format('Y-m-d H:i:s');
                     $handoverToken = bin2hex(random_bytes(16));
                     $bookingId = isset($pb['booking_id']) ? (string)$pb['booking_id'] : null;
-                    $persisted = $this->persistHandover($db, $handoverToken, (int)$user->UserId, $rid, $bookingId, $pickupPlan['member_id'], $pickupPlan['start_utc'], $pickupPlan['end_utc'], $loanEndUtc);
+                    $persisted = $this->persistHandover($db, $handoverToken, (int)$user->UserId, $rid, $bookingId, $pickupPlan['member_id'], $pickupPlan['start_utc'], $pickupPlan['end_utc'], $loanEndUtc, $returnSlotData);
                     if ($persisted) {
+                        $handoverPersisted = true;
                         $this->backfillHandoverReference($db, $handoverToken, $ref);
                     } else {
                         Log::Error('ZHL-Abholung: Übergabe-Zeilen konnten nicht gespeichert werden (token=%s, user=%s, res=%s)', $handoverToken, (int)$user->UserId, $rid);
@@ -482,6 +585,25 @@ class ZhlBookPresenter
             } catch (Throwable $e) {
                 Log::Error('ZHL-Abholung (Phase C) nach erfolgreicher Buchung fehlgeschlagen (ref=%s, res=%s): %s', $ref, $rid, $e);
                 $warnings[] = 'Die Ausleihe ist gebucht, aber der Abholtermin konnte nicht final reserviert werden — bitte beim ZHL-Team melden.';
+            }
+        }
+
+        // Return-only (SPEC-RUECKGABE): Gerät mit persönlicher Rückgabe, aber OHNE persönliche Abholung/
+        // Zusammen-Termin → es lief kein persistHandover. Hier die Handover-Zeilen (nur return) anlegen,
+        // damit der Staff-Rückgabepfad (zhl-resource-return) den Slot kennt.
+        if ($returnSlotData !== null && !$handoverPersisted) {
+            try {
+                $retToken = bin2hex(random_bytes(16));
+                $retPersisted = $this->persistHandover($db, $retToken, (int)$user->UserId, $rid, null, 0, null, null, $loanEndUtc, $returnSlotData);
+                if ($retPersisted) {
+                    $this->backfillHandoverReference($db, $retToken, $ref);
+                } else {
+                    Log::Error('ZHL-Rückgabe: return-Zeile konnte nicht gespeichert werden (token=%s, user=%s, res=%s)', $retToken, (int)$user->UserId, $rid);
+                    $warnings[] = 'Rückgabetermin gebucht, aber intern nicht hinterlegt — bitte beim ZHL-Team melden.';
+                }
+            } catch (Throwable $e) {
+                Log::Error('ZHL-Rückgabe (Phase C, return-only) fehlgeschlagen (ref=%s, res=%s): %s', $ref, $rid, $e);
+                $warnings[] = 'Rückgabetermin gebucht, aber intern nicht hinterlegt — bitte beim ZHL-Team melden.';
             }
         }
 
@@ -508,6 +630,7 @@ class ZhlBookPresenter
                 'to' => $endDate,
                 'pickup' => $pickupPlan !== null,
                 'einf' => $einfPlan !== null,
+                'return' => $returnPlan !== null,
                 'warnings' => $warnings,
             ],
         ]));
@@ -607,6 +730,25 @@ class ZhlBookPresenter
             ];
         }
 
+        // Rückgabe-Slot-Picker (SPEC-RUECKGABE) — nur bei persönlicher Rückgabe. Floor = max(Endtag-Anfang,
+        // Start-Anker); selber Terminplaner-Typ wie die Abholung. 'blocked' = Pflicht ohne freien Slot (AK-9-Andockpunkt).
+        $return = null;
+        if ($this->returnApplies($ueb)) {
+            $floorUtc = $this->returnFloorUtc($beginDate, $beginTime, $endDate, $tz);
+            $f = $this->fetchReturnSlots($this->tpConfig()['handover_type_label'] ?? 'Übergabe Medien', $ueb['tp_member_id'], $floorUtc, $tz);
+            $mandatory = !$user->IsAdmin;
+            $return = [
+                'mode' => $ueb['rueckgabe'],
+                'applies' => true,
+                'mandatory' => $mandatory,
+                'slots' => $f['slots'],
+                'days' => $this->groupPickupByDay($f['slots'], $tz),
+                'earliestLabel' => $f['earliestLabel'],
+                'selected' => $this->post('return_slot'),
+                'blocked' => ($mandatory && empty($f['slots'])),
+            ];
+        }
+
         // Hauspost-Alternative (C2) — eigenständiges Geräte-Flag, gilt unabhängig vom Übergabe-Modus.
         // Die Re-Render-Werte (a–f2) werden durchgereicht, damit ein Validierungsfehler die Eingaben behält.
         $hauspost = null;
@@ -670,6 +812,9 @@ class ZhlBookPresenter
             'einfuehrungTyp' => $ueb['einfuehrung_typ'],
             'einf' => $einf,
             'pickup' => $pickup,
+            'return' => $return,
+            'rueckgabe' => $ueb['rueckgabe'],
+            'rueckgabeort' => $ueb['rueckgabeort'] ?? null,
             'hauspost' => $hauspost,
             'fulfillment' => ($fulfillment === 'hauspost') ? 'hauspost' : 'pickup',
             'combineEligible' => $combineEligible,
@@ -1579,6 +1724,60 @@ class ZhlBookPresenter
     }
 
     /**
+     * Rückgabe-Slots aus dem Terminplaner (SPEC-RUECKGABE) — selber Typ wie die Abholung
+     * („Übergabe Medien"), aber Filter auf den Slot-START: Slot zeigen, wenn `startUtc >= $floorUtc`
+     * (Rückgabezeit = Slot-Start; `end_utc` nur Persistenz/Anzeige). $floorUtc = returnFloorUtc().
+     * Gleiche Response-Form wie fetchHandoverSlots.
+     * @return array{slots: array[], earliestLabel: ?string, typeId: ?int, memberId: ?int}
+     */
+    private function fetchReturnSlots(?string $typeLabel, ?int $memberId, ?string $floorUtc, $tz): array
+    {
+        $out = ['slots' => [], 'earliestLabel' => null, 'typeId' => null, 'memberId' => null];
+        if ($typeLabel === null || $typeLabel === '') {
+            return $out;
+        }
+        $q = ['type_label' => $typeLabel];
+        if ($memberId) {
+            $q['member_id'] = $memberId;
+        }
+        $resp = $this->tpRequest('GET', '/api/lesson_slots.php', $q);
+        if (!$resp || empty($resp['members'])) {
+            return $out;
+        }
+        $earliest = null;
+        foreach ($resp['members'] as $mem) {
+            $out['typeId'] = $out['typeId'] ?? (isset($mem['type_id']) ? (int)$mem['type_id'] : null);
+            $out['memberId'] = $out['memberId'] ?? (isset($mem['member_id']) ? (int)$mem['member_id'] : null);
+            foreach ($mem['slots'] ?? [] as $s) {
+                $startUtc = $s['start_utc'] ?? null;
+                $endUtc = $s['end_utc'] ?? null;
+                if (!$startUtc) {
+                    continue;
+                }
+                // Rückgabe darf nicht VOR dem Floor (Endtag-Anfang bzw. Ausleihstart) liegen.
+                if ($floorUtc !== null && strcmp((string)$startUtc, $floorUtc) < 0) {
+                    continue;
+                }
+                if ($earliest === null || $startUtc < $earliest) {
+                    $earliest = $startUtc;
+                }
+                $out['slots'][] = [
+                    'slot_id' => (string)$s['slot_id'],
+                    'label' => (string)($s['label'] ?? $startUtc),
+                    'start_utc' => (string)$startUtc,
+                    'end_utc' => $endUtc !== null ? (string)$endUtc : null,
+                    'type_id' => isset($mem['type_id']) ? (int)$mem['type_id'] : null,
+                    'member_id' => isset($mem['member_id']) ? (int)$mem['member_id'] : null,
+                ];
+            }
+        }
+        if ($earliest !== null) {
+            $out['earliestLabel'] = Date::Parse($earliest, 'UTC')->ToTimezone($tz)->Format('d.m.Y, H:i') . ' Uhr';
+        }
+        return $out;
+    }
+
+    /**
      * Nach gebuchter Einführung: offene Bestätigung anlegen (Einweiser bestätigt später → Zertifikat).
      * Mappt das Gerät auf den passenden Zertifikatstyp; mailt den Bestätigungs-Link, falls am Typ
      * eine confirm_email hinterlegt ist.
@@ -1669,7 +1868,7 @@ class ZhlBookPresenter
      * Fehlerbehandlung statt stillem Schlucken.
      * @return bool true, wenn alle drei Zeilen geschrieben wurden.
      */
-    private function persistHandover($db, string $token, int $userId, int $rid, ?string $bookingId, int $staffMemberId, string $pickupStartUtc, string $pickupEndUtc, string $loanEndUtc): bool
+    private function persistHandover($db, string $token, int $userId, int $rid, ?string $bookingId, int $staffMemberId, ?string $pickupStartUtc, ?string $pickupEndUtc, string $loanEndUtc, ?array $returnSlot = null): bool
     {
         $now = gmdate('Y-m-d H:i:s');
         try {
@@ -1680,27 +1879,37 @@ class ZhlBookPresenter
             $insTok->AddParameter(new Parameter('@now', $now));
             $db->Execute($insTok);
 
-            // 2. PICKUP-Zeile.
-            $insPickup = new AdHocCommand('INSERT INTO zhl_booking_handover (handover_token, type, resource_id, terminplaner_booking_id, staff_member_id, staff_role, scheduled_start_utc, scheduled_end_utc, status, created_at, updated_at) VALUES (@tok,@type,@rid,@bid,@staff,@role,@start,@end,@status,@now,@now)');
-            $insPickup->AddParameter(new Parameter('@tok', $token));
-            $insPickup->AddParameter(new Parameter('@type', 'pickup'));
-            $insPickup->AddParameter(new Parameter('@rid', $rid));
-            $insPickup->AddParameter(new Parameter('@bid', $bookingId));
-            $insPickup->AddParameter(new Parameter('@staff', $staffMemberId > 0 ? $staffMemberId : null));
-            $insPickup->AddParameter(new Parameter('@role', 'primary'));
-            $insPickup->AddParameter(new Parameter('@start', $pickupStartUtc));
-            $insPickup->AddParameter(new Parameter('@end', $pickupEndUtc));
-            $insPickup->AddParameter(new Parameter('@status', 'confirmed'));
-            $insPickup->AddParameter(new Parameter('@now', $now));
-            $db->Execute($insPickup);
+            // 2. PICKUP-Zeile — nur, wenn ein Abholtermin existiert (bei reiner Rückgabe entfällt sie).
+            if ($pickupStartUtc !== null) {
+                $insPickup = new AdHocCommand('INSERT INTO zhl_booking_handover (handover_token, type, resource_id, terminplaner_booking_id, staff_member_id, staff_role, scheduled_start_utc, scheduled_end_utc, status, created_at, updated_at) VALUES (@tok,@type,@rid,@bid,@staff,@role,@start,@end,@status,@now,@now)');
+                $insPickup->AddParameter(new Parameter('@tok', $token));
+                $insPickup->AddParameter(new Parameter('@type', 'pickup'));
+                $insPickup->AddParameter(new Parameter('@rid', $rid));
+                $insPickup->AddParameter(new Parameter('@bid', $bookingId));
+                $insPickup->AddParameter(new Parameter('@staff', $staffMemberId > 0 ? $staffMemberId : null));
+                $insPickup->AddParameter(new Parameter('@role', 'primary'));
+                $insPickup->AddParameter(new Parameter('@start', $pickupStartUtc));
+                $insPickup->AddParameter(new Parameter('@end', $pickupEndUtc));
+                $insPickup->AddParameter(new Parameter('@status', 'confirmed'));
+                $insPickup->AddParameter(new Parameter('@now', $now));
+                $db->Execute($insPickup);
+            }
 
-            // 3. RETURN-Zeile = Ausleihende (kein eigener Terminplaner-Slot in C1).
-            $insReturn = new AdHocCommand('INSERT INTO zhl_booking_handover (handover_token, type, resource_id, scheduled_start_utc, scheduled_end_utc, status, created_at, updated_at) VALUES (@tok,@type,@rid,@start,@end,@status,@now,@now)');
+            // 3. RETURN-Zeile. Mit gewähltem Rückgabe-Slot (SPEC-RUECKGABE) → echte Slot-Zeiten +
+            //    Terminplaner-Buchung + Staff-Member; sonst Fallback = Ausleihende (kein eigener Slot).
+            $rStart = $returnSlot !== null ? (string)$returnSlot['start_utc'] : $loanEndUtc;
+            $rEnd = $returnSlot !== null ? (string)($returnSlot['end_utc'] ?? $returnSlot['start_utc']) : $loanEndUtc;
+            $rBid = $returnSlot !== null ? ($returnSlot['booking_id'] ?? null) : null;
+            $rStaff = ($returnSlot !== null && (int)($returnSlot['member_id'] ?? 0) > 0) ? (int)$returnSlot['member_id'] : null;
+            $insReturn = new AdHocCommand('INSERT INTO zhl_booking_handover (handover_token, type, resource_id, terminplaner_booking_id, staff_member_id, staff_role, scheduled_start_utc, scheduled_end_utc, status, created_at, updated_at) VALUES (@tok,@type,@rid,@bid,@staff,@role,@start,@end,@status,@now,@now)');
             $insReturn->AddParameter(new Parameter('@tok', $token));
             $insReturn->AddParameter(new Parameter('@type', 'return'));
             $insReturn->AddParameter(new Parameter('@rid', $rid));
-            $insReturn->AddParameter(new Parameter('@start', $loanEndUtc));
-            $insReturn->AddParameter(new Parameter('@end', $loanEndUtc));
+            $insReturn->AddParameter(new Parameter('@bid', $rBid));
+            $insReturn->AddParameter(new Parameter('@staff', $rStaff));
+            $insReturn->AddParameter(new Parameter('@role', $rStaff !== null ? 'primary' : null));
+            $insReturn->AddParameter(new Parameter('@start', $rStart));
+            $insReturn->AddParameter(new Parameter('@end', $rEnd));
             $insReturn->AddParameter(new Parameter('@status', 'confirmed'));
             $insReturn->AddParameter(new Parameter('@now', $now));
             $db->Execute($insReturn);
@@ -1838,10 +2047,29 @@ class ZhlBookPresenter
         return !in_array($ueb['abholung'], ['ablageort', 'nicht_noetig'], true);
     }
 
+    /** Persönliche Rückgabe = Pflicht-Rückgabetermin (SPEC-RUECKGABE). Nur der persönliche Fall braucht einen Slot. */
+    private function returnApplies(array $ueb): bool
+    {
+        return ($ueb['rueckgabe'] ?? 'abgeben') === 'abgeben_persoenlich';
+    }
+
+    /**
+     * Floor für Rückgabe-Slots (SPEC-RUECKGABE): Slot-START muss >= diesem Wert liegen.
+     * = max(Tagesanfang Endtag, Ausleihstart-Anker). Multi-Day → Endtag-00:00 gewinnt
+     * (Same-Day-Rückgabe am Endtag, AK-8); Same-Day (begin==end) → Start-Anker gewinnt
+     * (kein Rückgabe-Slot VOR der Abholung/Nutzung). Rückgabe je UTC 'Y-m-d H:i:s'.
+     */
+    private function returnFloorUtc(string $beginDate, string $beginTime, string $endDate, $tz): string
+    {
+        $startAnchor = Date::Parse($beginDate . ' ' . $beginTime, $tz)->ToTimezone('UTC')->Format('Y-m-d H:i:s');
+        $endDayStart = Date::Parse($endDate . ' 00:00:00', $tz)->ToTimezone('UTC')->Format('Y-m-d H:i:s');
+        return strcmp($startAnchor, $endDayStart) >= 0 ? $startAnchor : $endDayStart;
+    }
+
     private function lookupUebergabe($db, int $rid): array
     {
-        $def = ['abholung' => 'abholen', 'abholort' => null, 'einfuehrung' => 'keine', 'einfuehrung_typ' => null, 'tp_member_id' => null, 'vorlauf_toleranz_h' => 0, 'booking_mode' => 'day', 'hauspost_allowed' => false];
-        $cmd = new AdHocCommand('SELECT abholung, abholort, einfuehrung, einfuehrung_typ, tp_member_id, vorlauf_toleranz_h, booking_mode, hauspost_allowed FROM zhl_uebergabe WHERE resource_id = @r LIMIT 1');
+        $def = ['abholung' => 'abholen', 'abholort' => null, 'einfuehrung' => 'keine', 'einfuehrung_typ' => null, 'tp_member_id' => null, 'vorlauf_toleranz_h' => 0, 'booking_mode' => 'day', 'hauspost_allowed' => false, 'rueckgabe' => 'abgeben', 'rueckgabeort' => null];
+        $cmd = new AdHocCommand('SELECT abholung, abholort, einfuehrung, einfuehrung_typ, tp_member_id, vorlauf_toleranz_h, booking_mode, hauspost_allowed, rueckgabe, rueckgabeort FROM zhl_uebergabe WHERE resource_id = @r LIMIT 1');
         $cmd->AddParameter(new Parameter('@r', $rid));
         $reader = $db->Query($cmd);
         $row = $reader->GetRow();
@@ -1858,6 +2086,8 @@ class ZhlBookPresenter
             'vorlauf_toleranz_h' => (int)($row['vorlauf_toleranz_h'] ?? 0),
             'booking_mode' => (string)($row['booking_mode'] ?? 'day'),
             'hauspost_allowed' => (bool)($row['hauspost_allowed'] ?? false),
+            'rueckgabe' => (string)($row['rueckgabe'] ?? 'abgeben'),
+            'rueckgabeort' => $row['rueckgabeort'] !== null && $row['rueckgabeort'] !== '' ? (string)$row['rueckgabeort'] : null,
         ];
     }
 

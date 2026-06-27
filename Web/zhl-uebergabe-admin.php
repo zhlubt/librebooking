@@ -48,6 +48,11 @@ class ZhlUebergabeAdminPage extends SecurePage
             'ablageort' => 'Am Ablageort abholen',
             'nicht_noetig' => 'Nicht nötig',
         ];
+        $RUECKGABE = [
+            'abgeben_persoenlich' => 'Persönliche Rückgabe (Termin Pflicht)',
+            'abgeben' => 'Am Rückgabeort abgeben',
+            'nicht_noetig' => 'Nicht nötig',
+        ];
         $EINF = [
             'keine' => 'Keine',
             'moeglich' => 'Möglich (optional)',
@@ -59,6 +64,7 @@ class ZhlUebergabeAdminPage extends SecurePage
         if ($this->IsPost() && $this->GetForm('action') === 'save') {
             $this->EnforceCSRFCheck();
             $abh = is_array($_POST['abholung'] ?? null) ? $_POST['abholung'] : [];
+            $rueck = is_array($_POST['rueckgabe'] ?? null) ? $_POST['rueckgabe'] : [];
             $einf = is_array($_POST['einfuehrung'] ?? null) ? $_POST['einfuehrung'] : [];
             $hp = is_array($_POST['hauspost'] ?? null) ? $_POST['hauspost'] : [];
             $aort = is_array($_POST['abholort'] ?? null) ? $_POST['abholort'] : [];
@@ -70,11 +76,11 @@ class ZhlUebergabeAdminPage extends SecurePage
                 $valid[(int)$r['resource_id']] = true;
             }
             $up = $pdo->prepare(
-                'INSERT INTO zhl_uebergabe (resource_id, abholung, einfuehrung, hauspost_allowed, abholort, rueckgabeort, updated_at)
-                 VALUES (?, ?, ?, ?, ?, ?, NOW())
-                 ON DUPLICATE KEY UPDATE abholung = VALUES(abholung), einfuehrung = VALUES(einfuehrung),
-                     hauspost_allowed = VALUES(hauspost_allowed), abholort = VALUES(abholort),
-                     rueckgabeort = VALUES(rueckgabeort), updated_at = NOW()'
+                'INSERT INTO zhl_uebergabe (resource_id, abholung, rueckgabe, einfuehrung, hauspost_allowed, abholort, rueckgabeort, updated_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, NOW())
+                 ON DUPLICATE KEY UPDATE abholung = VALUES(abholung), rueckgabe = VALUES(rueckgabe),
+                     einfuehrung = VALUES(einfuehrung), hauspost_allowed = VALUES(hauspost_allowed),
+                     abholort = VALUES(abholort), rueckgabeort = VALUES(rueckgabeort), updated_at = NOW()'
             );
             $n = 0;
             $pdo->beginTransaction();
@@ -84,11 +90,12 @@ class ZhlUebergabeAdminPage extends SecurePage
                         continue;
                     }
                     $a = isset($ABHOLUNG[$abh[$rid] ?? '']) ? (string)$abh[$rid] : 'abholen_persoenlich';
+                    $rg = isset($RUECKGABE[$rueck[$rid] ?? '']) ? (string)$rueck[$rid] : 'abgeben';
                     $e = isset($EINF[$einf[$rid] ?? '']) ? (string)$einf[$rid] : 'keine';
                     $hpv = !empty($hp[$rid]) ? 1 : 0;
                     $ao = trim((string)($aort[$rid] ?? ''));
                     $ro = trim((string)($rort[$rid] ?? ''));
-                    $up->execute([$rid, $a, $e, $hpv, $ao === '' ? null : mb_substr($ao, 0, 200), $ro === '' ? null : mb_substr($ro, 0, 200)]);
+                    $up->execute([$rid, $a, $rg, $e, $hpv, $ao === '' ? null : mb_substr($ao, 0, 200), $ro === '' ? null : mb_substr($ro, 0, 200)]);
                     $n++;
                 }
                 $pdo->commit();
@@ -107,7 +114,7 @@ class ZhlUebergabeAdminPage extends SecurePage
         $rows = $pdo->query(
             "SELECT r.resource_id AS rid, r.name AS name,
                     COALESCE(cav.attribute_value, '(ohne Geräte-Typ)') AS typ,
-                    u.abholung, u.einfuehrung, u.hauspost_allowed, u.abholort, u.rueckgabeort
+                    u.abholung, u.rueckgabe, u.einfuehrung, u.hauspost_allowed, u.abholort, u.rueckgabeort
              FROM resources r
              LEFT JOIN custom_attribute_values cav
                     ON cav.entity_id = r.resource_id AND cav.custom_attribute_id = " . self::TYP_ATTR_ID . "
@@ -124,6 +131,8 @@ class ZhlUebergabeAdminPage extends SecurePage
         // Legacy 'abholen' (und NULL/unbekannt) → im Editor als „persönlich" anzeigen, da der
         // Buchungspfad genau das jetzt erzwingt. Nur 'ablageort'/'nicht_noetig' sind entspannt.
         $normAbh = static fn(?string $v): string => in_array($v, ['ablageort', 'nicht_noetig'], true) ? $v : 'abholen_persoenlich';
+        // Rückgabe-Default = 'abgeben' (am Rückgabeort); nur die 3 bekannten Werte zulassen.
+        $normRueck = static fn(?string $v): string => in_array($v, ['abgeben_persoenlich', 'nicht_noetig'], true) ? $v : 'abgeben';
         $normEinf = static fn(?string $v): string => in_array($v, ['moeglich', 'notwendig'], true) ? $v : 'keine';
 
         $csrf = (string)$session->CSRFToken;
@@ -179,6 +188,7 @@ class ZhlUebergabeAdminPage extends SecurePage
     <b>So wirkt die Matrix auf die Buchung:</b>
     <ul class="mb-0 mt-1">
       <li><b>Übergabe-Modus</b> <code>Persönliche Abholung</code> = beim Buchen ist ein <b>Abholtermin Pflicht</b> (Terminplaner). <code>Am Ablageort</code> / <code>Nicht nötig</code> = kein Termin.</li>
+      <li><b>Rückgabe-Modus</b> <code>Persönliche Rückgabe</code> = beim Buchen ist ein <b>Rückgabetermin Pflicht</b> (Terminplaner-Typ „Übergabe Medien"); die Reservierung läuft bis zum Rückgabetag. <code>Am Rückgabeort</code> / <code>Nicht nötig</code> = kein Termin (Rückgabe = Ausleihende).</li>
       <li><b>Sichere Vorgabe:</b> Geräte ohne Eintrag gelten als <b>Abholung Pflicht</b>, bis Sie sie hier bewusst lockern.</li>
       <li><b>Einweisung</b> <code>Notwendig</code> = ohne Zertifikat/Einführungstermin keine Buchung möglich.</li>
       <li><b>Hauspost-Versand</b> = dieses Gerät darf per Hauspost verschickt werden. Der Haken entscheidet allein, <b>unabhängig vom Übergabe-Modus</b> (auch bei „Am Ablageort" oder „Nicht nötig").</li>
@@ -197,6 +207,7 @@ class ZhlUebergabeAdminPage extends SecurePage
             <tr>
               <th style="min-width:200px">Gerät</th>
               <th>Übergabe-Modus</th>
+              <th>Rückgabe-Modus</th>
               <th>Einweisung</th>
               <th class="text-center">Hauspost</th>
               <th>Abholort</th>
@@ -204,7 +215,7 @@ class ZhlUebergabeAdminPage extends SecurePage
             </tr>
           </thead>
           <tbody>
-          <?php foreach ($devices as $d): $rid = (int)$d['rid']; $curAbh = $normAbh($d['abholung']); $curEinf = $normEinf($d['einfuehrung']); ?>
+          <?php foreach ($devices as $d): $rid = (int)$d['rid']; $curAbh = $normAbh($d['abholung']); $curRueck = $normRueck($d['rueckgabe']); $curEinf = $normEinf($d['einfuehrung']); ?>
             <tr>
               <td>
                 <?= $h($d['name']) ?>
@@ -214,6 +225,13 @@ class ZhlUebergabeAdminPage extends SecurePage
                 <select class="form-select form-select-sm" name="abholung[<?= $rid ?>]">
                   <?php foreach ($ABHOLUNG as $val => $label): ?>
                     <option value="<?= $h($val) ?>" <?= $curAbh === $val ? 'selected' : '' ?>><?= $h($label) ?></option>
+                  <?php endforeach; ?>
+                </select>
+              </td>
+              <td>
+                <select class="form-select form-select-sm" name="rueckgabe[<?= $rid ?>]">
+                  <?php foreach ($RUECKGABE as $val => $label): ?>
+                    <option value="<?= $h($val) ?>" <?= $curRueck === $val ? 'selected' : '' ?>><?= $h($label) ?></option>
                   <?php endforeach; ?>
                 </select>
               </td>

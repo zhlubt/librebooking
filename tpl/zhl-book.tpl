@@ -281,6 +281,40 @@
 						{/if}
 						</div>{* /#zhl-einf-wrap *}
 					{/if}
+
+					{* --- Block C: persönliche Rückgabe (Slot-Picker, SPEC-RUECKGABE) — spiegelbildlich zur Abholung --- *}
+					{if $Return && $Return.applies}
+						<div class="zhl-ff-return"{if $Hauspost && $Hauspost.allowed && $Fulfillment == 'hauspost'} style="display:none;"{/if}>
+						<div id="zhl-return-wrap" data-mandatory="{if $Return.mandatory}1{else}0{/if}">
+						{if $Return.days}
+							<div class="zhl-einf-pick zhl-pickup">
+								<div class="zhl-einf-head">Rückgabetermin wählen{if $Return.mandatory} <span class="zhl-req">*</span>{/if}</div>
+								<div class="zhl-muted zhl-small" style="margin-bottom:8px;">Nur Termine <strong>am oder nach</strong> deinem Ausleihende. <strong>Bis zum Rückgabetag bleibt das Gerät auf dich gebucht</strong> (nicht nur bis Nutzungsende).{if $Rueckgabeort} Rückgabeort: {$Rueckgabeort|escape}.{/if} Die Termine aktualisieren sich automatisch, sobald du den Zeitraum änderst.</div>
+								<div class="zhl-pickup-daybar">
+									{foreach from=$Return.days item=d name=rd}
+										<button type="button" class="zhl-pickup-day{if $smarty.foreach.rd.first} active{/if}" data-day="{$d.date}">{$d.label|escape}</button>
+									{/foreach}
+								</div>
+								{foreach from=$Return.days item=d name=rd2}
+									<div class="zhl-pickup-times" data-day="{$d.date}"{if !$smarty.foreach.rd2.first} style="display:none;"{/if}>
+										{foreach from=$d.slots item=s}
+											<label class="zhl-pickup-pill">
+												<input type="radio" name="return_slot" value="{$s.slot_id|escape}" {if $Return.selected == $s.slot_id}checked{/if} {if $Return.mandatory}required{/if}>
+												<span>{$s.timeLabel|escape}</span>
+											</label>
+										{/foreach}
+									</div>
+								{/foreach}
+							</div>
+						{elseif $Return.mandatory}
+							<div class="zhl-ueb-item req">
+								<strong>⛔ Kein Rückgabetermin ab deinem Ausleihende frei</strong>
+								<span class="zhl-muted zhl-small">{if $Return.earliestLabel}Frühester Termin: {$Return.earliestLabel}.{else}Aktuell ist kein Rückgabetermin verfügbar — eine Buchung ist erst möglich, sobald Termine frei sind.{/if}</span>
+							</div>
+						{/if}
+						</div>{* /#zhl-return-wrap *}
+						</div>{* /.zhl-ff-return *}
+					{/if}
 				</div>
 
 				{if $Attributes}
@@ -309,11 +343,19 @@
 				{/if}
 
 				<div class="zhl-book-actions">
-					<button class="zhl-btn" type="submit" id="zhl-submit" {if $Einf.blocked || ($Pickup && $Pickup.blocked && $Fulfillment != 'hauspost')}disabled{/if}>Verbindlich buchen ▸</button>
+					<button class="zhl-btn" type="submit" id="zhl-submit" {if $Einf.blocked || ($Pickup && $Pickup.blocked && $Fulfillment != 'hauspost') || ($Return && $Return.blocked && $Fulfillment != 'hauspost')}disabled{/if}>Verbindlich buchen ▸</button>
 					{if $Einf.blocked}<span class="zhl-muted zhl-small" style="margin-left:10px;">Buchung erst möglich, wenn ein Einführungstermin frei ist.</span>{/if}
 					{if $Pickup && $Pickup.blocked && $Fulfillment != 'hauspost'}<span class="zhl-muted zhl-small" style="margin-left:10px;">Buchung erst möglich, wenn ein Abholtermin frei ist.</span>{/if}
+					{if $Return && $Return.blocked && $Fulfillment != 'hauspost'}<span class="zhl-muted zhl-small" style="margin-left:10px;">Buchung erst möglich, wenn ein Rückgabetermin frei ist.</span>{/if}
 				</div>
-				<p class="zhl-note">Verfügbarkeit, Vorlauf und Konflikte werden beim Buchen verbindlich geprüft. Ist eine Einführung nötig, wird der gewählte Termin direkt im Terminplaner gebucht; danach wird die Reservierung angelegt.</p>
+				{if $Einf.blocked || ($Pickup && $Pickup.blocked && $Fulfillment != 'hauspost') || ($Return && $Return.blocked && $Fulfillment != 'hauspost')}
+					<div class="zhl-ueb-item req" style="margin-top:14px;display:block;">
+						<strong>Kein passender Termin frei?</strong>
+						<span class="zhl-muted zhl-small">Stell stattdessen eine Wunschtermin-Anfrage — das ZHL-Medien-Team meldet sich mit einem Termin.</span>
+						<div style="margin-top:8px;"><a class="zhl-btn zhl-btn-ghost zhl-btn-sm" href="{$Path}zhl-termin-anfrage.php?rid={$ResourceId}&amp;pt={$ProjectTitle|escape:'url'}">📅 Wunschtermin anfragen</a></div>
+					</div>
+				{/if}
+				<p class="zhl-note">Verfügbarkeit, Vorlauf und Konflikte werden beim Buchen verbindlich geprüft. Ist eine Einführung nötig, wird der gewählte Termin direkt im Terminplaner gebucht; danach wird die Reservierung angelegt. <a href="{$Path}zhl-termin-anfrage.php?rid={$ResourceId}">Kein passender Zeitraum? Wunschtermin anfragen.</a></p>
 			</form>
 		</div>
 	{/if}
@@ -324,22 +366,25 @@
 	var submit = document.getElementById('zhl-submit');
 	var pickupWrap = document.getElementById('zhl-pickup-wrap');
 	var einfWrap = document.getElementById('zhl-einf-wrap');
+	var returnWrap = document.getElementById('zhl-return-wrap');
 	var ridEl = document.querySelector('input[name=resourceId]');
 	var fetchToken = 0;
 	function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]; }); }
 	function curFulfillment() { var v = 'pickup'; document.querySelectorAll('.zhl-ff-radio').forEach(function (r) { if (r.checked) { v = r.value; } }); return v; }
 	function setSubmitBlocked(blocked, reason) { if (!submit) { return; } submit.disabled = blocked; submit.title = blocked && reason ? reason : ''; }
 	// Submit-Sperre als Zustand: Einführung blockiert immer (Pflicht), Abholung nur wenn NICHT Hauspost.
-	var pickupBlocked = false, einfBlocked = false, slotsLoading = false;
+	var pickupBlocked = false, einfBlocked = false, returnBlocked = false, slotsLoading = false;
 	function updateSubmitState() {
 		if (slotsLoading) { setSubmitBlocked(true, 'Termine werden geladen …'); return; }
 		if (einfBlocked) { setSubmitBlocked(true, 'Kein Einführungstermin verfügbar — bitte anderen Ausleihstart wählen.'); return; }
 		if (pickupBlocked && curFulfillment() !== 'hauspost' && !combinedActive()) { setSubmitBlocked(true, 'Kein Abholtermin verfügbar — bitte anderen Ausleihstart wählen.'); return; }
+		if (returnBlocked && curFulfillment() !== 'hauspost') { setSubmitBlocked(true, 'Kein Rückgabetermin verfügbar — bitte anderes Ausleihende wählen.'); return; }
 		setSubmitBlocked(false);
 	}
 	function recomputeBlockedFromDom() {
 		einfBlocked = !!(einfWrap && einfWrap.getAttribute('data-active') === '1' && einfWrap.getAttribute('data-required') === '1' && !einfWrap.querySelector('input[name=einf_slot]'));
 		pickupBlocked = !!(pickupWrap && pickupWrap.getAttribute('data-mandatory') === '1' && !pickupWrap.querySelector('input[name=pickup_slot]'));
+		returnBlocked = !!(returnWrap && returnWrap.getAttribute('data-mandatory') === '1' && !returnWrap.querySelector('input[name=return_slot]'));
 	}
 
 	// --- Abhol-/Einführungstermine client-seitig rendern (Struktur = Server-Render) ---
@@ -395,16 +440,44 @@
 		einfWrap.innerHTML = h;
 		return false;
 	}
-	function loadSlots(start, time) {
+	// Rückgabe-Picker (SPEC-RUECKGABE) — Struktur = Abhol-Picker, name=return_slot. Gibt 'blocked' zurück.
+	function renderReturn(vm) {
+		if (!returnWrap) { return false; }
+		var mandatory = returnWrap.getAttribute('data-mandatory') === '1';
+		if (!vm || !vm.days || !vm.days.length) {
+			if (vm && mandatory) {
+				returnWrap.innerHTML = '<div class="zhl-ueb-item req"><strong>⛔ Kein Rückgabetermin ab deinem Ausleihende frei</strong> <span class="zhl-muted zhl-small">' +
+					(vm.earliestLabel ? 'Frühester Termin: ' + esc(vm.earliestLabel) + '.' : 'Aktuell ist kein Rückgabetermin verfügbar.') + '</span></div>';
+				return true;
+			}
+			returnWrap.innerHTML = '';
+			return false;
+		}
+		var h = '<div class="zhl-einf-pick zhl-pickup"><div class="zhl-einf-head">Rückgabetermin wählen' + (mandatory ? ' <span class="zhl-req">*</span>' : '') + '</div>' +
+			'<div class="zhl-muted zhl-small" style="margin-bottom:8px;">Nur Termine <strong>am oder nach</strong> deinem Ausleihende. <strong>Bis zum Rückgabetag bleibt das Gerät auf dich gebucht.</strong></div><div class="zhl-pickup-daybar">';
+		vm.days.forEach(function (d, i) { h += '<button type="button" class="zhl-pickup-day' + (i === 0 ? ' active' : '') + '" data-day="' + esc(d.date) + '">' + esc(d.label) + '</button>'; });
+		h += '</div>';
+		vm.days.forEach(function (d, i) {
+			h += '<div class="zhl-pickup-times" data-day="' + esc(d.date) + '"' + (i === 0 ? '' : ' style="display:none;"') + '>';
+			(d.slots || []).forEach(function (s) { h += '<label class="zhl-pickup-pill"><input type="radio" name="return_slot" value="' + esc(s.slot_id) + '"' + (mandatory ? ' required' : '') + '><span>' + esc(s.timeLabel) + '</span></label>'; });
+			h += '</div>';
+		});
+		h += '</div>';
+		returnWrap.innerHTML = h;
+		return false;
+	}
+	function loadSlots(start, time, end) {
 		if (!start || !ridEl) { return; }
 		var einfActive = einfWrap && einfWrap.getAttribute('data-active') === '1' && einfWrap.getAttribute('data-required') === '1';
 		var pickupMand = pickupWrap && pickupWrap.getAttribute('data-mandatory') === '1';
+		var returnMand = returnWrap && returnWrap.getAttribute('data-mandatory') === '1';
 		var token = ++fetchToken;
 		if (pickupWrap) { pickupWrap.innerHTML = '<div class="zhl-muted zhl-small">⏳ Termine werden geladen …</div>'; }
+		if (returnWrap) { returnWrap.innerHTML = '<div class="zhl-muted zhl-small">⏳ Termine werden geladen …</div>'; }
 		if (einfWrap && einfWrap.getAttribute('data-active') === '1') { einfWrap.innerHTML = ''; }
-		slotsLoading = (einfActive || pickupMand);
+		slotsLoading = (einfActive || pickupMand || returnMand);
 		updateSubmitState();
-		var url = window.location.pathname + '?ajax=slots&rid=' + encodeURIComponent(ridEl.value) + '&start=' + encodeURIComponent(start) + (time ? '&time=' + encodeURIComponent(time) : '');
+		var url = window.location.pathname + '?ajax=slots&rid=' + encodeURIComponent(ridEl.value) + '&start=' + encodeURIComponent(start) + (time ? '&time=' + encodeURIComponent(time) : '') + (end ? '&end=' + encodeURIComponent(end) : '');
 		fetch(url, { headers: { 'X-Requested-With': 'fetch' } })
 			.then(function (r) { if (!r.ok) { throw new Error('http'); } return r.json(); })
 			.then(function (j) {
@@ -412,16 +485,19 @@
 				if (!j || j.error) { throw new Error('data'); }
 				pickupBlocked = renderPickup(j.pickup);
 				einfBlocked = renderEinf(j.einf);
+				returnBlocked = renderReturn(j.return);
 				slotsLoading = false;
-				applyFulfillment(); // ruft updateSubmitState() + deaktiviert pickup_slot bei Hauspost
+				applyFulfillment(); // ruft updateSubmitState() + deaktiviert pickup_slot/return_slot bei Hauspost
 			})
 			.catch(function () {
 				if (token !== fetchToken) { return; }
 				slotsLoading = false;
 				if (einfActive) { einfBlocked = true; }
 				if (pickupMand) { pickupBlocked = true; }
+				if (returnMand) { returnBlocked = true; }
 				updateSubmitState();
 				if (pickupWrap && pickupWrap.innerHTML.indexOf('⏳') !== -1) { pickupWrap.innerHTML = '<div class="zhl-muted zhl-small">⚠ Termine konnten nicht geladen werden — bitte Start erneut wählen.</div>'; }
+				if (returnWrap && returnWrap.innerHTML.indexOf('⏳') !== -1) { returnWrap.innerHTML = '<div class="zhl-muted zhl-small">⚠ Termine konnten nicht geladen werden — bitte Zeitraum erneut wählen.</div>'; }
 			});
 	}
 
@@ -441,7 +517,7 @@
 			dStart.value = lo; dEnd.value = hi;
 			if (dLabel) { dLabel.textContent = (lo === hi) ? ('Ausleihe: ' + lo) : ('Ausleihe: ' + lo + ' – ' + hi); }
 			if (dWknd) { dWknd.style.display = sel.some(function (c) { return c.classList.contains('wknd'); }) ? '' : 'none'; }
-			loadSlots(lo, '');
+			loadSlots(lo, '', hi); // Rückgabe-Floor braucht den End-Tag (SPEC-RUECKGABE)
 		}
 		function setOneDay(td) { anchorDay = td.getAttribute('data-day'); applyRange(anchorDay, anchorDay); }
 		mgrid.addEventListener('click', function (ev) {
@@ -460,6 +536,7 @@
 	// --- Fulfillment-Umschalter (C2) + „Zusammen/Getrennt"-Umschalter (Einführung+Abholung). ---
 	var ffRadios = document.querySelectorAll('.zhl-ff-radio');
 	var ffPickup = document.querySelector('.zhl-ff-pickup');
+	var ffReturn = document.querySelector('.zhl-ff-return');
 	var ffHauspost = document.querySelector('.zhl-ff-hauspost');
 	var hpTitel = document.querySelector('.zhl-hp-titel');
 	var projTitle = document.querySelector('input[name=projectTitle]');
@@ -481,6 +558,13 @@
 		if (ffPickup) {
 			ffPickup.style.display = hidePickup ? 'none' : '';
 			ffPickup.querySelectorAll('input[name=pickup_slot]').forEach(function (el) { el.disabled = hidePickup; el.required = (!hidePickup && pMand); });
+		}
+		// Rückgabe (SPEC-RUECKGABE): bei Hauspost ausblenden (Rückversand per Post), sonst zeigen.
+		// Unabhängig von „Zusammen" (das betrifft nur Einführung+Abholung).
+		if (ffReturn) {
+			var rMand = returnWrap && returnWrap.getAttribute('data-mandatory') === '1';
+			ffReturn.style.display = isHp ? 'none' : '';
+			ffReturn.querySelectorAll('input[name=return_slot]').forEach(function (el) { el.disabled = isHp; el.required = (!isHp && rMand); });
 		}
 		if (ffHauspost) { ffHauspost.style.display = isHp ? '' : 'none'; ffHauspost.querySelectorAll('input').forEach(function (el) { el.required = isHp; }); }
 		if (isHp && hpTitel && projTitle && hpTitel.value === '') { hpTitel.value = projTitle.value; }
@@ -508,6 +592,7 @@
 	}
 	bindDayChips(pickupWrap);
 	bindDayChips(einfWrap);
+	bindDayChips(returnWrap);
 
 	// --- Wochen-Raster (Slotmodus): freie Zeitspanne anklicken → Termine zum START laden. ---
 	var grid = document.querySelector('.zhl-weekgrid');
@@ -521,7 +606,7 @@
 			clearSel(); td.classList.add('sel');
 			sD.value = td.getAttribute('data-day'); sB.value = td.getAttribute('data-b'); sE.value = td.getAttribute('data-e');
 			if (label) { label.textContent = sD.value + '  ' + sB.value + '–' + sE.value; }
-			loadSlots(sD.value, sB.value);
+			loadSlots(sD.value, sB.value, sD.value);
 		}
 		grid.addEventListener('click', function (ev) {
 			var td = ev.target.closest('td.s-free'); if (!td) { return; }
@@ -534,7 +619,7 @@
 			for (var j = lo; j <= hi; j++) { cells[j].classList.add('sel'); }
 			sD.value = cells[lo].getAttribute('data-day'); sB.value = cells[lo].getAttribute('data-b'); sE.value = cells[hi].getAttribute('data-e');
 			if (label) { label.textContent = sD.value + '  ' + sB.value + '–' + sE.value; }
-			loadSlots(sD.value, sB.value);
+			loadSlots(sD.value, sB.value, sD.value);
 			anchor = null;
 		});
 	}

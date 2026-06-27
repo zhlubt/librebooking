@@ -70,18 +70,21 @@ class ZhlCertificatesAdminPresenter
                 }
                 $doc = mb_substr($doc, 0, 500);
                 $active = $this->post('info_active') ? 1 : 0;
+                // Parameternamen bewusst eindeutig (kein Name ist Präfix eines anderen) — LibreBooks
+                // AdHocCommand ersetzt Platzhalter per String-Replace; `@n` würde sonst auch in `@now`
+                // greifen → „Unknown column 'nullow'".
                 $cmd = new AdHocCommand(
                     'INSERT INTO zhl_cert_type_info (cert_type_id, transponder_code, news_text, doc_url, active, updated_at) ' .
-                    'VALUES (@id,@c,@n,@d,@a,@now) ' .
+                    'VALUES (@cid,@code,@news,@doc,@act,@ts) ' .
                     'ON DUPLICATE KEY UPDATE transponder_code=VALUES(transponder_code), news_text=VALUES(news_text), ' .
                     'doc_url=VALUES(doc_url), active=VALUES(active), updated_at=VALUES(updated_at)'
                 );
-                $cmd->AddParameter(new Parameter('@id', $id));
-                $cmd->AddParameter(new Parameter('@c', $code));
-                $cmd->AddParameter(new Parameter('@n', $news));
-                $cmd->AddParameter(new Parameter('@d', $doc));
-                $cmd->AddParameter(new Parameter('@a', $active));
-                $cmd->AddParameter(new Parameter('@now', gmdate('Y-m-d H:i:s')));
+                $cmd->AddParameter(new Parameter('@cid', $id));
+                $cmd->AddParameter(new Parameter('@code', $code));
+                $cmd->AddParameter(new Parameter('@news', $news));
+                $cmd->AddParameter(new Parameter('@doc', $doc));
+                $cmd->AddParameter(new Parameter('@act', $active));
+                $cmd->AddParameter(new Parameter('@ts', gmdate('Y-m-d H:i:s')));
                 $db->Execute($cmd);
                 return 'Vertrauliche Infos gespeichert.';
 

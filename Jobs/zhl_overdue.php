@@ -1,217 +1,226 @@
 <?php
 /**
- * ZHL Übergabe-Modul Phase C — Overdue-/Rückgabe-Eskalation (F34).
+ * ZHL Rückgabe-Erinnerungen / Mahnungen (Mail-Umsetzung 2026-06-27).
  *
- * Findet überfällige RÜCKGABEN (zhl_booking_handover type='return', noch nicht 'done',
- * geplantes Ende + Toleranz überschritten) und eskaliert in mehreren Stufen per E-Mail.
- * Jede Stufe wird in zhl_overdue_notice protokolliert (Unique handover_id+stage) → keine
- * Doppel-Mails; pro Lauf wird höchstens die nächste fällige Stufe versandt.
+ * Zwei Pässe über die Rückgaben (zhl_booking_handover, type='return', noch nicht 'done'):
  *
- * Läuft über den ZHL-Cron-Runner (Web/zhl-cron.php) — der Container hat keinen Cron.
- * CLI-only (JobCop). Optionales User-Sperren in der Schlussstufe ist standardmäßig AUS.
+ *  A) VORTAG-ERINNERUNG (Stufe 1, freundlich, AUTOMATISCH): Rückgabe ist morgen → Mail sofort raus,
+ *     in zhl_rueckgabe_mahnung als status='sent' protokolliert (Unique handover+stage = einmalig).
  *
- * Cron-frei testbar: Migration 005 + ein überfälliger return-Datensatz, dann
+ *  B) ÜBERFÄLLIG (Stufe 2 „deutlich", Stufe 3 „letzte"): wird NICHT automatisch versandt, sondern als
+ *     status='pending' in die Freigabe-Queue eingereiht. Ein Admin gibt jede Mahnung einzeln frei
+ *     (zhl-mahnungen-admin.php) — das Gerät könnte längst zurück sein, nur unbestätigt.
+ *
+ * Läuft über den ZHL-Cron-Runner (Web/zhl-cron.php). CLI-only (JobCop). Cron-frei testbar:
  *   php -f Jobs/zhl_overdue.php
  */
 
 define('ROOT_DIR', __DIR__ . '/../');
 require_once(ROOT_DIR . 'Domain/Access/namespace.php');
-require_once(ROOT_DIR . 'Domain/Values/AccountStatus.php'); // für AccountStatus::INACTIVE (User-Sperre)
 require_once(ROOT_DIR . 'Jobs/JobCop.php');
 require_once(ROOT_DIR . 'lib/Email/namespace.php');
+require_once(ROOT_DIR . 'Presenters/ZhlReturnMail.php');
 
 JobCop::EnsureCommandLine();
 
-// --- Konfiguration (bewusst im Job, ZHL-eigen) ---
-const ZHL_OVERDUE_GRACE_HOURS = 24;          // Toleranz nach geplantem Rückgabe-Ende
-const ZHL_OVERDUE_STAGE_DAYS = [1, 3, 7];    // Tage-überfällig-Schwellen je Stufe (1..3)
-const ZHL_OVERDUE_LOCK_USER = false;         // Schlussstufe sperrt den User? (Default: nein)
+// --- Konfiguration (ZHL-eigen) ---
+const ZHL_RETURN_GRACE_HOURS = 24;     // Toleranz nach geplantem Rückgabe-Ende, bevor „überfällig"
+const ZHL_RETURN_DEUTLICH_DAYS = 2;    // Tage überfällig → Stufe 2 (deutlich) einreihen
+const ZHL_RETURN_LETZTE_DAYS = 6;      // Tage überfällig → Stufe 3 (letzte) einreihen
+const ZHL_RETURN_CONTACT = 'zhlmedien@uni-bayreuth.de';
 
-/**
- * Einfache ZHL-Eskalations-Mail (ohne Smarty-Template, plain HTML).
- */
-class ZhlOverdueEmail extends EmailMessage
+/** Empfänger (user) zu einer Rückgabe über das Handover-Token auflösen. @return array|null */
+function zhl_return_recipient($db, $token)
 {
-    private $zhlEmail;
-    private $zhlName;
-    private $zhlResource;
-    private $zhlDue;
-    private $zhlStage;
-    private $zhlFinalStage;
-
-    public function __construct($email, $name, $resourceName, $dueDate, $stage, $finalStage, $language = null)
-    {
-        $this->zhlEmail = $email;
-        $this->zhlName = $name;
-        $this->zhlResource = $resourceName;
-        $this->zhlDue = $dueDate;
-        $this->zhlStage = $stage;
-        $this->zhlFinalStage = $finalStage;
-        parent::__construct($language);
+    if (empty($token)) {
+        return null;
     }
-
-    public function To()
-    {
-        return new EmailAddress($this->zhlEmail, new FullName($this->zhlName, ''));
-    }
-
-    public function Subject()
-    {
-        $prefix = $this->zhlStage >= $this->zhlFinalStage ? 'LETZTE MAHNUNG' : 'Erinnerung';
-        return sprintf('[%s] Überfällige Rückgabe: %s', $prefix, $this->zhlResource);
-    }
-
-    public function Body()
-    {
-        $name = htmlspecialchars((string)$this->zhlName, ENT_QUOTES, 'UTF-8');
-        $res = htmlspecialchars((string)$this->zhlResource, ENT_QUOTES, 'UTF-8');
-        $due = htmlspecialchars((string)$this->zhlDue, ENT_QUOTES, 'UTF-8');
-        $final = $this->zhlStage >= $this->zhlFinalStage
-            ? '<p><strong>Dies ist die letzte Mahnung.</strong> Bitte geben Sie das Gerät umgehend zurück, '
-              . 'sonst kann Ihr Ausleih-Konto gesperrt werden.</p>'
-            : '<p>Bitte geben Sie das Gerät zeitnah zurück oder melden Sie sich beim ZHL-Team.</p>';
-
-        return '<p>Hallo ' . $name . ',</p>'
-            . '<p>die Rückgabe des Geräts <strong>' . $res . '</strong> ist seit dem '
-            . $due . ' überfällig (Mahnstufe ' . (int)$this->zhlStage . ').</p>'
-            . $final
-            . '<p>Mit freundlichen Grüßen<br>ZHL Medienausleihe</p>';
-    }
+    $cmd = new AdHocCommand(
+        'SELECT u.user_id, u.email, u.fname, u.lname, u.language ' .
+        'FROM zhl_handover_token t JOIN users u ON u.user_id = t.user_id ' .
+        'WHERE t.handover_token = @token'
+    );
+    $cmd->AddParameter(new Parameter('@token', $token));
+    $reader = $db->Query($cmd);
+    $row = $reader->GetRow() ?: null;
+    $reader->Free();
+    return ($row && !empty($row['email'])) ? $row : null;
 }
 
-Log::Debug('Running zhl_overdue.php');
+Log::Debug('Running zhl_overdue.php (Rückgabe-Erinnerungen)');
 
 try {
     $emailEnabled = Configuration::Instance()->GetKey(ConfigKeys::EMAIL_ENABLED, new BooleanConverter());
     $db = ServiceLocator::GetDatabase();
     $now = Date::Now();
-    $finalStage = count(ZHL_OVERDUE_STAGE_DAYS);
+    $tzName = Configuration::Instance()->GetKey(ConfigKeys::DEFAULT_TIMEZONE) ?: 'Europe/Berlin';
 
-    // Überfällige Rückgaben: geplantes Ende + Toleranz überschritten, noch nicht erledigt.
-    $cmd = new AdHocCommand(
+    // ===================== A) VORTAG-ERINNERUNG (automatisch) =====================
+    // Rückgaben, deren geplantes Ende MORGEN (lokaler Tag) liegt.
+    $tomorrowStartLocal = $now->ToTimezone($tzName)->AddDays(1)->GetDate(); // morgen 00:00 lokal
+    $tomorrowStartUtc = $tomorrowStartLocal->ToUtc();
+    $tomorrowEndUtc = $tomorrowStartLocal->AddDays(1)->ToUtc();             // übermorgen 00:00 lokal
+
+    $vorCmd = new AdHocCommand(
         "SELECT h.id, h.handover_token, h.reference_number, h.resource_id, h.scheduled_end_utc, " .
-        "r.name AS resource_name " .
-        "FROM zhl_booking_handover h " .
+        "r.name AS resource_name FROM zhl_booking_handover h " .
         "LEFT JOIN resources r ON r.resource_id = h.resource_id " .
         "WHERE h.type = 'return' AND h.status IN ('requested','confirmed') " .
         "AND h.scheduled_end_utc IS NOT NULL " .
-        "AND h.scheduled_end_utc < @cutoff"
+        "AND h.scheduled_end_utc >= @from AND h.scheduled_end_utc < @to"
     );
-    $cmd->AddParameter(new Parameter('@cutoff', $now->AddHours(-ZHL_OVERDUE_GRACE_HOURS)->ToDatabase()));
-    $reader = $db->Query($cmd);
-
-    $rows = [];
+    $vorCmd->AddParameter(new Parameter('@from', $tomorrowStartUtc->ToDatabase()));
+    $vorCmd->AddParameter(new Parameter('@to', $tomorrowEndUtc->ToDatabase()));
+    $vorRows = [];
+    $reader = $db->Query($vorCmd);
     while ($row = $reader->GetRow()) {
-        $rows[] = $row;
+        $vorRows[] = $row;
     }
     $reader->Free();
 
-    foreach ($rows as $row) {
+    foreach ($vorRows as $row) {
         $handoverId = (int)$row['id'];
-        $dueUtc = new DateTime($row['scheduled_end_utc'], new DateTimeZone('UTC'));
-        $nowUtc = new DateTime($now->ToDatabase(), new DateTimeZone('UTC'));
-        $daysOverdue = (int)floor(($nowUtc->getTimestamp() - $dueUtc->getTimestamp()) / 86400);
-
-        // Zielstufe = höchste Stufe, deren Schwelle erreicht ist.
-        $targetStage = 0;
-        foreach (ZHL_OVERDUE_STAGE_DAYS as $i => $threshold) {
-            if ($daysOverdue >= $threshold) {
-                $targetStage = $i + 1;
-            }
-        }
-        if ($targetStage === 0) {
+        if (zhl_mahnung_exists($db, $handoverId, ZhlReturnMail::STAGE_REMINDER)) {
             continue;
         }
-
-        // Bereits versandte Stufen?
-        $sentCmd = new AdHocCommand('SELECT MAX(stage) AS max_stage FROM zhl_overdue_notice WHERE handover_id = @hid');
-        $sentCmd->AddParameter(new Parameter('@hid', $handoverId));
-        $sentReader = $db->Query($sentCmd);
-        $sentRow = $sentReader->GetRow();
-        $sentReader->Free();
-        $maxSent = $sentRow && $sentRow['max_stage'] !== null ? (int)$sentRow['max_stage'] : 0;
-
-        // Zeitbasiert eskalieren: die zur AKTUELLEN Überfälligkeit passende Stufe senden
-        // (überspringt verpasste Stufen bei spät entdeckten Fällen — kein 1→2→3-Spam in
-        // Folge-Läufen). Schon versandte Stufe → nichts tun.
-        if ($targetStage <= $maxSent) {
+        $user = zhl_return_recipient($db, $row['handover_token']);
+        if (!$user) {
             continue;
         }
-        $nextStage = $targetStage;
-
-        // Empfänger über das Token auflösen (Assistent legt es immer an).
-        $user = null;
-        if (!empty($row['handover_token'])) {
-            $uCmd = new AdHocCommand(
-                'SELECT u.user_id, u.email, u.fname, u.lname, u.language ' .
-                'FROM zhl_handover_token t JOIN users u ON u.user_id = t.user_id ' .
-                'WHERE t.handover_token = @token'
-            );
-            $uCmd->AddParameter(new Parameter('@token', $row['handover_token']));
-            $uReader = $db->Query($uCmd);
-            $user = $uReader->GetRow() ?: null;
-            $uReader->Free();
-        }
-        if (!$user || empty($user['email'])) {
-            Log::Error('zhl_overdue: kein Empfänger für handover %s', $handoverId);
-            continue;
-        }
-
         $resourceName = $row['resource_name'] ?: 'Gerät';
-        $fullName = trim(($user['fname'] ?? '') . ' ' . ($user['lname'] ?? ''));
+        $name = trim(($user['fname'] ?? '') . ' ' . ($user['lname'] ?? ''));
+        $dueLabel = Date::Parse((string)$row['scheduled_end_utc'], 'UTC')->ToTimezone($tzName)->Format('d.m.Y');
 
-        // 1. Stufe ATOMAR beanspruchen (Unique handover_id+stage) — gegen parallele Cron-Läufe.
-        //    Duplicate-Key (parallele Instanz war schneller) → diese Stufe überspringen.
-        $ins = new AdHocCommand(
-            'INSERT INTO zhl_overdue_notice (handover_id, handover_token, reference_number, stage, recipient_email, sent_at) ' .
-            'VALUES (@hid, @token, @ref, @stage, @email, @sent)'
-        );
-        $ins->AddParameter(new Parameter('@hid', $handoverId));
-        $ins->AddParameter(new Parameter('@token', $row['handover_token']));
-        $ins->AddParameter(new Parameter('@ref', $row['reference_number']));
-        $ins->AddParameter(new Parameter('@stage', $nextStage));
-        $ins->AddParameter(new Parameter('@email', $user['email']));
-        $ins->AddParameter(new Parameter('@sent', $now->ToDatabase()));
-        try {
-            $db->Execute($ins);
-        } catch (Exception $claimEx) {
-            continue; // bereits beansprucht (parallel) → kein Doppel-Versand
+        // Stufe 1 atomar beanspruchen (status='sent'); Duplicate-Key → parallel schon gesendet.
+        if (!zhl_mahnung_claim($db, $handoverId, ZhlReturnMail::STAGE_REMINDER, $row, $user, $resourceName, 'sent', $now)) {
+            continue;
         }
-
-        // 2. Senden. Schlägt der Versand fehl, Anspruch ZURÜCKNEHMEN (Retry im nächsten Lauf),
-        //    statt eine nie zugestellte Stufe als „versandt" zu führen.
         if ($emailEnabled) {
             try {
-                ServiceLocator::GetEmailService()->Send(new ZhlOverdueEmail(
-                    $user['email'],
-                    $fullName,
+                ServiceLocator::GetEmailService()->Send(new ZhlReturnMail(
+                    new EmailAddress($user['email'], new FullName($name, '')),
+                    ZhlReturnMail::STAGE_REMINDER,
+                    $name,
                     $resourceName,
-                    $row['scheduled_end_utc'],
-                    $nextStage,
-                    $finalStage,
+                    $dueLabel,
+                    ZHL_RETURN_CONTACT,
                     $user['language'] ?? null
                 ));
             } catch (Exception $mailEx) {
-                Log::Error('zhl_overdue: Mailversand fehlgeschlagen (handover %s): %s', $handoverId, $mailEx->getMessage());
-                $del = new AdHocCommand('DELETE FROM zhl_overdue_notice WHERE handover_id = @hid AND stage = @stage');
-                $del->AddParameter(new Parameter('@hid', $handoverId));
-                $del->AddParameter(new Parameter('@stage', $nextStage));
-                $db->Execute($del);
+                Log::Error('zhl_overdue: Vortag-Mail fehlgeschlagen (handover %s): %s', $handoverId, $mailEx->getMessage());
+                zhl_mahnung_unclaim($db, $handoverId, ZhlReturnMail::STAGE_REMINDER);
                 continue;
             }
         }
-        Log::Debug('zhl_overdue: Stufe %s an %s (handover %s, %s Tage überfällig)',
-            $nextStage, $user['email'], $handoverId, $daysOverdue);
+        Log::Debug('zhl_overdue: Vortag-Erinnerung an %s (handover %s)', $user['email'], $handoverId);
+    }
 
-        // 3. Optional: Schlussstufe sperrt den User (Default AUS). INACTIVE = 3 (keine Magic Number).
-        if (ZHL_OVERDUE_LOCK_USER && $nextStage >= $finalStage) {
-            $lock = new AdHocCommand('UPDATE users SET status_id = @inactive WHERE user_id = @uid');
-            $lock->AddParameter(new Parameter('@inactive', AccountStatus::INACTIVE));
-            $lock->AddParameter(new Parameter('@uid', (int)$user['user_id']));
-            $db->Execute($lock);
-            Log::Debug('zhl_overdue: User %s gesperrt (Schlussstufe)', $user['user_id']);
+    // ===================== B) ÜBERFÄLLIG → FREIGABE-QUEUE (kein Auto-Versand) =====================
+    $cutoff = $now->AddHours(-ZHL_RETURN_GRACE_HOURS)->ToDatabase();
+    $ovCmd = new AdHocCommand(
+        "SELECT h.id, h.handover_token, h.reference_number, h.resource_id, h.scheduled_end_utc, " .
+        "r.name AS resource_name FROM zhl_booking_handover h " .
+        "LEFT JOIN resources r ON r.resource_id = h.resource_id " .
+        "WHERE h.type = 'return' AND h.status IN ('requested','confirmed') " .
+        "AND h.scheduled_end_utc IS NOT NULL AND h.scheduled_end_utc < @cutoff"
+    );
+    $ovCmd->AddParameter(new Parameter('@cutoff', $cutoff));
+    $ovRows = [];
+    $reader = $db->Query($ovCmd);
+    while ($row = $reader->GetRow()) {
+        $ovRows[] = $row;
+    }
+    $reader->Free();
+
+    $nowTs = (new DateTime($now->ToDatabase(), new DateTimeZone('UTC')))->getTimestamp();
+    foreach ($ovRows as $row) {
+        $handoverId = (int)$row['id'];
+        $dueTs = (new DateTime($row['scheduled_end_utc'], new DateTimeZone('UTC')))->getTimestamp();
+        $daysOverdue = (int)floor(($nowTs - $dueTs) / 86400);
+
+        // Höchste erreichte überfällige Stufe (2 deutlich, 3 letzte). Mitte entfällt.
+        $targetStage = 0;
+        if ($daysOverdue >= ZHL_RETURN_DEUTLICH_DAYS) {
+            $targetStage = ZhlReturnMail::STAGE_OVERDUE;
         }
+        if ($daysOverdue >= ZHL_RETURN_LETZTE_DAYS) {
+            $targetStage = ZhlReturnMail::STAGE_FINAL;
+        }
+        if ($targetStage === 0 || zhl_mahnung_exists($db, $handoverId, $targetStage)) {
+            continue;
+        }
+        $user = zhl_return_recipient($db, $row['handover_token']);
+        if (!$user) {
+            continue;
+        }
+        $resourceName = $row['resource_name'] ?: 'Gerät';
+        // Als 'pending' einreihen (KEIN Versand) — Admin gibt frei.
+        if (zhl_mahnung_claim($db, $handoverId, $targetStage, $row, $user, $resourceName, 'pending', $now)) {
+            // „Höchste erreichte Stufe": eine bereits offene NIEDRIGERE Stufe (z. B. Stufe 2) wird durch die
+            // höhere ersetzt → nicht doppelt anzeigen/versenden. Bereits gesendete Stufen bleiben unberührt.
+            $sup = new AdHocCommand(
+                "UPDATE zhl_rueckgabe_mahnung SET status = 'dismissed' " .
+                "WHERE handover_id = @hid AND status = 'pending' AND stage < @stage"
+            );
+            $sup->AddParameter(new Parameter('@hid', $handoverId));
+            $sup->AddParameter(new Parameter('@stage', $targetStage));
+            $db->Execute($sup);
+        }
+        Log::Debug('zhl_overdue: Stufe %s zur Freigabe eingereiht (handover %s, %s Tage überfällig)',
+            $targetStage, $handoverId, $daysOverdue);
     }
 } catch (Exception $ex) {
     Log::Error('Error running zhl_overdue.php: %s', $ex);
+}
+
+/** Existiert für (handover,stage) schon eine Zeile (jeglicher Status)? */
+function zhl_mahnung_exists($db, int $handoverId, int $stage): bool
+{
+    $cmd = new AdHocCommand('SELECT 1 FROM zhl_rueckgabe_mahnung WHERE handover_id = @hid AND stage = @stage');
+    $cmd->AddParameter(new Parameter('@hid', $handoverId));
+    $cmd->AddParameter(new Parameter('@stage', $stage));
+    $reader = $db->Query($cmd);
+    $row = $reader->GetRow();
+    $reader->Free();
+    // GetRow() liefert bei leerem Ergebnis NULL (nicht false) → auf echten Treffer prüfen.
+    return is_array($row);
+}
+
+/** (handover,stage) atomar einreihen (Unique). @return bool false bei Duplicate-Key (parallel). */
+function zhl_mahnung_claim($db, int $handoverId, int $stage, array $row, array $user, string $resourceName, string $status, $now): bool
+{
+    $name = trim(($user['fname'] ?? '') . ' ' . ($user['lname'] ?? ''));
+    $cmd = new AdHocCommand(
+        'INSERT INTO zhl_rueckgabe_mahnung ' .
+        '(handover_id, stage, reference_number, resource_name, recipient_email, recipient_name, recipient_user_id, ' .
+        'language, due_utc, status, created_at, sent_at) ' .
+        'VALUES (@hid, @stage, @ref, @res, @email, @name, @uid, @lang, @due, @status, @created, @sent)'
+    );
+    $cmd->AddParameter(new Parameter('@hid', $handoverId));
+    $cmd->AddParameter(new Parameter('@stage', $stage));
+    $cmd->AddParameter(new Parameter('@ref', $row['reference_number'] ?? null));
+    $cmd->AddParameter(new Parameter('@res', mb_substr($resourceName, 0, 190)));
+    $cmd->AddParameter(new Parameter('@email', mb_substr((string)$user['email'], 0, 190)));
+    $cmd->AddParameter(new Parameter('@name', mb_substr($name, 0, 190)));
+    $cmd->AddParameter(new Parameter('@uid', (int)$user['user_id']));
+    $cmd->AddParameter(new Parameter('@lang', $user['language'] ?? null));
+    $cmd->AddParameter(new Parameter('@due', $row['scheduled_end_utc'] ?? null));
+    $cmd->AddParameter(new Parameter('@status', $status));
+    $cmd->AddParameter(new Parameter('@created', $now->ToDatabase()));
+    $cmd->AddParameter(new Parameter('@sent', $status === 'sent' ? $now->ToDatabase() : null));
+    try {
+        $db->Execute($cmd);
+        return true;
+    } catch (Exception $e) {
+        return false; // Duplicate-Key = bereits beansprucht
+    }
+}
+
+/** Anspruch zurücknehmen (Mailversand fehlgeschlagen → Retry im nächsten Lauf). */
+function zhl_mahnung_unclaim($db, int $handoverId, int $stage): void
+{
+    $cmd = new AdHocCommand('DELETE FROM zhl_rueckgabe_mahnung WHERE handover_id = @hid AND stage = @stage');
+    $cmd->AddParameter(new Parameter('@hid', $handoverId));
+    $cmd->AddParameter(new Parameter('@stage', $stage));
+    $db->Execute($cmd);
 }

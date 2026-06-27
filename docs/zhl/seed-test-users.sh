@@ -51,7 +51,11 @@ echo "F40-Demo: Gruppe 'Eingewiesen: Gaming-PC' (id $CERTGID) -> 53-56; certuser
 
 # --- F40 Stufe 2: Zertifikat-Lifecycle (Permission-Plugin ZhlCertificate) ---
 # Voraussetzung: docs/zhl/migrations/001_zhl_certificate.sql eingespielt.
-q "INSERT IGNORE INTO zhl_certificate_required (resource_id) VALUES (53),(54),(55),(56);"
+# 2026-06-27 (Nutzer-Entscheidung): Schnitt-/VR-PCs (53-56) NICHT mehr hart cert-gaten — sie nutzen
+# jetzt wie das Studio den weichen Einführungs-Termin-Flow (zhl_uebergabe.einfuehrung='notwendig').
+# Das harte Gate (ZhlCertificate-Plugin) blockierte den Einführungs-Slot-Pfad (Henne-Ei). Daher
+# diese Zeile bewusst deaktiviert; zhl_certificate_required bleibt leer.
+# q "INSERT IGNORE INTO zhl_certificate_required (resource_id) VALUES (53),(54),(55),(56);"
 # certuser: GÜLTIGES Zertifikat (1 Jahr); certexpired: in Cert-Gruppe, aber ABGELAUFEN.
 q "INSERT INTO zhl_certificate (user_id,resource_id,granted_at,expires_at)
    SELECT u.user_id,r.resource_id,NOW(),DATE_ADD(NOW(),INTERVAL 1 YEAR)

@@ -1,4 +1,4 @@
--- 029: Verleih-Layouts auf STÜNDLICHES Raster umstellen (SPEC-LOAN-RASTER)
+-- 030: Verleih-Layouts auf STÜNDLICHES Raster umstellen (SPEC-LOAN-RASTER)
 --
 -- Befund Live-Dump 2026-06-22: layout 10/11 = 2h, 17 = 3h, 13 = 24h — KEINES hat 09:00/15:00 als
 -- Periodengrenze. Für 9/15-Übergabe-Anker UND 60-Min-Einführungen brauchen diese Layouts stündliche,

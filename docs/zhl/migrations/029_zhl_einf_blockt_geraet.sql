@@ -1,4 +1,4 @@
--- 028: Einführung reserviert das Gerät selbst (SPEC-STUDIO-EINFUEHRUNG / SPEC-LOAN-RASTER)
+-- 029: Einführung reserviert das Gerät selbst (SPEC-STUDIO-EINFUEHRUNG / SPEC-LOAN-RASTER)
 --
 -- Ersetzt den bisherigen Proxy `booking_mode='slot'` durch ein explizites Flag. Ist es gesetzt,
 -- legt die Buchung zusätzlich zur Terminplaner-Einführung eine native 60-Min-Geräte-Reservierung

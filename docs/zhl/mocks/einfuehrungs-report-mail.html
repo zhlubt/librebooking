@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Entwurf — Wöchentlicher Einführungstermine-Report</title>
+<!--
+  ENTWURF / MOCKUP — ZHL Medienausleihe
+  Wöchentliche Mail an zhlmedien@uni-bayreuth.de (montags morgens).
+  Fake-Daten: KW 27 = gutes Angebot, KW 29 = schlechtes Angebot.
+  Für den echten Versand werden alle Styles inline gezogen (E-Mail-Clients
+  strippen <style>); diese Datei dient nur der Design-Abnahme im Browser.
+-->
+<style>
+  body { margin:0; padding:0; background:#eef1f0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif; color:#1f2937; }
+  .wrap { max-width:680px; margin:0 auto; padding:24px 12px 48px; }
+  .card { background:#ffffff; border-radius:14px; overflow:hidden; box-shadow:0 1px 3px rgba(0,0,0,.08); }
+  .head { background:linear-gradient(135deg,#009260,#007a50); color:#fff; padding:28px 28px 24px; }
+  .head .kicker { font-size:12px; letter-spacing:.14em; text-transform:uppercase; opacity:.85; margin:0 0 6px; }
+  .head h1 { margin:0 0 6px; font-size:22px; font-weight:700; }
+  .head .sub { margin:0; font-size:13px; opacity:.9; }
+  .body { padding:24px 28px; }
+  .sec-title { font-size:13px; letter-spacing:.06em; text-transform:uppercase; color:#6b7280; margin:28px 0 12px; font-weight:700; }
+  .sec-title:first-child { margin-top:0; }
+  .banner { border-radius:10px; padding:14px 16px; font-size:14px; line-height:1.5; }
+  .banner.bad { background:#fdecea; border:1px solid #f5c6c0; color:#8a1f12; }
+  .banner.ok  { background:#e7f6ed; border:1px solid #b9e3c8; color:#1f6b3e; }
+  .thresh { background:#f3f6f5; border:1px dashed #c2d6cf; border-radius:10px; padding:12px 16px; font-size:13px; color:#374151; }
+  .thresh b { color:#007a50; }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  th, td { text-align:left; padding:10px 12px; border-bottom:1px solid #eef1f0; }
+  th { font-size:11px; letter-spacing:.05em; text-transform:uppercase; color:#6b7280; background:#f8faf9; }
+  td.num { text-align:center; font-variant-numeric:tabular-nums; font-weight:600; }
+  .wk { font-weight:700; color:#111827; }
+  .wk small { display:block; font-weight:400; color:#6b7280; font-size:11px; }
+  .pill { display:inline-block; padding:2px 9px; border-radius:999px; font-size:11px; font-weight:700; white-space:nowrap; }
+  .pill.ok  { background:#e7f6ed; color:#1f8a4c; }
+  .pill.warn{ background:#fdf3e0; color:#9a6b00; }
+  .pill.bad { background:#fdecea; color:#c0392b; }
+  tr.weekgroup td { border-top:2px solid #e5e9e8; }
+  .cat { color:#374151; }
+  .cat .dot { display:inline-block; width:8px; height:8px; border-radius:2px; margin-right:7px; vertical-align:middle; }
+  .dot.medien { background:#0ea5a0; } .dot.studio { background:#7c4dff; }
+  /* offerers */
+  .person { display:flex; align-items:center; justify-content:space-between; padding:10px 0; border-bottom:1px solid #eef1f0; font-size:14px; }
+  .person:last-child { border-bottom:0; }
+  .person .who { font-weight:600; }
+  .person .meta { color:#6b7280; font-size:12px; font-weight:400; }
+  .person .cnt { font-weight:700; color:#007a50; font-variant-numeric:tabular-nums; }
+  /* heatmap */
+  .hm-wrap { display:flex; gap:18px; flex-wrap:wrap; }
+  .hm { flex:1 1 280px; }
+  .hm h4 { margin:0 0 8px; font-size:13px; }
+  .hm h4 .tag { font-size:11px; font-weight:700; padding:1px 8px; border-radius:999px; margin-left:6px; }
+  .hm table { font-size:11px; }
+  .hm th, .hm td { padding:6px 4px; text-align:center; border:1px solid #eef1f0; }
+  .hm td.lab { text-align:right; color:#6b7280; font-weight:600; white-space:nowrap; }
+  .cell { font-weight:700; border-radius:4px; }
+  .l0 { background:#fbe9e7; color:#c0392b; }   /* keine */
+  .l1 { background:#fff6df; color:#9a6b00; }   /* dünn */
+  .l2 { background:#dbefe1; color:#1f8a4c; }   /* ok */
+  .l3 { background:#9ed9b4; color:#0c5c34; }   /* gut */
+  .legend { font-size:11px; color:#6b7280; margin-top:8px; }
+  .legend span { display:inline-block; width:11px; height:11px; border-radius:3px; vertical-align:middle; margin:0 3px 0 10px; }
+  .foot { padding:18px 28px 26px; color:#9099a3; font-size:11px; line-height:1.6; border-top:1px solid #eef1f0; }
+  .foot a { color:#007a50; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="card">
+
+    <div class="head">
+      <p class="kicker">ZHL Medienausleihe · Wochenreport</p>
+      <h1>Einführungstermine — Verfügbarkeit der nächsten 4 Wochen</h1>
+      <p class="sub">Stand: Montag, 29.06.2026 · Zeitraum KW 27–30 (29.06.–26.07.) · Quelle: meet.zhl-ubt.de</p>
+    </div>
+
+    <div class="body">
+
+      <!-- AMPEL / KURZFAZIT -->
+      <div class="banner bad">
+        <b>⚠️ 1 von 4 Wochen unterschreitet das Mindestziel.</b><br>
+        <b>KW 29 (13.–19.07.)</b> hat in <b>keiner</b> Kategorie Termine — Ausleihen mit Einführungspflicht
+        sind in dieser Woche blockiert. Bitte zusätzliche Termine anbieten.
+      </div>
+
+      <p class="sec-title">Mindestziel pro Woche &amp; Kategorie</p>
+      <div class="thresh">
+        Damit Ausleihen funktionieren, braucht jede Kategorie pro Woche mindestens
+        <b>1&nbsp;Tag mit Terminen</b> und <b>1&nbsp;Termin</b>.
+        &nbsp;<span style="color:#9099a3;">(Diese Werte sind im Admin änderbar.)</span>
+      </div>
+
+      <!-- 4-WOCHEN-STATUS -->
+      <p class="sec-title">Status je Woche &amp; Kategorie</p>
+      <table>
+        <thead>
+          <tr><th>Woche</th><th>Kategorie</th><th class="num">Tage</th><th class="num">Termine</th><th>Status</th></tr>
+        </thead>
+        <tbody>
+          <!-- KW 27 — GUT -->
+          <tr class="weekgroup">
+            <td rowspan="2" class="wk">KW 27<small>29.06.–05.07.</small></td>
+            <td class="cat"><span class="dot medien"></span>Einführung in Medien</td>
+            <td class="num">4</td><td class="num">11</td><td><span class="pill ok">ausreichend</span></td>
+          </tr>
+          <tr>
+            <td class="cat"><span class="dot studio"></span>Einführung ins Videostudio</td>
+            <td class="num">2</td><td class="num">5</td><td><span class="pill ok">ausreichend</span></td>
+          </tr>
+          <!-- KW 28 — KNAPP OK -->
+          <tr class="weekgroup">
+            <td rowspan="2" class="wk">KW 28<small>06.07.–12.07.</small></td>
+            <td class="cat"><span class="dot medien"></span>Einführung in Medien</td>
+            <td class="num">3</td><td class="num">7</td><td><span class="pill ok">ausreichend</span></td>
+          </tr>
+          <tr>
+            <td class="cat"><span class="dot studio"></span>Einführung ins Videostudio</td>
+            <td class="num">1</td><td class="num">2</td><td><span class="pill warn">gerade am Limit</span></td>
+          </tr>
+          <!-- KW 29 — SCHLECHT -->
+          <tr class="weekgroup">
+            <td rowspan="2" class="wk">KW 29<small>13.07.–19.07.</small></td>
+            <td class="cat"><span class="dot medien"></span>Einführung in Medien</td>
+            <td class="num">0</td><td class="num">0</td><td><span class="pill bad">zu wenig</span></td>
+          </tr>
+          <tr>
+            <td class="cat"><span class="dot studio"></span>Einführung ins Videostudio</td>
+            <td class="num">0</td><td class="num">0</td><td><span class="pill bad">zu wenig</span></td>
+          </tr>
+          <!-- KW 30 — TEILS -->
+          <tr class="weekgroup">
+            <td rowspan="2" class="wk">KW 30<small>20.07.–26.07.</small></td>
+            <td class="cat"><span class="dot medien"></span>Einführung in Medien</td>
+            <td class="num">2</td><td class="num">4</td><td><span class="pill ok">ausreichend</span></td>
+          </tr>
+          <tr>
+            <td class="cat"><span class="dot studio"></span>Einführung ins Videostudio</td>
+            <td class="num">0</td><td class="num">0</td><td><span class="pill bad">zu wenig</span></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- ANBIETER -->
+      <p class="sec-title">Wer bietet an (nächste 4 Wochen)</p>
+      <div>
+        <div class="person">
+          <span><span class="who">Paul Dölle</span> <span class="meta">· Medien, Videostudio</span></span>
+          <span class="cnt">14 Termine</span>
+        </div>
+        <div class="person">
+          <span><span class="who">Sabine Weber</span> <span class="meta">· Medien</span></span>
+          <span class="cnt">9 Termine</span>
+        </div>
+        <div class="person">
+          <span><span class="who">Tobias Lang</span> <span class="meta">· Videostudio</span></span>
+          <span class="cnt">6 Termine</span>
+        </div>
+        <div class="person" style="color:#c0392b;">
+          <span><span class="who">In KW 29 bietet niemand an</span> <span class="meta">· beide Kategorien leer</span></span>
+          <span class="cnt" style="color:#c0392b;">0 Termine</span>
+        </div>
+      </div>
+
+      <!-- ABDECKUNG -->
+      <p class="sec-title">Abdeckung über die Woche (Tage × Tageszeit)</p>
+      <div class="hm-wrap">
+        <!-- GUTE WOCHE -->
+        <div class="hm">
+          <h4>KW 27 <span class="tag" style="background:#e7f6ed;color:#1f8a4c;">gut abgedeckt</span></h4>
+          <table>
+            <tr><th></th><th>Mo</th><th>Di</th><th>Mi</th><th>Do</th><th>Fr</th><th>Sa</th></tr>
+            <tr><td class="lab">Vormittag</td>
+              <td class="cell l3">3</td><td class="cell l2">2</td><td class="cell l3">3</td><td class="cell l2">2</td><td class="cell l1">1</td><td class="cell l0">0</td></tr>
+            <tr><td class="lab">Mittag</td>
+              <td class="cell l2">2</td><td class="cell l1">1</td><td class="cell l2">2</td><td class="cell l1">1</td><td class="cell l0">0</td><td class="cell l0">0</td></tr>
+            <tr><td class="lab">Nachmittag</td>
+              <td class="cell l2">2</td><td class="cell l2">2</td><td class="cell l1">1</td><td class="cell l2">2</td><td class="cell l1">1</td><td class="cell l0">0</td></tr>
+            <tr><td class="lab">Abend</td>
+              <td class="cell l0">0</td><td class="cell l1">1</td><td class="cell l0">0</td><td class="cell l1">1</td><td class="cell l0">0</td><td class="cell l0">0</td></tr>
+          </table>
+        </div>
+        <!-- SCHLECHTE WOCHE -->
+        <div class="hm">
+          <h4>KW 29 <span class="tag" style="background:#fdecea;color:#c0392b;">große Lücken</span></h4>
+          <table>
+            <tr><th></th><th>Mo</th><th>Di</th><th>Mi</th><th>Do</th><th>Fr</th><th>Sa</th></tr>
+            <tr><td class="lab">Vormittag</td>
+              <td class="cell l0">0</td><td class="cell l0">0</td><td class="cell l0">0</td><td class="cell l0">0</td><td class="cell l0">0</td><td class="cell l0">0</td></tr>
+            <tr><td class="lab">Mittag</td>
+              <td class="cell l0">0</td><td class="cell l0">0</td><td class="cell l0">0</td><td class="cell l0">0</td><td class="cell l0">0</td><td class="cell l0">0</td></tr>
+            <tr><td class="lab">Nachmittag</td>
+              <td class="cell l0">0</td><td class="cell l0">0</td><td class="cell l0">0</td><td class="cell l0">0</td><td class="cell l0">0</td><td class="cell l0">0</td></tr>
+            <tr><td class="lab">Abend</td>
+              <td class="cell l0">0</td><td class="cell l0">0</td><td class="cell l0">0</td><td class="cell l0">0</td><td class="cell l0">0</td><td class="cell l0">0</td></tr>
+          </table>
+        </div>
+      </div>
+      <p class="legend">
+        Termine je Feld:
+        <span class="l0"></span> 0 (Lücke)
+        <span class="l1"></span> 1
+        <span class="l2"></span> 2
+        <span class="l3"></span> 3+
+        &nbsp;·&nbsp; Tageszeiten: Vormittag 08–12, Mittag 12–14, Nachmittag 14–17, Abend 17–20 Uhr.
+      </p>
+
+      <div class="banner ok" style="margin-top:20px;">
+        <b>Tipp aus den Daten:</b> Insgesamt sind <b>Nachmittage</b> und <b>Freitag/Samstag</b> am dünnsten besetzt —
+        hier zusätzliche Termine würden die Abdeckung am meisten verbessern.
+      </div>
+
+    </div>
+
+    <div class="foot">
+      Automatischer Wochenreport der ZHL-Medienausleihe · jeden Montag früh an zhlmedien@uni-bayreuth.de.<br>
+      Datenquelle: angebotene Einführungs-Slots auf <a href="https://meet.zhl-ubt.de">meet.zhl-ubt.de</a>.
+      Mindestwerte &amp; Empfänger sind im Admin konfigurierbar.<br>
+      <span style="color:#c2c8cf;">— Dies ist ein ENTWURF mit Beispiel-Daten —</span>
+    </div>
+
+  </div>
+</div>
+</body>
+</html>

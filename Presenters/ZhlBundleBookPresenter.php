@@ -36,6 +36,8 @@ class ZhlBundleBookPresenter
     private $postedEnd = '';
     private $postedPickupSlot = '';
     private $postedEinfSlot = '';
+    /** B-remove: vom Nutzer abgewählte (entfernte) Bundle-Positions-IDs — für Re-Render nach POST-Fehler. */
+    private $removedIds = [];
 
     public function __construct($page)
     {
@@ -96,7 +98,9 @@ class ZhlBundleBookPresenter
             echo json_encode(['error' => 'date']);
             return;
         }
-        $mainItems = $this->itemsForPhase($bundle, 'main');
+        // B-remove: Abhol-/Einführungstermine GEGEN die aktuell behaltenen Positionen berechnen — wählt
+        // der Nutzer das einzige einführungs-/abholpflichtige Gerät ab, liefert das VM null (kein Pflicht-Slot).
+        $mainItems = $this->applyKeepFilter($this->itemsForPhase($bundle, 'main'));
         echo json_encode([
             'pickup' => $this->buildPickupVm($db, $user, $mainItems, $start, $tz),
             'einf' => $this->buildEinfVm($db, $user, $mainItems, $start, $tz),
@@ -147,7 +151,21 @@ class ZhlBundleBookPresenter
             return;
         }
 
-        $mainItems = $this->itemsForPhase($bundle, 'main');
+        // B-remove: abgewählte Positionen aus „Das ist im Bundle" entfernen (vor der Auflösung).
+        $mainItems = $this->applyKeepFilter($this->itemsForPhase($bundle, 'main'));
+        if (!empty($_POST['keep_ui'])) {
+            $bookable = 0;
+            foreach ($mainItems as $it) {
+                if ((int)$it['quantity'] > 0) {
+                    $bookable++;
+                }
+            }
+            if ($bookable === 0) {
+                $this->bindForm($user, $bundle, $validStart ? $dayStartRaw : $this->today($tz), $projectTitle, $altChoices, ['Bitte mindestens eine Position im Bundle behalten — sonst gibt es nichts zu buchen.'], $afterDays, $afterChosen);
+                return;
+            }
+        }
+
         $resolver = $this->buildResolver($user);
 
         // --- 1. Verfügbarkeit ZUERST über die GANZEN gewählten Tage prüfen (schedule-agnostisches
@@ -654,10 +672,13 @@ class ZhlBundleBookPresenter
                 continue; // Alternativen separat als Radios.
             }
             $display[] = [
+                'id' => (int)$it['id'],
                 'label' => (string)$it['type_label'],
                 'quantity' => (int)$it['quantity'],
                 'required' => ((int)$it['required']) === 1,
                 'meta' => (string)($it['meta'] ?? ''),
+                // B-remove: abwählbare Position; bei Fehler-Re-Render die Auswahl des Nutzers behalten.
+                'keep' => !in_array((int)$it['id'], $this->removedIds, true),
             ];
         }
 
@@ -753,6 +774,33 @@ class ZhlBundleBookPresenter
         }
         $ir->Free();
         return $bundle;
+    }
+
+    /**
+     * B-remove: abgewählte (Nicht-Alternativ-)Positionen aus der Main-Item-Liste entfernen. Liest
+     * keep_ui/keep_item aus dem Request (GET-AJAX ODER POST). Setzt $this->removedIds für den Re-Render.
+     * Entfernt NUR qty>0-Items ohne alt_group; Alternativ-Gruppen (Radio) und Packlist (qty 0) bleiben.
+     * @param array[] $mainItems
+     * @return array[]
+     */
+    private function applyKeepFilter(array $mainItems): array
+    {
+        if (empty($_REQUEST['keep_ui'])) {
+            return $mainItems;
+        }
+        $keep = is_array($_REQUEST['keep_item'] ?? null) ? array_map('intval', $_REQUEST['keep_item']) : [];
+        $keepSet = array_flip($keep);
+        $this->removedIds = [];
+        $filtered = [];
+        foreach ($mainItems as $it) {
+            $removable = ((int)$it['quantity'] > 0) && empty($it['alt_group']);
+            if ($removable && !isset($keepSet[(int)$it['id']])) {
+                $this->removedIds[] = (int)$it['id'];
+                continue;
+            }
+            $filtered[] = $it;
+        }
+        return $filtered;
     }
 
     private function itemsForPhase(array $bundle, string $phase): array

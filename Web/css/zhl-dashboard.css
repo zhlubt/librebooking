@@ -137,6 +137,11 @@
 .zhl-dash .zhl-bundle-items { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 5px; }
 .zhl-dash .zhl-bundle-items li { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 14px; padding: 5px 0; border-bottom: 1px solid #f1f5f9; }
 .zhl-dash .zhl-bundle-items li:last-child { border-bottom: none; }
+/* B-remove: abwählbare Bundle-Positionen */
+.zhl-dash .zhl-keep { display: flex; align-items: center; gap: 9px; cursor: pointer; width: 100%; }
+.zhl-dash .zhl-keep input[type=checkbox] { width: 16px; height: 16px; accent-color: var(--green-dark, #007a50); flex: none; cursor: pointer; }
+.zhl-dash .zhl-keep input[type=checkbox]:not(:checked) ~ .zhl-keep-label { opacity: .45; text-decoration: line-through; }
+.zhl-dash .zhl-keep-label { transition: opacity .12s; }
 .zhl-dash .zhl-it-link { font-weight: 600; color: var(--text); }
 .zhl-dash .zhl-it-link:hover { color: var(--zg); }
 .zhl-dash .zhl-opt { font-size: 11px; color: var(--muted); background: var(--bg-soft); border-radius: 20px; padding: 1px 8px; }

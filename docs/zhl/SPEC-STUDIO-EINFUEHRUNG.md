@@ -23,9 +23,9 @@ Stunde, damit sich Slot und Studio-Periode decken (`generate_time_slots` steppt 
 
 ## Lösung (minimal, kein Schema-Eingriff)
 
-Gating-Proxy für „Einführung reserviert das Gerät selbst" = **`booking_mode === 'slot'`**
-(aktuell ausschließlich das Studio). Schritt 2 ersetzt diesen Proxy durch ein explizites
-Gerät-Flag, sobald weitere Geräte das Gerät-vor-Ort-Modell brauchen.
+Gate für „Einführung reserviert das Gerät selbst" = **`zhl_uebergabe.einf_blockt_geraet`**
+(Migration 028; res 21 = 1). Ersetzt den ursprünglichen `booking_mode==='slot'`-Proxy — so können
+in Schritt 2 weitere Geräte das Gerät-vor-Ort-Modell bekommen, ohne den Buchungsmodus zu missbrauchen.
 
 ### A) Slot-Angebot filtern (`AjaxSlots`)
 Im Slot-Modus + Einführung nötig: nach `fetchEinfuehrungSlots(...)` die Slots auf jene

@@ -553,7 +553,7 @@ class ZhlBookPresenter
                     // 60-Min-Geräte-Reservierung für die Einführungs-Stunde anlegen (SPEC-STUDIO-EINFUEHRUNG /
                     // SPEC-LOAN-RASTER). Best-effort: scheitert sie, bleibt die Ausleihe + Warnhinweis.
                     if ($ueb['einf_blockt_geraet'] && !empty($einfPlan['start_utc']) && !empty($einfPlan['end_utc'])) {
-                        $einfResErr = $this->reserveEinfuehrungOnResource($user, $resource, $einfPlan['start_utc'], $einfPlan['end_utc'], $ref, $tz);
+                        $einfResErr = $this->reserveEinfuehrungOnResource($user, $resource, $einfPlan['start_utc'], $einfPlan['end_utc'], $ref, $tz, $facadeAttrs);
                         if ($einfResErr !== null) {
                             Log::Error('ZHL-Einführung: Studio-Reservierung fehlgeschlagen (ref=%s, res=%s): %s', $ref, $rid, $einfResErr);
                             $warnings[] = 'Der Einführungstermin beim Team ist gebucht, aber die Studio-Reservierung für diese Stunde konnte nicht angelegt werden — bitte beim ZHL-Team melden.';
@@ -1148,7 +1148,7 @@ class ZhlBookPresenter
      * volle native Validierung (Konflikt/Vorlauf/Periodengrenze) bleibt letzte Instanz.
      * @return ?string null bei Erfolg, sonst eine Fehlermeldung (Logging/Warnung)
      */
-    private function reserveEinfuehrungOnResource(UserSession $user, $resource, string $startUtc, string $endUtc, string $ref, $tz): ?string
+    private function reserveEinfuehrungOnResource(UserSession $user, $resource, string $startUtc, string $endUtc, string $ref, $tz, array $attributeValues = []): ?string
     {
         try {
             $beginUtc = Date::Parse($startUtc, 'UTC');
@@ -1173,7 +1173,10 @@ class ZhlBookPresenter
             $b->Format('Y-m-d'),
             $b->Format('H:i'),
             $e->Format('Y-m-d'),
-            $e->Format('H:i')
+            $e->Format('H:i'),
+            // Pflicht-Reservierungs-Attribute (z. B. „Haftpflichtversicherung") aus der Hauptbuchung
+            // mitgeben — sonst lehnt die native Validierung die Einführungs-Reservierung ab.
+            $attributeValues
         );
         try {
             $factory = new ReservationPresenterFactory();

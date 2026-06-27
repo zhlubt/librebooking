@@ -55,6 +55,54 @@ class ZhlCertTypeInfo
     }
 
     /**
+     * Zugangsdaten (Code/News/Doc) je GERÄT für DIESEN Nutzer — gegated wie ForUser: nur Geräte,
+     * deren abdeckendes Zertifikat der Nutzer mit gültigem (nicht abgelaufenem) Grant hält und für
+     * das aktive Infos gepflegt sind. Für die Buchungsdetail-Seite („Zugangsdaten zum gebuchten Gerät").
+     * @param int[] $resourceIds gebuchte Geräte-IDs (Filter; app-intern, kein User-Input)
+     * @return array<int,array{transponder_code:string,news_text:string,doc_url:string}> resource_id → Felder
+     */
+    public static function ForUserByResource($db, int $userId, array $resourceIds): array
+    {
+        $out = [];
+        $ids = array_values(array_unique(array_filter(array_map('intval', $resourceIds), static fn ($v) => $v > 0)));
+        if ($userId <= 0 || empty($ids)) {
+            return $out;
+        }
+        try {
+            $in = implode(',', $ids); // nur ints (intval), sichere Inline-Liste
+            $cmd = new AdHocCommand(
+                'SELECT ctr.resource_id, i.transponder_code, i.news_text, i.doc_url ' .
+                'FROM zhl_cert_grant g ' .
+                'JOIN zhl_cert_type t ON t.id = g.cert_type_id AND t.active = 1 ' .
+                'JOIN zhl_cert_type_info i ON i.cert_type_id = g.cert_type_id AND i.active = 1 ' .
+                'JOIN zhl_cert_type_resource ctr ON ctr.cert_type_id = g.cert_type_id ' .
+                'WHERE g.user_id = @uid AND (g.expires_at IS NULL OR g.expires_at > @now) ' .
+                'AND ctr.resource_id IN (' . $in . ')'
+            );
+            $cmd->AddParameter(new Parameter('@uid', $userId));
+            $cmd->AddParameter(new Parameter('@now', gmdate('Y-m-d H:i:s')));
+            $reader = $db->Query($cmd);
+            while ($row = $reader->GetRow()) {
+                $rid = (int)$row['resource_id'];
+                if (isset($out[$rid])) {
+                    continue; // erstes abdeckendes Zertifikat gewinnt
+                }
+                $code = trim((string)($row['transponder_code'] ?? ''));
+                $news = trim((string)($row['news_text'] ?? ''));
+                $doc = trim((string)($row['doc_url'] ?? ''));
+                if ($code === '' && $news === '' && $doc === '') {
+                    continue;
+                }
+                $out[$rid] = ['transponder_code' => $code, 'news_text' => $news, 'doc_url' => $doc];
+            }
+            $reader->Free();
+        } catch (Throwable $e) {
+            Log::Error('ZHL-CertTypeInfo: ForUserByResource(%d) fehlgeschlagen: %s', $userId, $e);
+        }
+        return $out;
+    }
+
+    /**
      * Alle gepflegten Infos je Zertifikats-Typ — NUR für den Admin-Editor (kein Nutzer-Gate!).
      * @return array<int,array{transponder_code:string,news_text:string,doc_url:string,active:int}>
      */

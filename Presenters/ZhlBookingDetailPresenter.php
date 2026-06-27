@@ -7,6 +7,7 @@ require_once(ROOT_DIR . 'Domain/namespace.php');
 require_once(ROOT_DIR . 'Domain/Access/namespace.php');
 require_once(ROOT_DIR . 'lib/Application/Reservation/namespace.php');
 require_once(ROOT_DIR . 'Presenters/ZhlTerminplaner.php');
+require_once(ROOT_DIR . 'lib/Application/Zhl/ZhlCertTypeInfo.php');
 
 /**
  * Presenter Ausleih-Detail. Lädt eine einzelne Buchung des angemeldeten Nutzers
@@ -109,10 +110,42 @@ class ZhlBookingDetailPresenter
 
         $handover = $this->loadHandover($ref, $tz);
 
+        // D3b: Zugangsdaten (Code/Anleitung) je gebuchtem Gerät, das der Nutzer SELBST per gültigem
+        // Zertifikat freigeschaltet hat. Gleiches Gate wie „Mein Konto" (ForUserByResource).
+        $accessItems = [];
+        $resourceIds = [];
+        foreach ($devices as $d) {
+            if (isset($d['resourceId']) && (int)$d['resourceId'] > 0) {
+                $resourceIds[] = (int)$d['resourceId'];
+            }
+        }
+        if (!empty($resourceIds)) {
+            $access = ZhlCertTypeInfo::ForUserByResource(ServiceLocator::GetDatabase(), (int)$user->UserId, $resourceIds);
+            foreach ($devices as $d) {
+                $rid = isset($d['resourceId']) ? (int)$d['resourceId'] : 0;
+                if ($rid > 0 && isset($access[$rid])) {
+                    $accessItems[] = [
+                        'device' => (string)$d['name'],
+                        'code' => $access[$rid]['transponder_code'],
+                        'news' => $access[$rid]['news_text'],
+                        'docUrl' => (preg_match('#^https?://#i', $access[$rid]['doc_url']) ? $access[$rid]['doc_url'] : ''),
+                    ];
+                }
+            }
+        }
+
+        // Die interne Übergabe-/Einführungs-Notiz („[ZHL] …") ist Betriebs-Metadaten, nicht für den
+        // Nutzer — nicht anzeigen. Echte, nutzer-eingegebene Beschreibungen bleiben sichtbar.
+        $description = trim((string)$match->Description);
+        if (stripos($description, '[ZHL]') === 0) {
+            $description = '';
+        }
+
         $this->page->BindDetail([
             'ref' => $ref,
             'title' => $title,
-            'description' => trim((string)$match->Description),
+            'description' => $description,
+            'accessItems' => $accessItems,
             'state' => $state,
             'statusLabel' => $statusLabel,
             'deviceCount' => $deviceCount,
@@ -196,6 +229,10 @@ class ZhlBookingDetailPresenter
             return;
         }
 
+        // Eckdaten der Buchung JETZT festhalten (aus der OWNER-Sicht $match), solange die Reservierung noch
+        // existiert. Gespeichert wird der Schnappschuss erst NACH erfolgreichem Löschen → Tab „Storniert".
+        $snapshot = $this->buildCancelSnapshot($match);
+
         // (2) Native Reservierung löschen (Kern-Aktion). Scheitert sie → Abbruch, nichts sonst verändert.
         try {
             $resRepo = new ReservationRepository();
@@ -212,6 +249,11 @@ class ZhlBookingDetailPresenter
             $this->render($user, $ref, 'Die Ausleihe konnte nicht storniert werden. Bitte erneut versuchen oder das ZHL-Team kontaktieren.');
             return;
         }
+
+        // Schnappschuss der stornierten Buchung sichern (best effort) — die native Reservierung ist jetzt
+        // gelöscht; ohne diesen Eintrag wäre die Buchung für den Nutzer spurlos verschwunden. Ein Fehler
+        // hier darf das bereits erfolgte Storno NICHT zurückdrehen → nur loggen.
+        $this->saveCancelSnapshot($db, $ref, $user->UserId, $snapshot, $now);
 
         // (3) Terminplaner-Slots stornieren (best effort). Eine fehlgeschlagene Zeile wird NICHT lokal
         //     gelöscht — so bleibt ihre terminplaner_booking_id für die manuelle Nacharbeit erhalten.

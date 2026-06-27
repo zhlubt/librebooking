@@ -66,13 +66,35 @@
           {else}
             <p class="hint">Für diese Buchung sind keine gesonderten Abhol- oder Rückgabetermine hinterlegt. Geräte werden zum Buchungszeitraum bereitgestellt.</p>
           {/if}
-          <div class="info-box" style="margin-top:16px">
-            <span class="ib-ic"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/></svg></span>
-            <span>Bitte bringen Sie zur Abholung Ihren Uni-Ausweis mit.</span>
-          </div>
         </div>
       </div>
     </div>
+
+    {* D3b: Zugangsdaten zu freigeschalteten Geräten — nur für eigene gültige Zertifikate sichtbar *}
+    {if $AccessItems}
+    <div class="card zugang-card" style="margin-top:18px">
+      <div class="card-head">
+        <span class="ch-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>
+        <h2>Zugangsdaten &amp; Anleitungen</h2>
+      </div>
+      <div class="card-body">
+        {foreach from=$AccessItems item=a}
+          <div class="zugang-item">
+            {if $a.code != ''}
+              <div class="zugang-row">
+                <span>Der Zugangscode zum <strong>{$a.device|escape}</strong> lautet:</span>
+                <code class="zc-code" data-code="{$a.code|escape}">••••••••</code>
+                <button type="button" class="zc-btn zc-reveal">anzeigen</button>
+                <button type="button" class="zc-btn zc-copy">kopieren</button>
+              </div>
+            {/if}
+            {if $a.news != ''}<div class="zugang-news">{$a.news|escape|nl2br}</div>{/if}
+            {if $a.docUrl != ''}<a class="zugang-doc" href="{$a.docUrl|escape}" target="_blank" rel="noopener">Hier finden Sie die Anleitungen zum {$a.device|escape} →</a>{/if}
+          </div>
+        {/foreach}
+      </div>
+    </div>
+    {/if}
 
     <!-- Enthaltene Geräte -->
     {if $DeviceCount > 0}
@@ -125,5 +147,30 @@
 
   </div>
 </main>
+
+{literal}
+<script>
+(function () {
+  document.addEventListener('click', function (e) {
+    var btn = e.target.closest ? e.target.closest('.zc-reveal, .zc-copy') : null;
+    if (!btn) { return; }
+    var row = btn.closest('.zugang-row');
+    var codeEl = row ? row.querySelector('.zc-code') : null;
+    if (!codeEl) { return; }
+    var code = codeEl.getAttribute('data-code') || '';
+    if (btn.classList.contains('zc-reveal')) {
+      var shown = codeEl.classList.toggle('is-shown');
+      codeEl.textContent = shown ? code : '••••••••';
+      btn.textContent = shown ? 'verbergen' : 'anzeigen';
+    } else if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(code).then(function () {
+        var t = btn.textContent; btn.textContent = 'kopiert ✓';
+        setTimeout(function () { btn.textContent = t; }, 1500);
+      });
+    }
+  });
+})();
+</script>
+{/literal}
 
 {include file='globalfooter.tpl'}

@@ -1099,6 +1099,50 @@ class ZhlBookPresenter
     }
 
     /**
+     * Richtet ein Zeitfenster [beginUtc, endUtc) auf die buchbaren Schedule-Perioden des Geräts aus:
+     * liefert Anfang/Ende der Vereinigung aller reservierbaren Perioden, die das Fenster überlappen.
+     * Slot-Schedules (Studio) haben Stunden-Perioden → ein 30-Min-Einführungstermin wird so auf die
+     * volle Stunde geweitet, damit die native SchedulePeriodRule das Ende akzeptiert.
+     * @return ?array{begin:Date,end:Date} (lokale TZ) oder null = keine reservierbare Periode überlappt.
+     */
+    private function alignToSchedulePeriods(UserSession $user, $resource, Date $beginUtc, Date $endUtc): ?array
+    {
+        $tz = $user->Timezone;
+        $repo = new ScheduleRepository();
+        $layout = $repo->GetLayout((int)$resource->ScheduleId, new ScheduleLayoutFactory($tz));
+        $startDay = $beginUtc->ToTimezone($tz)->Format('Y-m-d');
+        $endDay = $endUtc->ToTimezone($tz)->Format('Y-m-d');
+        $days = [Date::Parse($startDay . ' 00:00:00', $tz)];
+        if ($endDay !== $startDay) {
+            $days[] = Date::Parse($endDay . ' 00:00:00', $tz);
+        }
+        $alignedBegin = null;
+        $alignedEnd = null;
+        foreach ($days as $day) {
+            foreach ($layout->GetLayout($day, false) as $p) {
+                if (!method_exists($p, 'IsReservable') || !$p->IsReservable() || $p->BeginDate() === null || $p->EndDate() === null) {
+                    continue;
+                }
+                $pb = $p->BeginDate();
+                $pe = $p->EndDate();
+                // Überlappt die Periode das Fenster? (Periodenanfang < Fensterende UND Periodenende > Fensteranfang)
+                if ($pb->LessThan($endUtc) && $pe->GreaterThan($beginUtc)) {
+                    if ($alignedBegin === null || $pb->LessThan($alignedBegin)) {
+                        $alignedBegin = $pb;
+                    }
+                    if ($alignedEnd === null || $pe->GreaterThan($alignedEnd)) {
+                        $alignedEnd = $pe;
+                    }
+                }
+            }
+        }
+        if ($alignedBegin === null || $alignedEnd === null) {
+            return null;
+        }
+        return ['begin' => $alignedBegin->ToTimezone($tz), 'end' => $alignedEnd->ToTimezone($tz)];
+    }
+
+    /**
      * SPEC-STUDIO-EINFUEHRUNG: legt für die Einführungs-Stunde eine native Geräte-Reservierung an
      * (Studio muss für die Einführung vor Ort & blockiert sein). Reserviert auf der freien Pool-Einheit;
      * volle native Validierung (Konflikt/Vorlauf/Periodengrenze) bleibt letzte Instanz.
@@ -1112,10 +1156,15 @@ class ZhlBookPresenter
         } catch (Exception $e) {
             return 'ungültige Einführungs-Zeit';
         }
+        // Einführungstermin (z. B. 30 Min) auf die buchbaren Schedule-Perioden ausrichten — der Studio-
+        // Schedule hat Stunden-Perioden, ein Ende wie 14:30 ist keine gültige Periodengrenze (native
+        // SchedulePeriodRule lehnt sonst mit „Endzeit nicht gültig" ab). Wir blockieren die überlappende(n)
+        // volle(n) Stunde(n) → deckt sich mit „das Studio ist für diese Stunde reserviert".
+        $aligned = $this->alignToSchedulePeriods($user, $resource, $beginUtc, $endUtcD);
+        $b = $aligned !== null ? $aligned['begin'] : $beginUtc->ToTimezone($tz);
+        $e = $aligned !== null ? $aligned['end'] : $endUtcD->ToTimezone($tz);
         $poolIds = $this->poolResourceIds($user, $resource);
-        $unit = $this->pickFreeUnit($poolIds, $beginUtc, $endUtcD) ?? (int)$resource->GetId();
-        $b = $beginUtc->ToTimezone($tz);
-        $e = $endUtcD->ToTimezone($tz);
+        $unit = $this->pickFreeUnit($poolIds, $b, $e) ?? (int)$resource->GetId();
         $facade = new ZhlReservationFacade(
             $user->UserId,
             $unit,

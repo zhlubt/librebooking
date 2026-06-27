@@ -106,6 +106,7 @@ function typeIcon(string $t): string {
 // Degradiert still zu leeren Listen, falls die DB nicht erreichbar ist.
 $bundles = [];
 $mediaTypes = [];
+$typeInfo = [];   // type_label → Tutorial/Info-URL (zhl_type_info), leer wenn keine
 try {
     if (!isset($pdo)) {
         $pdo = new PDO(
@@ -126,23 +127,77 @@ try {
         $bundles = $bRows;
     }
 
-    $mRows = $pdo->query("SELECT cav.attribute_value AS typ, r.name AS name
+    // Je Geräte-Typ die einzelnen Geräte (mit resource_id + schedule_id), damit man direkt buchen kann.
+    $mRows = $pdo->query("SELECT cav.attribute_value AS typ, r.name AS name, r.resource_id AS rid, r.schedule_id AS sid
         FROM custom_attribute_values cav
         JOIN custom_attributes ca ON ca.custom_attribute_id = cav.custom_attribute_id AND ca.display_label = 'Geräte-Typ'
         JOIN resources r ON r.resource_id = cav.entity_id
         WHERE r.status_id = 1
         ORDER BY cav.attribute_value, r.sort_order, r.name")->fetchAll(PDO::FETCH_ASSOC);
     $grouped = [];
-    foreach ($mRows as $r) { $grouped[$r['typ']][] = $r['name']; }
-    foreach ($grouped as $typ => $names) {
+    foreach ($mRows as $r) { $grouped[$r['typ']][] = ['name' => $r['name'], 'rid' => (int)$r['rid'], 'sid' => (int)$r['sid']]; }
+    foreach ($grouped as $typ => $units) {
+        // Baugleiche Geräte zu "Modell ×N" zusammenfassen; ein repräsentatives Gerät trägt den Buchungs-Link
+        // (zhl-book.php weicht via Pool-Fallback ohnehin auf eine freie gleichtypige Einheit aus).
         $models = [];
-        foreach ($names as $n) { $base = modelBase($n); $models[$base] = ($models[$base] ?? 0) + 1; }
-        $mediaTypes[] = ['typ' => $typ, 'count' => count($names), 'models' => $models];
+        foreach ($units as $u) {
+            $base = modelBase($u['name']);
+            if (!isset($models[$base])) { $models[$base] = ['count' => 0, 'rid' => $u['rid'], 'sid' => $u['sid']]; }
+            $models[$base]['count']++;
+        }
+        $mediaTypes[] = ['typ' => $typ, 'count' => count($units), 'models' => $models];
     }
     usort($mediaTypes, static fn($a, $b) => $b['count'] <=> $a['count'] ?: strcmp($a['typ'], $b['typ']));
+
+    // Tutorials/Anleitungen je Geräte-Typ (zhl_type_info); fehlt die Tabelle, bleibt die Liste leer.
+    try {
+        $tiRows = $pdo->query("SELECT type_label, info_url FROM zhl_type_info WHERE active = 1 AND info_url <> ''")->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($tiRows as $r) { $typeInfo[trim((string)$r['type_label'])] = trim((string)$r['info_url']); }
+    } catch (Throwable $e) {
+        // keine Tutorials → einfach keine "Anleitung"-Links
+    }
 } catch (Throwable $e) {
     // Katalog bleibt leer; die Seite zeigt dann nur die statischen Abschnitte.
 }
+
+// Kuratierte Filter-Kategorien — spiegelt ZhlDashboardPresenter::categoryMap() (der In-App-Filter),
+// damit die Startseite dieselben Kategorien wie die Buchungs-Oberfläche zeigt. Reine Anzeige-Logik.
+$catMap = [
+    ['key' => 'mikro', 'label' => 'Mikrofone', 'label_en' => 'Microphones', 'types' => ['Funkmikrofon (mit zwei Sendern)', 'Podcast-Mikrofon', 'Podcast-Mikrofon (Shure)', 'Podcast-Mikrofon (Yeti)']],
+    ['key' => 'videostudio', 'label' => 'Videostudio', 'label_en' => 'Video studio', 'types' => ['Videostudio']],
+    ['key' => 'smartphone', 'label' => 'Smartphone-Video-Kit', 'label_en' => 'Smartphone video kit', 'types' => ['Smartphone-Video-Kit']],
+    ['key' => 'kamera', 'label' => 'Kameras', 'label_en' => 'Cameras', 'types' => ['Profi-Kamera', 'Einfache Allround-Kamera', 'Objektiv', 'Gimbal', 'Stativ', 'Kleines Kamerastativ', 'Richtmikrofon']],
+    ['key' => 'moderation', 'label' => 'Moderationsmaterial', 'label_en' => 'Facilitation materials', 'types' => ['Moderationsmaterial']],
+    ['key' => 'schnitt', 'label' => 'Schnittcomputer', 'label_en' => 'Editing computer', 'types' => ['Schnitt-/VR-PC']],
+    ['key' => 'immersive', 'label' => 'Immersive Medien (VR / AR / 3D)', 'label_en' => 'Immersive media (VR / AR / 3D)', 'types' => ['VR-Brille', 'AR-Brille', '360-Grad-Kamera', 'Teleskopstange (360°-Kamera)']],
+    ['key' => 'drohne', 'label' => 'Drohne', 'label_en' => 'Drone', 'types' => ['Drohne']],
+];
+$typeToCat = [];
+foreach ($catMap as $c) { foreach ($c['types'] as $t) { $typeToCat[$t] = $c['key']; } }
+
+// Jedem Geräte-Typ seine Kategorie zuordnen (für den clientseitigen Filter) + Geräte je Kategorie zählen.
+$catCounts = [];
+foreach ($mediaTypes as &$mt) {
+    $mt['cat'] = $typeToCat[$mt['typ']] ?? 'weitere';
+    $catCounts[$mt['cat']] = ($catCounts[$mt['cat']] ?? 0) + $mt['count'];
+}
+unset($mt);
+
+// Sichtbare Filter-Buttons: nur Kategorien mit Treffern, in Map-Reihenfolge, „Weitere" ans Ende.
+$categories = [];
+foreach ($catMap as $c) {
+    if (!empty($catCounts[$c['key']])) {
+        $categories[] = ['key' => $c['key'], 'label' => $c['label'], 'label_en' => $c['label_en'], 'count' => $catCounts[$c['key']]];
+    }
+}
+if (!empty($catCounts['weitere'])) {
+    $categories[] = ['key' => 'weitere', 'label' => 'Weitere Geräte', 'label_en' => 'Other devices', 'count' => $catCounts['weitere']];
+}
+$totalDevices = array_sum(array_column($mediaTypes, 'count'));
+
+// Vorbelegtes Startdatum für die Direkt-Buchung: heute + 1 Woche (Planungs-Vorlauf / Mindest-Vorlaufzeit).
+// zhl-book.php nimmt dieses rd als Default-Start; sid setzt den passenden Schedule (wie im Dashboard-Link).
+$bookDate = date('Y-m-d', strtotime('+7 days'));
 ?>
 <!DOCTYPE html>
 <html lang="de">
@@ -331,8 +386,26 @@ try {
   .type-card .ti svg { width:22px; height:22px; stroke:var(--green-dark); }
   .type-card h3 { font-size:15px; line-height:1.22; }
   .type-card .cnt { font-size:12.5px; font-weight:700; color:var(--green-dark); background:#e6f7ef; padding:3px 9px; border-radius:999px; margin-left:auto; flex:none; white-space:nowrap; }
-  .type-card .models { font-size:13px; color:var(--muted); line-height:1.5; }
-  .type-card .models .q { color:var(--ink-2); font-weight:600; }
+  .type-card .models { display:flex; flex-wrap:wrap; gap:7px; }
+
+  /* Kategorie-Filter über "Alle Geräte einzeln buchbar" */
+  .cat-filter { display:flex; flex-wrap:wrap; gap:9px; justify-content:center; max-width:920px; margin:0 auto 16px; }
+  .cf { display:inline-flex; align-items:center; gap:8px; cursor:pointer; font:inherit; font-size:14px; font-weight:600; color:var(--ink-2); background:var(--card); border:1px solid var(--line); padding:8px 14px; border-radius:999px; transition:background .15s var(--ease),color .15s var(--ease),border-color .15s var(--ease),box-shadow .15s var(--ease); }
+  .cf:hover { border-color:#bfe3d2; color:var(--green-dark); }
+  .cf.active { background:var(--grad); color:#fff; border-color:transparent; box-shadow:0 4px 12px rgba(0,146,96,.25); }
+  .cf .cf-c { font-size:12px; font-weight:700; min-width:20px; height:20px; padding:0 6px; display:inline-flex; align-items:center; justify-content:center; border-radius:999px; background:#e6f7ef; color:var(--green-dark); }
+  .cf.active .cf-c { background:rgba(255,255,255,.25); color:#fff; }
+  .cat-hint { text-align:center; font-size:13.5px; color:var(--muted); margin:0 auto 30px; max-width:620px; }
+
+  /* Anklickbare Geräte (direkt buchen) + Tutorial-Link */
+  .model-link { display:inline-flex; align-items:center; gap:5px; font-size:13px; color:var(--ink-2); background:var(--bg-soft); border:1px solid var(--line); padding:5px 11px; border-radius:999px; transition:transform .13s var(--ease),background .13s var(--ease),color .13s var(--ease),border-color .13s var(--ease),box-shadow .13s var(--ease); }
+  .model-link:hover { background:var(--green); border-color:var(--green); color:#fff; transform:translateY(-1px); box-shadow:0 4px 10px rgba(0,146,96,.25); }
+  .model-link .q { font-weight:700; opacity:.7; }
+  .model-link .arr { width:13px; height:13px; opacity:0; margin-left:-3px; transition:opacity .13s var(--ease),margin .13s var(--ease); }
+  .model-link:hover .arr { opacity:1; margin-left:0; }
+  .tut-link { display:inline-flex; align-items:center; gap:6px; margin-top:13px; font-size:13px; font-weight:600; color:var(--green-dark); }
+  .tut-link svg { width:15px; height:15px; flex:none; }
+  .tut-link:hover { text-decoration:underline; }
 </style>
 </head>
 <body>
@@ -560,21 +633,37 @@ try {
       <p class="lead" data-en="Every device type the ZHL lends — always up to date, straight from our inventory. No account needed to browse.">Alle Geräte-Typen, die das ZHL verleiht — immer aktuell, direkt aus unserem Bestand. Zum Stöbern ist kein Konto nötig.</p>
     </div>
     <?php if ($mediaTypes): ?>
+    <?php if ($categories): ?>
+    <div class="cat-filter">
+      <button type="button" class="cf active" data-filter="all"><span data-en="All">Alle</span><span class="cf-c"><?= (int)$totalDevices ?></span></button>
+      <?php foreach ($categories as $c): ?>
+      <button type="button" class="cf" data-filter="<?= e($c['key']) ?>"><span data-en="<?= e($c['label_en']) ?>"><?= e($c['label']) ?></span><span class="cf-c"><?= (int)$c['count'] ?></span></button>
+      <?php endforeach; ?>
+    </div>
+    <?php endif; ?>
+    <p class="cat-hint" data-en="Click a device to book it directly (sign-in required). Where a guide exists, you can open it right here.">Klicken Sie ein Gerät an, um es direkt zu buchen (Anmeldung nötig). Wo es eine Anleitung gibt, können Sie sie gleich hier öffnen.</p>
     <div class="types-grid">
       <?php foreach ($mediaTypes as $t): ?>
-      <div class="type-card">
+      <div class="type-card" data-cat="<?= e($t['cat']) ?>">
         <div class="th">
           <span class="ti"><?= typeIcon($t['typ']) ?></span>
           <h3><?= e($t['typ']) ?></h3>
           <span class="cnt"><?= (int)$t['count'] ?>&nbsp;<span data-en="<?= $t['count'] === 1 ? 'item' : 'items' ?>"><?= $t['count'] === 1 ? 'Gerät' : 'Stück' ?></span></span>
         </div>
-        <?php
-          $parts = [];
-          foreach ($t['models'] as $model => $c) {
-              $parts[] = e($model) . ($c > 1 ? ' <span class="q">×' . (int)$c . '</span>' : '');
-          }
-        ?>
-        <div class="models"><?= implode(' · ', $parts) ?></div>
+        <div class="models">
+          <?php foreach ($t['models'] as $model => $m): ?>
+          <a class="model-link" href="zhl-book.php?rid=<?= (int)$m['rid'] ?>&amp;sid=<?= (int)$m['sid'] ?>&amp;rd=<?= e($bookDate) ?>" title="Jetzt buchen / Book now">
+            <span><?= e($model) ?></span><?php if ($m['count'] > 1): ?> <span class="q">×<?= (int)$m['count'] ?></span><?php endif; ?>
+            <svg class="arr" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+          </a>
+          <?php endforeach; ?>
+        </div>
+        <?php if (isset($typeInfo[$t['typ']])): ?>
+        <a class="tut-link" href="<?= e($typeInfo[$t['typ']]) ?>" target="_blank" rel="noopener">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+          <span data-en="View guide">Anleitung ansehen</span>
+        </a>
+        <?php endif; ?>
       </div>
       <?php endforeach; ?>
     </div>
@@ -652,6 +741,22 @@ try {
   }
   function toggleLang(){ applyLang(cur === "de" ? "en" : "de"); }
   (function(){ try { var s = localStorage.getItem("zhlLang"); if (s === "en") applyLang("en"); } catch(e){} })();
+
+  // Kategorie-Filter für "Alle Geräte einzeln buchbar" — rein clientseitig, kein Reload.
+  (function(){
+    var btns = document.querySelectorAll(".cf");
+    if (!btns.length) return;
+    var cards = document.querySelectorAll("#kategorien .type-card");
+    btns.forEach(function(b){
+      b.addEventListener("click", function(){
+        var f = b.getAttribute("data-filter");
+        btns.forEach(function(x){ x.classList.toggle("active", x === b); });
+        cards.forEach(function(c){
+          c.style.display = (f === "all" || c.getAttribute("data-cat") === f) ? "" : "none";
+        });
+      });
+    });
+  })();
 </script>
 </body>
 </html>

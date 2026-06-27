@@ -7,16 +7,16 @@
 		<div class="zhl-dash-head">
 			<div>
 				<div class="zhl-uplabel">Medienausleihe ZHL</div>
-				<h1 class="zhl-h1">✅ Buchung bestätigt</h1>
+				<h1 class="zhl-h1"><svg class="zhl-ic" style="width:1.05em;height:1.05em;vertical-align:-0.16em;flex:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg> Buchung bestätigt</h1>
 			</div>
 		</div>
 		<div class="zhl-book-card" style="max-width:560px;">
 			<p class="zhl-sub">Deine Reservierung ist angelegt.</p>
 			{if $ReferenceNumber}<p>Buchungsnummer: <strong>{$ReferenceNumber|escape}</strong></p>{/if}
-			{if $Warning}<div class="zhl-ueb-item req" style="margin:10px 0;"><strong>⚠ Bitte beachten</strong> <span class="zhl-muted zhl-small">{$Warning|escape}</span></div>{/if}
+			{if $Warning}<div class="zhl-ueb-item req" style="margin:10px 0;"><strong><svg class="zhl-ic" style="width:1.05em;height:1.05em;vertical-align:-0.16em;flex:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> Bitte beachten</strong> <span class="zhl-muted zhl-small">{$Warning|escape}</span></div>{/if}
 			{include file='zhl-mediainfo.tpl' MediaInfos=$MediaInfos}
 			<div class="zhl-book-actions" style="display:flex; gap:10px; flex-wrap:wrap;">
-				<a class="zhl-btn" href="{$Path}zhl-bookings.php">📅 Meine Buchungen</a>
+				<a class="zhl-btn" href="{$Path}zhl-bookings.php"><svg class="zhl-ic" style="width:1.05em;height:1.05em;vertical-align:-0.16em;flex:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> Meine Buchungen</a>
 				<a class="zhl-btn zhl-btn-ghost" href="{$Path}zhl-dashboard.php">Weiteres Gerät buchen</a>
 			</div>
 		</div>
@@ -51,7 +51,7 @@
 				{/if}
 				{if $ScheduleName}<div class="zhl-muted zhl-small" style="margin-top:6px;">Kategorie: {$ScheduleName|escape}</div>{/if}
 				{if $MinNoticeDays > 0}
-					<div class="zhl-vorlauf-note" style="margin-top:10px;">⏳ Vorlauf {$MinNoticeDays} Tage — frühester Start: <strong>{$EarliestLabel}</strong></div>
+					<div class="zhl-vorlauf-note" style="margin-top:10px;"><svg class="zhl-ic" style="width:1.05em;height:1.05em;vertical-align:-0.16em;flex:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> Vorlauf {$MinNoticeDays} Tage — frühester Start: <strong>{$EarliestLabel}</strong></div>
 				{/if}
 			</div>
 
@@ -87,7 +87,7 @@
 							<tbody>
 								{foreach from=$Picker.grid.days item=d}
 									<tr{if $d.weekend} class="zhl-wg-weekend"{/if}>
-										<th class="zhl-wg-day">{$d.label}{if $d.weekend} <span class="zhl-wg-tp" title="Zugang nur mit freigeschaltetem Transponder">🔑</span>{/if}<br><span>{$d.dm}</span></th>
+										<th class="zhl-wg-day">{$d.label}{if $d.weekend} <span class="zhl-wg-tp" title="Zugang nur mit freigeschaltetem Transponder"><svg class="zhl-ic" style="width:1.05em;height:1.05em;vertical-align:-0.16em;flex:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/></svg></span>{/if}<br><span>{$d.dm}</span></th>
 										{foreach from=$d.cells item=c}
 											<td class="zhl-wg-cell s-{$c.state}" {if $c.state == 'free'}data-day="{$d.date}" data-b="{$c.h}" data-e="{$c.he}"{/if}></td>
 										{/foreach}
@@ -103,7 +103,7 @@
 						<span><i class="lg lg-sel"></i> deine Auswahl</span>
 						<strong id="zhl-sel-label" style="margin-left:auto;">Klicke Start- und End-Feld an einem Tag.</strong>
 					</div>
-					{if $Picker.grid.hasWeekend}<div class="zhl-muted zhl-small" style="margin-top:6px;">🔑 Wochenende (Sa/So): Zugang nur mit für das Gebäude freigeschaltetem Transponder.</div>{/if}
+					{if $Picker.grid.hasWeekend}<div class="zhl-muted zhl-small" style="margin-top:6px;"><svg class="zhl-ic" style="width:1.05em;height:1.05em;vertical-align:-0.16em;flex:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/></svg> Wochenende (Sa/So): Zugang nur mit für das Gebäude freigeschaltetem Transponder.</div>{/if}
 				{else}
 					{* Tagesmodus: Monats-Kalender — Start- und End-Tag anklicken (zusammenhängende Spanne). *}
 					<input type="hidden" name="dayStart" id="dayStart" value="">
@@ -133,17 +133,17 @@
 						<span><i class="lg lg-sel"></i> deine Auswahl</span>
 						<strong id="zhl-day-label" style="margin-left:auto;">Klicke Start- und End-Tag an.</strong>
 					</div>
-					<div class="zhl-muted zhl-small" id="zhl-day-wknd" style="margin-top:6px;display:none;">🔑 Wochenende (Sa/So) im Zeitraum: Zugang nur mit für das Gebäude freigeschaltetem Transponder.</div>
+					<div class="zhl-muted zhl-small" id="zhl-day-wknd" style="margin-top:6px;display:none;"><svg class="zhl-ic" style="width:1.05em;height:1.05em;vertical-align:-0.16em;flex:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/></svg> Wochenende (Sa/So) im Zeitraum: Zugang nur mit für das Gebäude freigeschaltetem Transponder.</div>
 				{/if}
 
 				<div class="zhl-uplabel" style="margin-top:16px;">Übergabe & Einführung</div>
 				<div class="zhl-ueb">
 					{if $Abholung == 'nicht_noetig'}
-						<div class="zhl-ueb-item"><strong>🔑 Keine Abholung nötig</strong> <span class="zhl-muted zhl-small">Zugang z. B. über Schlüsseltresor.</span></div>
+						<div class="zhl-ueb-item"><strong><svg class="zhl-ic" style="width:1.05em;height:1.05em;vertical-align:-0.16em;flex:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/></svg> Keine Abholung nötig</strong> <span class="zhl-muted zhl-small">Zugang z. B. über Schlüsseltresor.</span></div>
 					{elseif $Abholung == 'abholen_persoenlich'}
-						<div class="zhl-ueb-item"><strong>📦 Abholung – persönlich</strong> <span class="zhl-muted zhl-small">{if $Abholort}Ort: {$Abholort|escape} · {/if}Dieses Gerät wird persönlich übergeben.</span></div>
+						<div class="zhl-ueb-item"><strong><svg class="zhl-ic" style="width:1.05em;height:1.05em;vertical-align:-0.16em;flex:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16.5 9.4 7.5 4.21"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg> Abholung – persönlich</strong> <span class="zhl-muted zhl-small">{if $Abholort}Ort: {$Abholort|escape} · {/if}Dieses Gerät wird persönlich übergeben.</span></div>
 					{else}
-						<div class="zhl-ueb-item"><strong>📦 Abholung</strong>{if $Abholort} <span class="zhl-muted zhl-small">Ort: {$Abholort|escape}</span>{/if}</div>
+						<div class="zhl-ueb-item"><strong><svg class="zhl-ic" style="width:1.05em;height:1.05em;vertical-align:-0.16em;flex:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16.5 9.4 7.5 4.21"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg> Abholung</strong>{if $Abholort} <span class="zhl-muted zhl-small">Ort: {$Abholort|escape}</span>{/if}</div>
 					{/if}
 
 					{* „Zusammen oder getrennt" — nur wenn eine Einführung ansteht UND eine Abholung greift.
@@ -153,11 +153,11 @@
 							<div class="zhl-uplabel">Einführung und Abholung</div>
 							<label class="zhl-attr-check">
 								<input type="radio" name="handover_mode" value="zusammen" class="zhl-hm-radio"{if $HandoverMode != 'getrennt'} checked{/if}>
-								<span>🤝 Zusammen <span class="zhl-muted zhl-small">— ein gemeinsamer Termin für Einführung und Abholung</span></span>
+								<span><svg class="zhl-ic" style="width:1.05em;height:1.05em;vertical-align:-0.16em;flex:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> Zusammen <span class="zhl-muted zhl-small">— ein gemeinsamer Termin für Einführung und Abholung</span></span>
 							</label>
 							<label class="zhl-attr-check">
 								<input type="radio" name="handover_mode" value="getrennt" class="zhl-hm-radio"{if $HandoverMode == 'getrennt'} checked{/if}>
-								<span>📅 Getrennt <span class="zhl-muted zhl-small">— Einführung und Abholung an zwei verschiedenen Terminen</span></span>
+								<span><svg class="zhl-ic" style="width:1.05em;height:1.05em;vertical-align:-0.16em;flex:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> Getrennt <span class="zhl-muted zhl-small">— Einführung und Abholung an zwei verschiedenen Terminen</span></span>
 							</label>
 							<div class="zhl-combined-note zhl-ueb-item ok" style="display:none; margin-top:8px;">
 								<strong>✓ Ein Termin genügt</strong> <span class="zhl-muted zhl-small">Der unten gewählte Einführungstermin ist zugleich der Abholtermin — du bekommst das Gerät direkt im Anschluss.</span>
@@ -173,11 +173,11 @@
 							<div class="zhl-uplabel">Wie möchtest du das Material erhalten?</div>
 							<label class="zhl-attr-check">
 								<input type="radio" name="fulfillment" value="pickup" class="zhl-ff-radio"{if $Fulfillment != 'hauspost'} checked{/if}>
-								<span>{if $Abholung == 'ablageort'}📍 Am Ablageort abholen{elseif $Abholung == 'nicht_noetig'}📍 Selbst abholen (vor Ort){else}📦 Persönlich abholen{/if}</span>
+								<span>{if $Abholung == 'ablageort'}<svg class="zhl-ic" style="width:1.05em;height:1.05em;vertical-align:-0.16em;flex:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg> Am Ablageort abholen{elseif $Abholung == 'nicht_noetig'}<svg class="zhl-ic" style="width:1.05em;height:1.05em;vertical-align:-0.16em;flex:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg> Selbst abholen (vor Ort){else}<svg class="zhl-ic" style="width:1.05em;height:1.05em;vertical-align:-0.16em;flex:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16.5 9.4 7.5 4.21"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg> Persönlich abholen{/if}</span>
 							</label>
 							<label class="zhl-attr-check">
 								<input type="radio" name="fulfillment" value="hauspost" class="zhl-ff-radio"{if $Fulfillment == 'hauspost'} checked{/if}>
-								<span>✉️ Per Hauspost verschicken</span>
+								<span><svg class="zhl-ic" style="width:1.05em;height:1.05em;vertical-align:-0.16em;flex:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 5L2 7"/></svg> Per Hauspost verschicken</span>
 							</label>
 						</div>
 					{else}
@@ -211,7 +211,7 @@
 							</div>
 						{elseif $Pickup.mandatory}
 							<div class="zhl-ueb-item req">
-								<strong>⛔ Kein Abholtermin vor deinem Ausleihstart frei</strong>
+								<strong><svg class="zhl-ic" style="width:1.05em;height:1.05em;vertical-align:-0.16em;flex:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg> Kein Abholtermin vor deinem Ausleihstart frei</strong>
 								<span class="zhl-muted zhl-small">{if $Pickup.earliestLabel}Frühester Termin: {$Pickup.earliestLabel}. Wähle einen späteren Ausleihstart.{else}Aktuell ist kein Abholtermin verfügbar — eine Buchung ist erst möglich, sobald Termine frei sind.{/if}</span>
 							</div>
 						{/if}
@@ -244,9 +244,9 @@
 					{/if}
 
 					{if $Einfuehrung == 'notwendig'}
-						<div class="zhl-ueb-item req"><strong>🎓 Einführung erforderlich</strong> <span class="zhl-muted zhl-small">{if $EinfuehrungTyp}Termintyp „{$EinfuehrungTyp|escape}" · {/if}vor der Nutzung persönlich nötig (auch zu früherem Termin).</span></div>
+						<div class="zhl-ueb-item req"><strong><svg class="zhl-ic" style="width:1.05em;height:1.05em;vertical-align:-0.16em;flex:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 10v6"/><path d="m2 10 10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg> Einführung erforderlich</strong> <span class="zhl-muted zhl-small">{if $EinfuehrungTyp}Termintyp „{$EinfuehrungTyp|escape}" · {/if}vor der Nutzung persönlich nötig (auch zu früherem Termin).</span></div>
 					{elseif $Einfuehrung == 'moeglich'}
-						<div class="zhl-ueb-item"><strong>🎓 Einführung möglich</strong> <span class="zhl-muted zhl-small">{if $EinfuehrungTyp}Termintyp „{$EinfuehrungTyp|escape}"{/if}</span></div>
+						<div class="zhl-ueb-item"><strong><svg class="zhl-ic" style="width:1.05em;height:1.05em;vertical-align:-0.16em;flex:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 10v6"/><path d="m2 10 10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg> Einführung möglich</strong> <span class="zhl-muted zhl-small">{if $EinfuehrungTyp}Termintyp „{$EinfuehrungTyp|escape}"{/if}</span></div>
 					{/if}
 
 					{if $Einf.mode != 'keine'}
@@ -275,7 +275,7 @@
 							</div>
 						{else}
 							<div class="zhl-ueb-item req">
-								<strong>⛔ Kein Einführungstermin vor deinem Ausleihstart frei</strong>
+								<strong><svg class="zhl-ic" style="width:1.05em;height:1.05em;vertical-align:-0.16em;flex:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg> Kein Einführungstermin vor deinem Ausleihstart frei</strong>
 								<span class="zhl-muted zhl-small">{if $Einf.earliestLabel}Frühester Termin: {$Einf.earliestLabel}. Wähle einen späteren Ausleihstart.{else}Aktuell ist kein Einführungstermin verfügbar — eine Buchung ist erst möglich, sobald Termine frei sind.{/if}</span>
 							</div>
 						{/if}
@@ -308,7 +308,7 @@
 							</div>
 						{elseif $Return.mandatory}
 							<div class="zhl-ueb-item req">
-								<strong>⛔ Kein Rückgabetermin ab deinem Ausleihende frei</strong>
+								<strong><svg class="zhl-ic" style="width:1.05em;height:1.05em;vertical-align:-0.16em;flex:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg> Kein Rückgabetermin ab deinem Ausleihende frei</strong>
 								<span class="zhl-muted zhl-small">{if $Return.earliestLabel}Frühester Termin: {$Return.earliestLabel}.{else}Aktuell ist kein Rückgabetermin verfügbar — eine Buchung ist erst möglich, sobald Termine frei sind.{/if}</span>
 							</div>
 						{/if}
@@ -352,7 +352,7 @@
 					<div class="zhl-ueb-item req" style="margin-top:14px;display:block;">
 						<strong>Kein passender Termin frei?</strong>
 						<span class="zhl-muted zhl-small">Stell stattdessen eine Wunschtermin-Anfrage — das ZHL-Medien-Team meldet sich mit einem Termin.</span>
-						<div style="margin-top:8px;"><a class="zhl-btn zhl-btn-ghost zhl-btn-sm" href="{$Path}zhl-termin-anfrage.php?rid={$ResourceId}&amp;pt={$ProjectTitle|escape:'url'}">📅 Wunschtermin anfragen</a></div>
+						<div style="margin-top:8px;"><a class="zhl-btn zhl-btn-ghost zhl-btn-sm" href="{$Path}zhl-termin-anfrage.php?rid={$ResourceId}&amp;pt={$ProjectTitle|escape:'url'}"><svg class="zhl-ic" style="width:1.05em;height:1.05em;vertical-align:-0.16em;flex:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> Wunschtermin anfragen</a></div>
 					</div>
 				{/if}
 				<p class="zhl-note">Verfügbarkeit, Vorlauf und Konflikte werden beim Buchen verbindlich geprüft. Ist eine Einführung nötig, wird der gewählte Termin direkt im Terminplaner gebucht; danach wird die Reservierung angelegt. <a href="{$Path}zhl-termin-anfrage.php?rid={$ResourceId}">Kein passender Zeitraum? Wunschtermin anfragen.</a></p>
@@ -393,7 +393,7 @@
 		var mandatory = pickupWrap.getAttribute('data-mandatory') === '1';
 		if (!vm || !vm.days || !vm.days.length) {
 			if (vm && mandatory) {
-				pickupWrap.innerHTML = '<div class="zhl-ueb-item req"><strong>⛔ Kein Abholtermin vor deinem Ausleihstart frei</strong> <span class="zhl-muted zhl-small">' +
+				pickupWrap.innerHTML = '<div class="zhl-ueb-item req"><strong><svg class="zhl-ic" style="width:1.05em;height:1.05em;vertical-align:-0.16em;flex:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg> Kein Abholtermin vor deinem Ausleihstart frei</strong> <span class="zhl-muted zhl-small">' +
 					(vm.earliestLabel ? 'Frühester Termin: ' + esc(vm.earliestLabel) + '. Wähle einen späteren Ausleihstart.' : 'Aktuell ist kein Abholtermin verfügbar.') + '</span></div>';
 				return true;
 			}
@@ -423,7 +423,7 @@
 		}
 		if (!active || !vm) { return false; }
 		if (!vm.days || !vm.days.length) {
-			einfWrap.innerHTML = '<div class="zhl-ueb-item req"><strong>⛔ Kein Einführungstermin vor deinem Ausleihstart frei</strong> <span class="zhl-muted zhl-small">' +
+			einfWrap.innerHTML = '<div class="zhl-ueb-item req"><strong><svg class="zhl-ic" style="width:1.05em;height:1.05em;vertical-align:-0.16em;flex:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg> Kein Einführungstermin vor deinem Ausleihstart frei</strong> <span class="zhl-muted zhl-small">' +
 				(vm.earliestLabel ? 'Frühester Termin: ' + esc(vm.earliestLabel) + '. Wähle einen späteren Ausleihstart.' : 'Aktuell ist kein Einführungstermin verfügbar.') + '</span></div>';
 			return required;
 		}
@@ -446,7 +446,7 @@
 		var mandatory = returnWrap.getAttribute('data-mandatory') === '1';
 		if (!vm || !vm.days || !vm.days.length) {
 			if (vm && mandatory) {
-				returnWrap.innerHTML = '<div class="zhl-ueb-item req"><strong>⛔ Kein Rückgabetermin ab deinem Ausleihende frei</strong> <span class="zhl-muted zhl-small">' +
+				returnWrap.innerHTML = '<div class="zhl-ueb-item req"><strong><svg class="zhl-ic" style="width:1.05em;height:1.05em;vertical-align:-0.16em;flex:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg> Kein Rückgabetermin ab deinem Ausleihende frei</strong> <span class="zhl-muted zhl-small">' +
 					(vm.earliestLabel ? 'Frühester Termin: ' + esc(vm.earliestLabel) + '.' : 'Aktuell ist kein Rückgabetermin verfügbar.') + '</span></div>';
 				return true;
 			}
@@ -472,8 +472,8 @@
 		var pickupMand = pickupWrap && pickupWrap.getAttribute('data-mandatory') === '1';
 		var returnMand = returnWrap && returnWrap.getAttribute('data-mandatory') === '1';
 		var token = ++fetchToken;
-		if (pickupWrap) { pickupWrap.innerHTML = '<div class="zhl-muted zhl-small">⏳ Termine werden geladen …</div>'; }
-		if (returnWrap) { returnWrap.innerHTML = '<div class="zhl-muted zhl-small">⏳ Termine werden geladen …</div>'; }
+		if (pickupWrap) { pickupWrap.innerHTML = '<div class="zhl-muted zhl-small"><svg class="zhl-ic" style="width:1.05em;height:1.05em;vertical-align:-0.16em;flex:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> Termine werden geladen …</div>'; }
+		if (returnWrap) { returnWrap.innerHTML = '<div class="zhl-muted zhl-small"><svg class="zhl-ic" style="width:1.05em;height:1.05em;vertical-align:-0.16em;flex:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> Termine werden geladen …</div>'; }
 		if (einfWrap && einfWrap.getAttribute('data-active') === '1') { einfWrap.innerHTML = ''; }
 		slotsLoading = (einfActive || pickupMand || returnMand);
 		updateSubmitState();
@@ -496,8 +496,8 @@
 				if (pickupMand) { pickupBlocked = true; }
 				if (returnMand) { returnBlocked = true; }
 				updateSubmitState();
-				if (pickupWrap && pickupWrap.innerHTML.indexOf('⏳') !== -1) { pickupWrap.innerHTML = '<div class="zhl-muted zhl-small">⚠ Termine konnten nicht geladen werden — bitte Start erneut wählen.</div>'; }
-				if (returnWrap && returnWrap.innerHTML.indexOf('⏳') !== -1) { returnWrap.innerHTML = '<div class="zhl-muted zhl-small">⚠ Termine konnten nicht geladen werden — bitte Zeitraum erneut wählen.</div>'; }
+				if (pickupWrap && pickupWrap.innerHTML.indexOf('<svg class="zhl-ic" style="width:1.05em;height:1.05em;vertical-align:-0.16em;flex:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>') !== -1) { pickupWrap.innerHTML = '<div class="zhl-muted zhl-small"><svg class="zhl-ic" style="width:1.05em;height:1.05em;vertical-align:-0.16em;flex:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> Termine konnten nicht geladen werden — bitte Start erneut wählen.</div>'; }
+				if (returnWrap && returnWrap.innerHTML.indexOf('<svg class="zhl-ic" style="width:1.05em;height:1.05em;vertical-align:-0.16em;flex:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>') !== -1) { returnWrap.innerHTML = '<div class="zhl-muted zhl-small"><svg class="zhl-ic" style="width:1.05em;height:1.05em;vertical-align:-0.16em;flex:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> Termine konnten nicht geladen werden — bitte Zeitraum erneut wählen.</div>'; }
 			});
 	}
 

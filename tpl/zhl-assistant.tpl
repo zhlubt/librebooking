@@ -12,9 +12,9 @@
 	</div>
 
 	<nav class="zhl-modenav">
-		<a class="zhl-mode active" href="{$Path}zhl-assistant.php">🎯 Bundles buchen</a>
-		<a class="zhl-mode" href="{$Path}zhl-dashboard.php">🎛 Geräte einzeln buchen</a>
-		<a class="zhl-mode" href="{$Path}zhl-bookings.php">📅 Meine Buchungen</a>
+		<a class="zhl-mode active" href="{$Path}zhl-assistant.php"><svg class="zhl-ic" style="width:1.05em;height:1.05em;vertical-align:-0.16em;flex:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg> Bundles buchen</a>
+		<a class="zhl-mode" href="{$Path}zhl-dashboard.php"><svg class="zhl-ic" style="width:1.05em;height:1.05em;vertical-align:-0.16em;flex:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="21" y1="4" x2="14" y2="4"/><line x1="10" y1="4" x2="3" y2="4"/><line x1="21" y1="12" x2="12" y2="12"/><line x1="8" y1="12" x2="3" y2="12"/><line x1="21" y1="20" x2="16" y2="20"/><line x1="12" y1="20" x2="3" y2="20"/><line x1="14" y1="2" x2="14" y2="6"/><line x1="8" y1="10" x2="8" y2="14"/><line x1="16" y1="18" x2="16" y2="22"/></svg> Geräte einzeln buchen</a>
+		<a class="zhl-mode" href="{$Path}zhl-bookings.php"><svg class="zhl-ic" style="width:1.05em;height:1.05em;vertical-align:-0.16em;flex:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> Meine Buchungen</a>
 		<a class="zhl-mode zhl-mode-logout" href="{$Path}logout.php">Abmelden</a>
 	</nav>
 
@@ -53,11 +53,11 @@
 				<span class="zhl-diff {$Selected->difficulty}">{if $Selected->difficulty == 'einfach'}Einfach{elseif $Selected->difficulty == 'fortgeschritten'}Fortgeschritten{else}Profi{/if}</span>
 			</div>
 
-			{if $Selected->hint}<p class="zhl-bundle-hint">💡 {$Selected->hint|escape}</p>{/if}
+			{if $Selected->hint}<p class="zhl-bundle-hint"><svg class="zhl-ic" style="width:1.05em;height:1.05em;vertical-align:-0.16em;flex:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5.76.76 1.23 1.52 1.41 2.5"/></svg> {$Selected->hint|escape}</p>{/if}
 
 			{if $Selected->einweisungLevel == 'zwingend'}
 				<div class="zhl-einw zwingend">
-					<div class="zhl-einw-head">🔒 Einweisung erforderlich</div>
+					<div class="zhl-einw-head"><svg class="zhl-ic" style="width:1.05em;height:1.05em;vertical-align:-0.16em;flex:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> Einweisung erforderlich</div>
 					<p class="zhl-einw-text">{$Selected->einweisungText|escape}</p>
 					<div class="zhl-einw-ways">
 						<span class="zhl-einw-way"><strong>A) Monatsseminar</strong> „Studio-Einführung" – 1× pro Monat.</span>
@@ -68,13 +68,13 @@
 				</div>
 			{elseif $Selected->einweisungLevel == 'empfehlenswert'}
 				<div class="zhl-einw empf">
-					<div class="zhl-einw-head">💡 Einweisung empfehlenswert</div>
+					<div class="zhl-einw-head"><svg class="zhl-ic" style="width:1.05em;height:1.05em;vertical-align:-0.16em;flex:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5.76.76 1.23 1.52 1.41 2.5"/></svg> Einweisung empfehlenswert</div>
 					<p class="zhl-einw-text">{$Selected->einweisungText|escape}</p>
 					{if $Selected->einweisungUrl}<a class="zhl-btn zhl-btn-sm zhl-btn-ghost" href="{$Selected->einweisungUrl|escape}" target="_blank" rel="noopener">Termin ansehen ▸</a>{/if}
 				</div>
 			{elseif $Selected->einweisungLevel == 'beratung'}
 				<div class="zhl-einw berat">
-					<div class="zhl-einw-head">🗣 Experten-Beratung empfohlen</div>
+					<div class="zhl-einw-head"><svg class="zhl-ic" style="width:1.05em;height:1.05em;vertical-align:-0.16em;flex:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg> Experten-Beratung empfohlen</div>
 					<p class="zhl-einw-text">{$Selected->einweisungText|escape}</p>
 					{if $Selected->einweisungUrl}<a class="zhl-btn zhl-btn-sm zhl-btn-ghost" href="{$Selected->einweisungUrl|escape}" target="_blank" rel="noopener">Beratungstermin anfragen ▸</a>{/if}
 				</div>
@@ -85,7 +85,7 @@
 				{foreach from=$Selected->items item=it}
 					<li class="{if $it->required && !$it->ok}miss{/if}">
 						<a class="zhl-it-link" href="{$Path}zhl-dashboard.php?q={$it->type|escape:'url'}&amp;start={$StartInput}&amp;days={$Days}">{$it->quantity}× {$it->type|escape}</a>
-						{if $it->infoUrl != ''}<a class="zhl-it-info" href="{$it->infoUrl|escape}" target="_blank" rel="noopener" title="{if $it->infoText != ''}{$it->infoText|escape}{else}Info-Material{/if}" aria-label="Info-Material" data-en-title="Info material">ℹ</a>{/if}
+						{if $it->infoUrl != ''}<a class="zhl-it-info" href="{$it->infoUrl|escape}" target="_blank" rel="noopener" title="{if $it->infoText != ''}{$it->infoText|escape}{else}Info-Material{/if}" aria-label="Info-Material" data-en-title="Info material"><svg class="zhl-ic" style="width:1.05em;height:1.05em;vertical-align:-0.16em;flex:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></a>{/if}
 						{if $it->altGroup && $it->altOptions|@count > 1}<span class="zhl-it-note" data-en="auto choice, otherwise alternative">automatische Auswahl, sonst Alternative</span>{/if}
 						{if !$it->required}<span class="zhl-opt">optional</span>{/if}
 						{if $it->note}<span class="zhl-it-note">{$it->note|escape}</span>{/if}
@@ -106,7 +106,7 @@
 
 			{if $Selected->offerSchnitt}
 				<div class="zhl-seq">
-					<div class="zhl-seq-head">🎬 Danach schneiden?</div>
+					<div class="zhl-seq-head"><svg class="zhl-ic" style="width:1.05em;height:1.05em;vertical-align:-0.16em;flex:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/></svg> Danach schneiden?</div>
 					<p class="zhl-seq-text">Nach der Aufnahme kannst du am <strong>Schnittplatz</strong> schneiden – eine <strong>getrennte Buchung</strong> für die Zeit <em>nach</em> deiner Drehphase, ganz optional.{if $SchnittPool !== null} <span class="zhl-muted">({$SchnittPool} Schnitt-/VR-PC frei)</span>{/if}</p>
 					<a class="zhl-btn zhl-btn-sm zhl-btn-ghost" href="{$Path}zhl-dashboard.php?q={$SchnittType|escape:'url'}&amp;start={$SchnittStartInput}&amp;days=7">Schnittplatz ab {$SchnittStartInput} ansehen ▸</a>
 				</div>
@@ -129,9 +129,9 @@
 					</div>
 					<div class="zhl-goal-foot">
 						{if $b->available}<span class="zhl-badge free">verfügbar</span>{else}<span class="zhl-badge full">nicht komplett frei</span>{/if}
-						{if $b->einweisungLevel == 'zwingend'}<span class="zhl-chip zwingend">🔒 Einweisung</span>
-						{elseif $b->einweisungLevel == 'empfehlenswert'}<span class="zhl-chip empf">💡 Einweisung</span>
-						{elseif $b->einweisungLevel == 'beratung'}<span class="zhl-chip berat">🗣 Beratung</span>{/if}
+						{if $b->einweisungLevel == 'zwingend'}<span class="zhl-chip zwingend"><svg class="zhl-ic" style="width:1.05em;height:1.05em;vertical-align:-0.16em;flex:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> Einweisung</span>
+						{elseif $b->einweisungLevel == 'empfehlenswert'}<span class="zhl-chip empf"><svg class="zhl-ic" style="width:1.05em;height:1.05em;vertical-align:-0.16em;flex:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5.76.76 1.23 1.52 1.41 2.5"/></svg> Einweisung</span>
+						{elseif $b->einweisungLevel == 'beratung'}<span class="zhl-chip berat"><svg class="zhl-ic" style="width:1.05em;height:1.05em;vertical-align:-0.16em;flex:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg> Beratung</span>{/if}
 						<span class="zhl-goal-go">wählen ▸</span>
 					</div>
 				</a>

@@ -7,7 +7,7 @@
 		<div class="zhl-dash-head">
 			<div>
 				<div class="zhl-uplabel">Medienausleihe ZHL</div>
-				<h1 class="zhl-h1">✅ Bundle gebucht</h1>
+				<h1 class="zhl-h1"><svg class="zhl-ic" style="width:1.05em;height:1.05em;vertical-align:-0.16em;flex:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg> Bundle gebucht</h1>
 			</div>
 		</div>
 		<div class="zhl-book-card" style="max-width:620px;">
@@ -20,7 +20,7 @@
 			{/if}
 			{include file='zhl-mediainfo.tpl' MediaInfos=$MediaInfos}
 			<div class="zhl-book-actions" style="display:flex; gap:10px; flex-wrap:wrap; margin-top:14px;">
-				<a class="zhl-btn" href="{$Path}zhl-bookings.php">📅 Meine Buchungen</a>
+				<a class="zhl-btn" href="{$Path}zhl-bookings.php"><svg class="zhl-ic" style="width:1.05em;height:1.05em;vertical-align:-0.16em;flex:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> Meine Buchungen</a>
 				<a class="zhl-btn zhl-btn-ghost" href="{$Path}zhl-assistant.php">Weiteres Bundle buchen</a>
 			</div>
 		</div>
@@ -51,18 +51,25 @@
 			{* Komposition / Packliste *}
 			<div class="zhl-book-card">
 				<div class="zhl-uplabel">Das ist im Bundle</div>
-				{if $BundleHint}<p class="zhl-bundle-hint">💡 {$BundleHint|escape}</p>{/if}
-				<ul class="zhl-bundle-items">
+				{if $BundleHint}<p class="zhl-bundle-hint"><svg class="zhl-ic" style="width:1.05em;height:1.05em;vertical-align:-0.16em;flex:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5.76.76 1.23 1.52 1.41 2.5"/></svg> {$BundleHint|escape}</p>{/if}
+				<input type="hidden" name="keep_ui" value="1">
+				<ul class="zhl-bundle-items zhl-keep-list">
 					{foreach from=$DisplayItems item=it}
-						<li>{$it.quantity}× {$it.label|escape}{if !$it.required} <span class="zhl-opt">optional</span>{/if}{if $it.meta} <span class="zhl-it-note">{$it.meta|escape}</span>{/if}</li>
+						<li>
+							<label class="zhl-keep">
+								<input type="checkbox" name="keep_item[]" value="{$it.id}"{if $it.keep} checked{/if}>
+								<span class="zhl-keep-label">{$it.quantity}× {$it.label|escape}{if !$it.required} <span class="zhl-opt">optional</span>{/if}{if $it.meta} <span class="zhl-it-note">{$it.meta|escape}</span>{/if}</span>
+							</label>
+						</li>
 					{/foreach}
 				</ul>
+				<p class="zhl-muted zhl-small" style="margin-top:2px;">Häkchen entfernen, um eine Position wegzulassen (z. B. wenn du sie nicht brauchst).</p>
 
 				{if $Packlist}
 					<div class="zhl-uplabel" style="margin-top:14px;">Packliste (nicht buchbar)</div>
 					<ul class="zhl-bundle-items">
 						{foreach from=$Packlist item=p}
-							<li>📦 {$p.label|escape}{if $p.meta} <span class="zhl-it-note">{$p.meta|escape}</span>{/if}</li>
+							<li><svg class="zhl-ic" style="width:1.05em;height:1.05em;vertical-align:-0.16em;flex:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16.5 9.4 7.5 4.21"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg> {$p.label|escape}{if $p.meta} <span class="zhl-it-note">{$p.meta|escape}</span>{/if}</li>
 						{/foreach}
 					</ul>
 				{/if}
@@ -107,7 +114,7 @@
 						<strong id="zhl-day-label" style="margin-left:auto;">Klicke Start- und End-Tag an.</strong>
 					</div>
 					<p class="zhl-muted zhl-small" style="margin-top:6px;">Der Kalender zeigt grob die Verfügbarkeit des Leitgeräts. Die vollständige Prüfung aller Bundle-Geräte erfolgt beim Buchen.</p>
-					{if $MaxDays > 0}<p class="zhl-muted zhl-small" style="margin-top:2px;">⏳ Maximale Ausleihdauer: <strong>{$MaxDays} Tage</strong>. <em>Wichtig:</em> Die Geräte sind <strong>ab dem Abholtag</strong> für dich reserviert (nicht erst ab Einsatzbeginn) — die Dauer zählt also ab der Übergabe.</p>{/if}
+					{if $MaxDays > 0}<p class="zhl-muted zhl-small" style="margin-top:2px;"><svg class="zhl-ic" style="width:1.05em;height:1.05em;vertical-align:-0.16em;flex:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> Maximale Ausleihdauer: <strong>{$MaxDays} Tage</strong>. <em>Wichtig:</em> Die Geräte sind <strong>ab dem Abholtag</strong> für dich reserviert (nicht erst ab Einsatzbeginn) — die Dauer zählt also ab der Übergabe.</p>{/if}
 				{else}
 					<div class="zhl-book-errors">Für dieses Bundle ist kein buchbares Leitgerät hinterlegt — bitte beim ZHL-Team melden.</div>
 				{/if}
@@ -144,8 +151,8 @@
 						{if $CombineEligible}
 <div class="zhl-handovermode" style="margin-bottom:8px;">
 <div class="zhl-uplabel">Einführung und Abholung</div>
-<label class="zhl-attr-check"><input type="radio" name="handover_mode" value="zusammen" class="zhl-hm-radio"{if $HandoverMode != 'getrennt'} checked{/if}><span>🤝 Zusammen <span class="zhl-muted zhl-small">— ein gemeinsamer Termin für Einführung und Abholung</span></span></label>
-<label class="zhl-attr-check"><input type="radio" name="handover_mode" value="getrennt" class="zhl-hm-radio"{if $HandoverMode == 'getrennt'} checked{/if}><span>📅 Getrennt <span class="zhl-muted zhl-small">— Einführung und Abholung an zwei verschiedenen Terminen</span></span></label>
+<label class="zhl-attr-check"><input type="radio" name="handover_mode" value="zusammen" class="zhl-hm-radio"{if $HandoverMode != 'getrennt'} checked{/if}><span><svg class="zhl-ic" style="width:1.05em;height:1.05em;vertical-align:-0.16em;flex:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> Zusammen <span class="zhl-muted zhl-small">— ein gemeinsamer Termin für Einführung und Abholung</span></span></label>
+<label class="zhl-attr-check"><input type="radio" name="handover_mode" value="getrennt" class="zhl-hm-radio"{if $HandoverMode == 'getrennt'} checked{/if}><span><svg class="zhl-ic" style="width:1.05em;height:1.05em;vertical-align:-0.16em;flex:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> Getrennt <span class="zhl-muted zhl-small">— Einführung und Abholung an zwei verschiedenen Terminen</span></span></label>
 </div>
 {else}
 <input type="hidden" name="handover_mode" value="getrennt">
@@ -159,7 +166,7 @@
 				{* Folge-Phase: Schnitt-/VR-PC *}
 				{if $HasAfter}
 					<div class="zhl-seq" style="margin-top:16px;">
-						<div class="zhl-seq-head">🎬 Danach schneiden?</div>
+						<div class="zhl-seq-head"><svg class="zhl-ic" style="width:1.05em;height:1.05em;vertical-align:-0.16em;flex:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/></svg> Danach schneiden?</div>
 						<label class="zhl-attr-check">
 							<input type="checkbox" name="afterChosen" id="afterChosen" value="1" {if $AfterChosen}checked{/if}>
 							<span>Schnitt-/VR-PC im Anschluss an die Aufnahme mitbuchen (getrennte Folge-Buchung).</span>
@@ -249,7 +256,7 @@
 		if (!pickupWrap) { return false; }
 		if (!vm) { pickupWrap.innerHTML = ''; return false; }
 		if (!vm.days || !vm.days.length) {
-			pickupWrap.innerHTML = '<div class="zhl-ueb-item req" style="margin-top:16px;"><strong>⛔ Kein Abholtermin verfügbar</strong> <span class="zhl-muted zhl-small">' +
+			pickupWrap.innerHTML = '<div class="zhl-ueb-item req" style="margin-top:16px;"><strong><svg class="zhl-ic" style="width:1.05em;height:1.05em;vertical-align:-0.16em;flex:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg> Kein Abholtermin verfügbar</strong> <span class="zhl-muted zhl-small">' +
 				(vm.earliestLabel ? 'Frühester Termin: ' + esc(vm.earliestLabel) + '.' : 'Aktuell kein Abholtermin frei.') + '</span></div>';
 			return vm.mandatory === true; // blockiert nur, wenn Abholung Pflicht ist
 		}
@@ -277,7 +284,7 @@
 		if (!einfWrap) { return false; }
 		if (!vm || vm.certified) { einfWrap.innerHTML = ''; return false; }
 		if (!vm.days || !vm.days.length) {
-			einfWrap.innerHTML = '<div class="zhl-ueb-item req" style="margin-top:16px;"><strong>⛔ Kein Einführungstermin verfügbar</strong> <span class="zhl-muted zhl-small">' +
+			einfWrap.innerHTML = '<div class="zhl-ueb-item req" style="margin-top:16px;"><strong><svg class="zhl-ic" style="width:1.05em;height:1.05em;vertical-align:-0.16em;flex:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg> Kein Einführungstermin verfügbar</strong> <span class="zhl-muted zhl-small">' +
 				(vm.earliestLabel ? 'Frühester Termin: ' + esc(vm.earliestLabel) + '.' : 'Aktuell kein Termin frei.') + '</span></div>';
 			return true; // Einführung ist Pflicht → ohne Termin keine Buchung
 		}
@@ -299,6 +306,15 @@
 		einfWrap.innerHTML = h;
 		return false;
 	}
+	// B-remove: aktuelle Positions-Auswahl (Häkchen) als Query, damit die AJAX-Termine nur die
+	// behaltenen Geräte berücksichtigen (abgewähltes einf-/abhol-pflichtiges Gerät → kein Pflicht-Slot).
+	function keepQuery() {
+		var boxes = document.querySelectorAll('.zhl-keep-list input[name="keep_item[]"]');
+		if (!boxes.length) { return ''; }
+		var qs = '&keep_ui=1';
+		boxes.forEach(function (b) { if (b.checked) { qs += '&keep_item%5B%5D=' + encodeURIComponent(b.value); } });
+		return qs;
+	}
 	function loadSlots(startYmd) {
 		if (!slotBox || !startYmd) { return; }
 		var bid = slotBox.getAttribute('data-bid');
@@ -308,8 +324,8 @@
 		if (pickupWrap) { pickupWrap.innerHTML = ''; }
 		if (einfWrap) { einfWrap.innerHTML = ''; }
 		if (needsSlot) { setSubmitBlocked(true, 'Termine werden geladen …'); }
-		if (hint) { hint.textContent = '⏳ Termine werden geladen …'; hint.style.display = ''; }
-		fetch(window.location.pathname + '?ajax=slots&bid=' + encodeURIComponent(bid) + '&start=' + encodeURIComponent(startYmd), { headers: { 'X-Requested-With': 'fetch' } })
+		if (hint) { hint.innerHTML = '<svg class="zhl-ic" style="width:1.05em;height:1.05em;vertical-align:-0.16em;flex:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> Termine werden geladen …'; hint.style.display = ''; }
+		fetch(window.location.pathname + '?ajax=slots&bid=' + encodeURIComponent(bid) + '&start=' + encodeURIComponent(startYmd) + keepQuery(), { headers: { 'X-Requested-With': 'fetch' } })
 			.then(function (r) { if (!r.ok) { throw new Error('http'); } return r.json(); })
 			.then(function (j) {
 				if (token !== fetchToken) { return; } // veraltete Antwort verwerfen
@@ -321,9 +337,18 @@
 			.catch(function () {
 				if (token !== fetchToken) { return; }
 				if (needsSlot) { setSubmitBlocked(true, 'Termine konnten nicht geladen werden.'); }
-				if (hint) { hint.textContent = '⚠ Termine konnten nicht geladen werden — bitte Zeitraum erneut wählen oder Seite neu laden.'; hint.style.display = ''; }
+				if (hint) { hint.innerHTML = '<svg class="zhl-ic" style="width:1.05em;height:1.05em;vertical-align:-0.16em;flex:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> Termine konnten nicht geladen werden — bitte Zeitraum erneut wählen oder Seite neu laden.'; hint.style.display = ''; }
 			});
 	}
+
+	// B-remove: Termine neu laden, wenn der Nutzer eine Bundle-Position ab-/zuwählt (Pflicht-Slots
+	// können sich dadurch ändern). Nutzt den aktuell gewählten Aufnahme-Start (Hidden dayStart).
+	document.querySelectorAll('.zhl-keep-list input[name="keep_item[]"]').forEach(function (b) {
+		b.addEventListener('change', function () {
+			var ds = document.getElementById('dayStart');
+			if (ds && ds.value) { loadSlots(ds.value); }
+		});
+	});
 
 	// --- Monats-Kalender: zusammenhängende Spanne aus ganzen Tagen anklicken. ---
 	var mgrid = document.querySelector('.zhl-monthgrid');

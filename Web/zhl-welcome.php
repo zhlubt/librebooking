@@ -35,15 +35,24 @@ try {
 
 function e(string $s): string { return htmlspecialchars($s, ENT_QUOTES, 'UTF-8'); }
 
-// Kachel-Icons je Kategorie (Stichwort-Heuristik, rein kosmetisch)
+// Kachel-Icons je Kategorie (Stichwort-Heuristik, rein kosmetisch).
+// Minimalistische Lucide-Stil Linien-Icons statt Emojis.
 function tile_icon(string $name): string {
     $n = mb_strtolower($name);
-    if (str_contains($n, 'vr') || str_contains($n, 'immersiv') || str_contains($n, '360')) return '🕶️';
-    if (str_contains($n, 'drohne')) return '🚁';
-    if (str_contains($n, 'video') || str_contains($n, 'studio')) return '🎬';
-    if (str_contains($n, 'moderation')) return '🪧';
-    if (str_contains($n, 'technik') || str_contains($n, 'verleih')) return '🎒';
-    return '📦';
+    $svg = static fn(string $p): string =>
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" '
+        . 'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' . $p . '</svg>';
+    if (str_contains($n, 'vr') || str_contains($n, 'immersiv') || str_contains($n, '360'))
+        return $svg('<circle cx="6" cy="15" r="4"/><circle cx="18" cy="15" r="4"/><path d="M14 15a2 2 0 0 0-2-2 2 2 0 0 0-2 2"/><path d="M2.5 13 5 7c.7-1.3 1.4-2 3-2"/><path d="M21.5 13 19 7c-.7-1.3-1.5-2-3-2"/>');
+    if (str_contains($n, 'drohne'))
+        return $svg('<rect x="9" y="9" width="6" height="6" rx="1"/><circle cx="5" cy="5" r="2.5"/><circle cx="19" cy="5" r="2.5"/><circle cx="5" cy="19" r="2.5"/><circle cx="19" cy="19" r="2.5"/><line x1="9" y1="9" x2="6.8" y2="6.8"/><line x1="15" y1="9" x2="17.2" y2="6.8"/><line x1="9" y1="15" x2="6.8" y2="17.2"/><line x1="15" y1="15" x2="17.2" y2="17.2"/>');
+    if (str_contains($n, 'video') || str_contains($n, 'studio'))
+        return $svg('<path d="m22 8-6 4 6 4V8z"/><rect x="2" y="6" width="14" height="12" rx="2"/>');
+    if (str_contains($n, 'moderation'))
+        return $svg('<path d="M2 3h20"/><path d="M21 3v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V3"/><path d="m7 21 5-5 5 5"/>');
+    if (str_contains($n, 'technik') || str_contains($n, 'verleih'))
+        return $svg('<rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>');
+    return $svg('<path d="M16.5 9.4 7.5 4.21"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/>');
 }
 ?>
 <!DOCTYPE html>
@@ -78,7 +87,8 @@ function tile_icon(string $name): string {
   .tile { background:#fff; border:1px solid #e6ece9; border-radius:14px; padding:22px;
           display:flex; flex-direction:column; gap:8px; transition:box-shadow .15s ease, transform .1s ease; }
   .tile:hover { box-shadow:0 8px 24px rgba(0,116,76,.10); transform:translateY(-2px); }
-  .tile .ic { font-size:30px; }
+  .tile .ic { color:var(--green); }
+  .tile .ic svg { width:30px; height:30px; }
   .tile .nm { font-weight:650; font-size:17px; }
   .tile .ct { color:var(--muted); font-size:14px; }
   .how { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:16px; }

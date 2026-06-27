@@ -55,7 +55,7 @@
 					<input type="hidden" name="action" value="save_info">
 					<input type="hidden" name="type_id" value="{$t.id}">
 					<div class="d-flex align-items-center gap-2 mb-2">
-						<strong class="small" style="color:#8a6d1a">🔒 Vertrauliche Infos für Zertifikatsinhaber</strong>
+						<strong class="small" style="color:#8a6d1a"><svg class="zhl-ic" style="width:1.05em;height:1.05em;vertical-align:-0.16em;flex:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> Vertrauliche Infos für Zertifikatsinhaber</strong>
 						<span class="text-muted small">— erscheinen NUR eingeloggt in „Mein Konto", nie per E-Mail</span>
 						<label class="form-check-label small ms-auto"><input type="checkbox" class="form-check-input me-1" name="info_active" value="1" {if $t.info.active}checked{/if}>aktiv</label>
 					</div>

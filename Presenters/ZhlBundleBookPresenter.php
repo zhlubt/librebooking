@@ -73,6 +73,14 @@ class ZhlBundleBookPresenter
             $this->page->RedirectToDashboard();
             return;
         }
+        // Slot-Geräte (z. B. Videostudio) → direkt in die stundenweise Einzelbuchung führen
+        // (Nutzer-Wunsch: Bundle verlassen, Einzelgerät-Modus). Slot- vs. Tages-Zeitmodell und
+        // gemischte Schedules lassen sich nicht als EIN Tages-Bundle buchen.
+        $slotRid = $this->firstSlotResource($db, $bundle);
+        if ($slotRid > 0) {
+            $this->page->RedirectToResourceBooking($slotRid, $this->resourceScheduleId($db, $slotRid));
+            return;
+        }
         $aroundYmd = $this->readDate('rd', $tz);
         $this->bindForm($user, $bundle, $aroundYmd, '', [], [], 7, false);
     }
@@ -116,6 +124,13 @@ class ZhlBundleBookPresenter
         $bundle = $this->loadBundle($db, $bid);
         if ($bundle === null) {
             $this->page->RedirectToDashboard();
+            return;
+        }
+        // Defensiv: ein (z. B. gecachtes) Bundle-Formular für ein Slot-Gerät landet ebenfalls in der
+        // stundenweisen Einzelbuchung statt in der hier nicht passenden Tages-Bundle-Buchung.
+        $slotRid = $this->firstSlotResource($db, $bundle);
+        if ($slotRid > 0) {
+            $this->page->RedirectToResourceBooking($slotRid, $this->resourceScheduleId($db, $slotRid));
             return;
         }
 
@@ -873,6 +888,30 @@ class ZhlBundleBookPresenter
             $ids = $this->resourceIdsOfType($db, (string)$it['type_label']);
             if (!empty($ids)) {
                 return (int)$ids[0];
+            }
+        }
+        return 0;
+    }
+
+    /**
+     * Erstes slot-basiertes Gerät der Main-Phase (z. B. Videostudio, zhl_uebergabe.booking_mode='slot').
+     * Solche Geräte werden stundenweise (2h-Slots) gebucht und passen nicht in den Tages-Bundle-Flow
+     * → der Nutzer wird in die Einzelbuchung dieses Geräts geführt. booking_mode wird zur Laufzeit aus
+     * der Live-DB gelesen → selbstkorrigierend, falls die Bundle-Komposition sich ändert. 0 = keins.
+     */
+    private function firstSlotResource($db, array $bundle): int
+    {
+        foreach ($this->itemsForPhase($bundle, 'main') as $it) {
+            if ((int)$it['quantity'] <= 0) {
+                continue; // Packlisten-/Info-Position, keine buchbare Ressource.
+            }
+            $rids = $it['specific_resource_id'] !== null
+                ? [(int)$it['specific_resource_id']]
+                : $this->resourceIdsOfType($db, (string)$it['type_label']);
+            foreach ($rids as $rid) {
+                if ($this->lookupUebergabe($db, (int)$rid)['booking_mode'] === 'slot') {
+                    return (int)$rid;
+                }
             }
         }
         return 0;

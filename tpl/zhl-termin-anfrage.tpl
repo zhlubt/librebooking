@@ -7,7 +7,7 @@
 		<div class="zhl-dash-head">
 			<div>
 				<div class="zhl-uplabel">Medienausleihe ZHL</div>
-				<h1 class="zhl-h1">✅ Anfrage gesendet</h1>
+				<h1 class="zhl-h1"><svg class="zhl-ic" style="width:1.05em;height:1.05em;vertical-align:-0.16em;flex:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg> Anfrage gesendet</h1>
 			</div>
 		</div>
 		<div class="zhl-book-card" style="max-width:560px;">
@@ -17,7 +17,7 @@
 				<span class="zhl-muted zhl-small">Das Team meldet sich mit einem passenden Termin oder einer Rückfrage. Eine Kopie der Anfrage ging an deine E-Mail-Adresse. Du kannst offene Anfragen unter „Meine Buchungen" einsehen und zurückziehen.</span>
 			</div>
 			<div class="zhl-book-actions" style="display:flex; gap:10px; flex-wrap:wrap;">
-				<a class="zhl-btn" href="{$Path}zhl-bookings.php">📅 Meine Buchungen</a>
+				<a class="zhl-btn" href="{$Path}zhl-bookings.php"><svg class="zhl-ic" style="width:1.05em;height:1.05em;vertical-align:-0.16em;flex:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> Meine Buchungen</a>
 				<a class="zhl-btn zhl-btn-ghost" href="{$Path}zhl-dashboard.php">Zur Geräteauswahl</a>
 			</div>
 		</div>
@@ -45,7 +45,7 @@
 				<div class="zhl-uplabel">{if $Kind == 'bundle'}Dein Bundle{else}Dein Gerät{/if}</div>
 				<h2 class="zhl-h2">{$Label|escape}</h2>
 				<div class="zhl-ueb-item" style="margin-top:12px;display:block;">
-					<strong>ℹ Hinweis</strong>
+					<strong><svg class="zhl-ic" style="width:1.05em;height:1.05em;vertical-align:-0.16em;flex:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg> Hinweis</strong>
 					<span class="zhl-muted zhl-small">Eine Anfrage <strong>reserviert das Gerät nicht</strong> automatisch — sie ist ein Wunsch, den das Team verbindlich mit dir abstimmt. Die normalen Mindest-Vorlaufzeiten gelten weiter; kurzfristige Termine kann nur das Team eintragen.</span>
 				</div>
 			</div>

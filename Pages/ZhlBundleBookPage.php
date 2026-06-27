@@ -63,6 +63,15 @@ class ZhlBundleBookPage extends SecurePage implements IZhlBundleBookPage
     {
         $this->Redirect('zhl-bundle-book.php?' . $query);
     }
+
+    public function RedirectToResourceBooking(int $rid, int $sid)
+    {
+        $q = 'zhl-book.php?rid=' . $rid;
+        if ($sid > 0) {
+            $q .= '&sid=' . $sid;
+        }
+        $this->Redirect($q);
+    }
 }
 
 interface IZhlBundleBookPage
@@ -71,4 +80,5 @@ interface IZhlBundleBookPage
     public function BindSuccess(array $vm);
     public function RedirectToDashboard();
     public function RedirectToSuccess(string $query);
+    public function RedirectToResourceBooking(int $rid, int $sid);
 }

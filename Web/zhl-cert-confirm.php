@@ -76,14 +76,14 @@ $name = $row ? trim(($row['fname'] ?? '') . ' ' . ($row['lname'] ?? '')) : '';
     <?php if (!$row): ?>
       <div class="alert alert-warning mb-0">Dieser Bestätigungs-Link ist ungültig oder abgelaufen.</div>
     <?php elseif ($result === 'confirmed' || ($row['status'] === 'confirmed' && $result === null)): ?>
-      <div class="alert alert-success mb-0">✅ Danke! <strong><?= h($name) ?></strong> hat das Zertifikat <strong>„<?= h($row['cert_name']) ?>"</strong> erhalten und kann das Material jetzt selbstständig buchen.</div>
+      <div class="alert alert-success mb-0"><svg class="zhl-ic" style="width:1.05em;height:1.05em;vertical-align:-0.16em;flex:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg> Danke! <strong><?= h($name) ?></strong> hat das Zertifikat <strong>„<?= h($row['cert_name']) ?>"</strong> erhalten und kann das Material jetzt selbstständig buchen.</div>
     <?php elseif ($result === 'rejected' || $row['status'] === 'rejected'): ?>
       <div class="alert alert-secondary mb-0">Notiert — es wurde <strong>kein</strong> Zertifikat vergeben.</div>
     <?php else: ?>
       <p>Hat <strong><?= h($name) ?></strong> <span class="text-muted">(<?= h($row['email']) ?>)</span> die Einführung <strong>„<?= h($row['cert_name']) ?>"</strong> erfolgreich absolviert?</p>
       <form method="post" class="d-flex gap-2 mt-3">
         <input type="hidden" name="t" value="<?= h($token) ?>">
-        <button name="decision" value="ja" class="btn btn-success">✅ Ja, bestätigen</button>
+        <button name="decision" value="ja" class="btn btn-success"><svg class="zhl-ic" style="width:1.05em;height:1.05em;vertical-align:-0.16em;flex:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg> Ja, bestätigen</button>
         <button name="decision" value="nein" class="btn btn-outline-secondary">Nein</button>
       </form>
       <p class="text-muted small mt-3 mb-0">Bitte erst <em>nach</em> dem durchgeführten Termin bestätigen.</p>

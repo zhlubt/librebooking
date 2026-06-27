@@ -143,3 +143,15 @@ h1, h2, h3, h4, h5, .h1, .h2, .h3, .h4, .h5 { color: var(--zhl-text); font-weigh
 
 /* Footer hell statt grau */
 footer.bg-light { background: #fff !important; color: var(--zhl-muted); border-top-color: var(--zhl-border) !important; }
+
+/* Minimalistische Linien-Icons (Lucide-Stil), ersetzen die früheren Emojis.
+   Skalieren mit der Schriftgröße des Kontexts und erben die Textfarbe. */
+.zhl-ic {
+  display: inline-block;
+  width: 1.05em;
+  height: 1.05em;
+  vertical-align: -0.16em;
+  flex: none;
+  stroke: currentColor;
+  fill: none;
+}

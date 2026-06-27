@@ -101,6 +101,11 @@ class ZhlBookPresenter
                 $einf = ['certified' => true];
             } else {
                 $f = $this->fetchEinfuehrungSlots($ueb['einfuehrung_typ'], $ueb['tp_member_id'], $loanStartUtc, $tz);
+                // Slot-Modus (Studio): die Einführung reserviert das Gerät selbst → nur Termine
+                // anbieten, an denen das Studio in dieser Stunde frei ist (SPEC-STUDIO-EINFUEHRUNG).
+                if ($ueb['booking_mode'] === 'slot') {
+                    $f['slots'] = $this->filterSlotsResourceFree($user, $resource, $f['slots']);
+                }
                 $einf = ['certified' => false, 'required' => ($ueb['einfuehrung'] === 'notwendig'), 'slots' => $f['slots'], 'days' => $this->groupPickupByDay($f['slots'], $tz), 'earliestLabel' => $f['earliestLabel']];
             }
         }
@@ -311,6 +316,11 @@ class ZhlBookPresenter
         if ($chosenSlot !== '' && !$certified && $ueb['einfuehrung'] !== 'keine') {
             $einfLoanStartUtc = Date::Parse($beginDate . ' ' . $beginTime, $tz)->ToTimezone('UTC')->Format('Y-m-d H:i:s');
             $ef = $this->fetchEinfuehrungSlots($ueb['einfuehrung_typ'], $ueb['tp_member_id'], $einfLoanStartUtc, $tz);
+            // Slot-Modus (Studio): nur Termine mit freiem Studio gelten (SPEC-STUDIO-EINFUEHRUNG) —
+            // wurde das Studio seit der Anzeige belegt, fällt der Slot hier raus → klarer Fehler vor Save.
+            if ($ueb['booking_mode'] === 'slot') {
+                $ef['slots'] = $this->filterSlotsResourceFree($user, $resource, $ef['slots']);
+            }
             $einfResolved = null;
             foreach ($ef['slots'] as $s) {
                 if ((string)$s['slot_id'] === (string)$chosenSlot) {
@@ -539,6 +549,16 @@ class ZhlBookPresenter
                     $einfBookingId = isset($book['booking_id']) ? (string)$book['booking_id'] : null;
                     $this->persistEinfuehrung($db, $ref, $rid, $einfPlan['member_id'], $einfBookingId, $einfPlan['start_utc'], $einfPlan['end_utc']);
                     $this->createCertConfirmation($db, (int)$user->UserId, $rid);
+                    // Slot-Modus (Studio): die Einführung findet IM Gerät statt → zusätzlich zur
+                    // Personal-Buchung eine native 60-Min-Geräte-Reservierung für die Einführungs-Stunde
+                    // anlegen (SPEC-STUDIO-EINFUEHRUNG). Best-effort: scheitert sie, bleibt die Ausleihe.
+                    if ($ueb['booking_mode'] === 'slot' && !empty($einfPlan['start_utc']) && !empty($einfPlan['end_utc'])) {
+                        $einfResErr = $this->reserveEinfuehrungOnResource($user, $resource, $einfPlan['start_utc'], $einfPlan['end_utc'], $ref, $tz);
+                        if ($einfResErr !== null) {
+                            Log::Error('ZHL-Einführung: Studio-Reservierung fehlgeschlagen (ref=%s, res=%s): %s', $ref, $rid, $einfResErr);
+                            $warnings[] = 'Der Einführungstermin beim Team ist gebucht, aber die Studio-Reservierung für diese Stunde konnte nicht angelegt werden — bitte beim ZHL-Team melden.';
+                        }
+                    }
                     // „Zusammen": der gebuchte Einführungstermin IST zugleich der Übergabetermin →
                     // Übergabe-Zeile aus dem Einführungs-Slot ableiten (KEIN separater Abhol-Slot gebucht).
                     if ($combined) {
@@ -1047,6 +1067,76 @@ class ZhlBookPresenter
             if (!$this->unitBusy($byResource[$pid] ?? [], $begin, $end)) {
                 return $pid;
             }
+        }
+        return null;
+    }
+
+    /**
+     * SPEC-STUDIO-EINFUEHRUNG: behält nur Einführungs-Slots, deren Fenster [start_utc,end_utc) im
+     * Geräte-Pool frei ist (Studio-Stunde verfügbar). Slots ohne saubere UTC-Zeiten fallen raus.
+     * @param array[] $slots Slots aus fetchEinfuehrungSlots (mit start_utc/end_utc als 'Y-m-d H:i:s' UTC)
+     * @return array[]
+     */
+    private function filterSlotsResourceFree(UserSession $user, $resource, array $slots): array
+    {
+        $poolIds = $this->poolResourceIds($user, $resource);
+        $out = [];
+        foreach ($slots as $s) {
+            if (empty($s['start_utc']) || empty($s['end_utc'])) {
+                continue;
+            }
+            try {
+                $begin = Date::Parse((string)$s['start_utc'], 'UTC');
+                $end = Date::Parse((string)$s['end_utc'], 'UTC');
+            } catch (Exception $e) {
+                continue;
+            }
+            if ($this->pickFreeUnit($poolIds, $begin, $end) !== null) {
+                $out[] = $s;
+            }
+        }
+        return array_values($out);
+    }
+
+    /**
+     * SPEC-STUDIO-EINFUEHRUNG: legt für die Einführungs-Stunde eine native Geräte-Reservierung an
+     * (Studio muss für die Einführung vor Ort & blockiert sein). Reserviert auf der freien Pool-Einheit;
+     * volle native Validierung (Konflikt/Vorlauf/Periodengrenze) bleibt letzte Instanz.
+     * @return ?string null bei Erfolg, sonst eine Fehlermeldung (Logging/Warnung)
+     */
+    private function reserveEinfuehrungOnResource(UserSession $user, $resource, string $startUtc, string $endUtc, string $ref, $tz): ?string
+    {
+        try {
+            $beginUtc = Date::Parse($startUtc, 'UTC');
+            $endUtcD = Date::Parse($endUtc, 'UTC');
+        } catch (Exception $e) {
+            return 'ungültige Einführungs-Zeit';
+        }
+        $poolIds = $this->poolResourceIds($user, $resource);
+        $unit = $this->pickFreeUnit($poolIds, $beginUtc, $endUtcD) ?? (int)$resource->GetId();
+        $b = $beginUtc->ToTimezone($tz);
+        $e = $endUtcD->ToTimezone($tz);
+        $facade = new ZhlReservationFacade(
+            $user->UserId,
+            $unit,
+            'Einführung Videostudio',
+            'Pflicht-Einführung zur Buchung ' . $ref . ' (das Studio ist für diese Stunde reserviert).',
+            $b->Format('Y-m-d'),
+            $b->Format('H:i'),
+            $e->Format('Y-m-d'),
+            $e->Format('H:i')
+        );
+        try {
+            $factory = new ReservationPresenterFactory();
+            $presenter = $factory->Create($facade, $user);
+            $series = $presenter->BuildReservation();
+            $presenter->HandleReservation($series);
+        } catch (Exception $ex) {
+            return 'Reservierungs-Handler-Fehler: ' . $ex->getMessage();
+        }
+        if (!$facade->WasSaved()) {
+            $errs = $facade->GetErrors();
+            return empty($errs) ? 'Reservierung nicht gespeichert' : implode(' ', $errs);
         }
         return null;
     }

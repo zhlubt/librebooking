@@ -8,6 +8,10 @@
 				<div class="mb-1"><a href="{$CompanyUrl}">{$CompanyName}</a></div>
 			{/if}
 			<div class="zhl-footer-muted">© 2026 · Zentrum für Hochschullehre · Universität Bayreuth</div>
+			<div class="zhl-footer-muted">
+				<a href="https://www.uni-bayreuth.de/impressum" target="_blank" rel="noopener">{translate key="ZhlImprint"}</a>
+				· <a href="https://www.zhl.uni-bayreuth.de/de/_service/datenschutzerklaerung/index.html" target="_blank" rel="noopener">{translate key="ZhlPrivacy"}</a>
+			</div>
 			<div class="zhl-footer-muted"><a href="https://github.com/LibreBooking/librebooking">LibreBooking - GPLv3 -
 					{$DisplayVersion}</a></div>
 		</footer>

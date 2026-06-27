@@ -24,6 +24,8 @@ $zhlCommon = [
         'ZhlNavCertificates'      => 'Einführungs-Zertifikate',
         'ZhlNavBundles'           => 'Geräte-Bundles',
         'ZhlNavHandovers'         => 'Übergaben',
+        'ZhlImprint'              => 'Impressum',
+        'ZhlPrivacy'              => 'Datenschutz',
         'ZhlLogout'               => 'Abmelden',
         'ZhlDays'                 => 'Tage',
 
@@ -97,6 +99,8 @@ $zhlCommon = [
         'ZhlNavCertificates'      => 'Induction Certificates',
         'ZhlNavBundles'           => 'Device Bundles',
         'ZhlNavHandovers'         => 'Handovers',
+        'ZhlImprint'              => 'Legal notice',
+        'ZhlPrivacy'              => 'Privacy policy',
         'ZhlLogout'               => 'Sign out',
         'ZhlDays'                 => 'days',
 

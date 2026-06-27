@@ -194,7 +194,8 @@
 </main>
 
 <footer>
-  <span data-en="Questions about lending?">Fragen zur Ausleihe?</span> <a href="mailto:zhlmedien@uni-bayreuth.de">zhlmedien@uni-bayreuth.de</a> · Zentrum für Hochschullehre, Universität Bayreuth
+  <span data-en="Questions about lending?">Fragen zur Ausleihe?</span> <a href="mailto:zhlmedien@uni-bayreuth.de">zhlmedien@uni-bayreuth.de</a> · Zentrum für Hochschullehre, Universität Bayreuth<br>
+  <a href="https://www.uni-bayreuth.de/impressum" target="_blank" rel="noopener" data-en="Legal notice">Impressum</a> · <a href="https://www.zhl.uni-bayreuth.de/de/_service/datenschutzerklaerung/index.html" target="_blank" rel="noopener" data-en="Privacy policy">Datenschutz</a>
 </footer>
 
 {literal}

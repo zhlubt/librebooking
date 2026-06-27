@@ -350,7 +350,9 @@ $bookDate = date('Y-m-d', strtotime('+7 days'));
   .foot-contact a:hover { color:#fff; }
   .foot-contact .row { display:flex; align-items:flex-start; gap:10px; margin-bottom:10px; }
   .foot-contact .row svg { width:16px; height:16px; color:var(--green); flex:none; margin-top:3px; }
-  .foot-bottom { border-top:1px solid rgba(255,255,255,.08); padding:20px 0; text-align:center; font-size:13px; color:#7a8a83; }
+  .foot-bottom { border-top:1px solid rgba(255,255,255,.08); padding:20px 0; text-align:center; font-size:13px; color:#7a8a83; line-height:1.9; }
+  .foot-bottom a { color:#9fb3ab; text-decoration:underline; }
+  .foot-bottom a:hover { color:#fff; }
 
   /* Katalog: Bundles */
   .btn-primary { border:none; cursor:pointer; background:var(--grad); color:#fff; font-weight:600; box-shadow:0 6px 16px rgba(0,146,96,.28); }
@@ -722,7 +724,9 @@ $bookDate = date('Y-m-d', strtotime('+7 days'));
       </div>
     </div>
   </div>
-  <div class="foot-bottom">© 2026 · Zentrum für Hochschullehre · Universität Bayreuth</div>
+  <div class="foot-bottom">© 2026 · Zentrum für Hochschullehre · Universität Bayreuth<br>
+    <a href="https://www.uni-bayreuth.de/impressum" target="_blank" rel="noopener" data-en="Legal notice">Impressum</a> · <a href="https://www.zhl.uni-bayreuth.de/de/_service/datenschutzerklaerung/index.html" target="_blank" rel="noopener" data-en="Privacy policy">Datenschutz</a>
+  </div>
 </footer>
 
 <script>

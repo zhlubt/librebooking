@@ -144,7 +144,9 @@ function tile_icon(string $name): string {
 
   <footer>
     ZHL — Zentrum für Hochschullehre, Universität Bayreuth ·
-    <a href="index.php">Zum Buchungssystem</a>
+    <a href="index.php">Zum Buchungssystem</a><br>
+    <a href="https://www.uni-bayreuth.de/impressum" target="_blank" rel="noopener" data-en="Legal notice">Impressum</a> ·
+    <a href="https://www.zhl.uni-bayreuth.de/de/_service/datenschutzerklaerung/index.html" target="_blank" rel="noopener" data-en="Privacy policy">Datenschutz</a>
   </footer>
 </body>
 </html>

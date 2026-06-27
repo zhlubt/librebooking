@@ -2,6 +2,7 @@
 
 require_once(ROOT_DIR . 'Pages/SecurePage.php');
 require_once(ROOT_DIR . 'Presenters/ZhlBookingsPresenter.php');
+require_once(ROOT_DIR . 'lib/Application/Zhl/ZhlTerminRequest.php');
 
 /**
  * ZHL „Meine Buchungen" — eigene Ausleihen des angemeldeten Nutzers, gruppiert
@@ -22,11 +23,33 @@ class ZhlBookingsPage extends SecurePage implements IZhlBookingsPage
     public function PageLoad()
     {
         $user = ServiceLocator::GetServer()->GetUserSession();
+
+        // B: eigene offene Wunschtermin-Anfrage zurückziehen (PRG). SetStatus gated auf
+        // status=open AND user_id = eigener (sicheres Storno fremder/erledigter Anfragen ausgeschlossen).
+        if ($this->IsPost() && $this->GetForm('action') === 'cancel_request') {
+            $this->EnforceCSRFCheck();
+            $reqId = (int)$this->GetForm('req_id');
+            if ($reqId > 0) {
+                ZhlTerminRequest::SetStatus(
+                    ServiceLocator::GetDatabase(),
+                    $reqId,
+                    'cancelled',
+                    (int)$user->UserId,
+                    'Vom Nutzer zurückgezogen.',
+                    null,
+                    (int)$user->UserId
+                );
+            }
+            $this->Redirect('zhl-bookings.php?anfrage_storniert=1');
+            return;
+        }
+
         $this->presenter->PageLoad($user);
         $this->Set('HideNavBar', false);
         // Erfolgsbanner nach Storno (Redirect-Ziel der Detailseite).
         $this->Set('CancelledNotice', isset($_GET['storniert']) && $_GET['storniert'] === '1');
         $this->Set('CancelWarning', isset($_GET['warn']) ? trim((string)$_GET['warn']) : '');
+        $this->Set('RequestCancelledNotice', isset($_GET['anfrage_storniert']) && $_GET['anfrage_storniert'] === '1');
         $this->Display('zhl-bookings.tpl');
     }
 

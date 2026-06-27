@@ -24,6 +24,39 @@
         <span>Ihre Ausleihe wurde storniert.{if isset($CancelWarning) && $CancelWarning != ''} <b>{$CancelWarning|escape}</b>{/if}</span>
       </div>
     {/if}
+    {if isset($RequestCancelledNotice) && $RequestCancelledNotice}
+      <div class="info-box" style="border-color:#bfe3d2;background:#eaf6ef;color:#00744c">
+        <span class="ib-ic"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></span>
+        <span>Ihre Wunschtermin-Anfrage wurde zurückgezogen.</span>
+      </div>
+    {/if}
+
+    {if $OpenRequestCount > 0}
+      <div class="card" style="margin-bottom:18px">
+        <div class="card-head">
+          <span class="ch-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span>
+          <h2>Offene Wunschtermin-Anfragen</h2>
+          <span class="ch-right muted">{$OpenRequestCount}</span>
+        </div>
+        <div class="card-body">
+          <p class="hint" style="margin-bottom:12px">Diese Anfragen liegen beim ZHL-Medien-Team. Das Team meldet sich mit einem Termin — bis dahin ist nichts fest gebucht. Du kannst eine Anfrage zurückziehen.</p>
+          {foreach from=$OpenRequests item=rq}
+            <div class="zhl-ueb-item" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:8px">
+              <div style="flex:1;min-width:200px">
+                <strong>{$rq.label|escape}</strong>{if $rq.isBundle} <span class="badge badge-ok">Bundle</span>{/if}
+                <div class="zhl-muted zhl-small">Wunsch: {$rq.fromLabel|escape} – {$rq.toLabel|escape}{if $rq.projectTitle != ''} · {$rq.projectTitle|escape}{/if}</div>
+              </div>
+              <form method="post" action="{$Path}zhl-bookings.php" onsubmit="return confirm('Diese Wunschtermin-Anfrage zurückziehen?');">
+                {csrf_token}
+                <input type="hidden" name="action" value="cancel_request">
+                <input type="hidden" name="req_id" value="{$rq.id}">
+                <button type="submit" class="btn btn-light">Zurückziehen</button>
+              </form>
+            </div>
+          {/foreach}
+        </div>
+      </div>
+    {/if}
 
     {if !$HasAny}
       <div class="info-box">

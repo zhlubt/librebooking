@@ -11,7 +11,7 @@
 		</div>
 		<div class="d-flex gap-2 align-items-center">
 			<button type="button" class="zhl-btn zhl-btn-sm" data-lang-btn onclick="zhlToggleLang()">EN</button>
-			{if $IsAdmin}<a class="zhl-btn zhl-btn-sm" href="{$Path}zhl-bundles-admin.php">⚙ <span data-en="Bundles">Bundles</span></a><a class="zhl-btn zhl-btn-sm" href="{$Path}zhl-certificates-admin.php">🎓 <span data-en="Certificates">Zertifikate</span></a><a class="zhl-btn zhl-btn-sm" href="{$Path}zhl-typeinfo-admin.php">ℹ <span data-en="Media info">Geräte-Infos</span></a>{/if}
+			{if $IsAdmin}<a class="zhl-btn zhl-btn-sm" href="{$Path}zhl-bundles-admin.php">⚙ <span data-en="Bundles">Bundles</span></a><a class="zhl-btn zhl-btn-sm" href="{$Path}zhl-certificates-admin.php">🎓 <span data-en="Certificates">Zertifikate</span></a><a class="zhl-btn zhl-btn-sm" href="{$Path}zhl-typeinfo-admin.php">ℹ <span data-en="Media info">Geräte-Infos</span></a><a class="zhl-btn zhl-btn-sm" href="{$Path}zhl-termin-anfrage-admin.php">📅 <span data-en="Requests">Anfragen</span></a>{/if}
 		</div>
 	</div>
 

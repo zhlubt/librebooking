@@ -5,6 +5,7 @@ require_once(ROOT_DIR . 'lib/Common/namespace.php');
 require_once(ROOT_DIR . 'lib/Database/namespace.php');
 require_once(ROOT_DIR . 'Domain/namespace.php');
 require_once(ROOT_DIR . 'Domain/Access/namespace.php');
+require_once(ROOT_DIR . 'lib/Application/Zhl/ZhlTerminRequest.php');
 
 /**
  * Presenter „Meine Buchungen". Liest die eigenen Reservierungen des angemeldeten
@@ -71,6 +72,9 @@ class ZhlBookingsPresenter
         // ist beim Stornieren gelöscht worden, daher separate Quelle. Bereits absteigend (neueste zuerst).
         $cancelled = $this->loadCancelled($user->UserId, $tz, $now);
 
+        // B: offene Wunschtermin-Anfragen des Nutzers (noch nicht gebucht/abgelehnt/storniert).
+        $openRequests = $this->loadOpenRequests((int)$user->UserId, $tz);
+
         // Anstehend aufsteigend, Laufend aufsteigend, Vergangen absteigend (neueste zuerst).
         usort($current, fn($a, $b) => strcmp($a['startSort'], $b['startSort']));
         usort($upcoming, fn($a, $b) => strcmp($a['startSort'], $b['startSort']));
@@ -102,7 +106,41 @@ class ZhlBookingsPresenter
             'cancelledCount' => count($cancelled),
             'defaultGroup' => $defaultGroup,
             'hasAny' => (count($current) + count($upcoming) + count($past) + count($cancelled)) > 0,
+            'openRequests' => $openRequests,
+            'openRequestCount' => count($openRequests),
         ]);
+    }
+
+    /**
+     * Offene Wunschtermin-Anfragen des Nutzers, aufbereitet für die Anzeige (Label, Wunsch-Zeitraum
+     * lokal, Datum der Anfrage). Best effort — fehlt die Tabelle, leere Liste.
+     * @return array[]
+     */
+    private function loadOpenRequests(int $userId, $tz): array
+    {
+        $out = [];
+        $fmt = function ($utc) use ($tz): string {
+            if ($utc === null || $utc === '') {
+                return '';
+            }
+            try {
+                return Date::Parse((string)$utc, 'UTC')->ToTimezone($tz)->Format('d.m.Y');
+            } catch (Exception $e) {
+                return '';
+            }
+        };
+        foreach (ZhlTerminRequest::ListOpenForUser(ServiceLocator::GetDatabase(), $userId) as $r) {
+            $out[] = [
+                'id' => (int)$r['id'],
+                'label' => (string)$r['label'],
+                'isBundle' => ($r['kind'] ?? 'single') === 'bundle',
+                'fromLabel' => $fmt($r['desired_start'] ?? null),
+                'toLabel' => $fmt($r['desired_end'] ?? null),
+                'projectTitle' => (string)($r['project_title'] ?? ''),
+                'createdLabel' => $fmt($r['created_at'] ?? null),
+            ];
+        }
+        return $out;
     }
 
     /**

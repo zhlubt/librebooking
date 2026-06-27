@@ -205,7 +205,7 @@
 				<div class="zhl-book-actions" style="margin-top:18px;">
 					<button class="zhl-btn" type="submit" id="zhl-submit" {if !$Cal}disabled{/if}>Bundle verbindlich buchen ▸</button>
 				</div>
-				<p class="zhl-note">Verfügbarkeit, Vorlauf und Konflikte aller Geräte werden beim Buchen verbindlich geprüft. Es wird <strong>in einer Reservierung</strong> gebucht.</p>
+				<p class="zhl-note">Verfügbarkeit, Vorlauf und Konflikte aller Geräte werden beim Buchen verbindlich geprüft. Es wird <strong>in einer Reservierung</strong> gebucht. <a href="{$Path}zhl-termin-anfrage.php?bundle={$BundleId}">Kein passender Zeitraum? Wunschtermin anfragen.</a></p>
 			</div>
 		</form>
 	{/if}

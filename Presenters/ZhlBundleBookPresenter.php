@@ -1468,11 +1468,22 @@ class ZhlBundleBookPresenter
         $allowed = $this->allowedResourceIds($user);
         // E1: auto-Gruppen NICHT auf eine Wahl einschränken — dort pickt der Resolver automatisch die erste
         // freie Option nach Priorität; eine User-Wahl gibt es nicht (Radios sind ausgeblendet).
+        // Zugleich die gültigen Options-Labels je Gruppe sammeln, damit eine GEFÄLSCHTE/unbekannte Wahl
+        // ($altChoices[g] ist keine echte Option) wie „keine Wahl" behandelt wird (alle Optionen bleiben) —
+        // statt alle Optionen wegzufiltern. Spiegelt den Resolver, der eine ungültige Wahl nicht akzeptiert.
         $autoGroups = [];
+        $groupOptions = []; // group => [type_label => true]
         foreach ($mainItems as $it) {
             $g = (isset($it['alt_group']) && $it['alt_group'] !== '') ? (string)$it['alt_group'] : null;
-            if ($g !== null && (string)($it['alt_mode'] ?? 'choice') === 'auto') {
+            if ($g === null) {
+                continue;
+            }
+            if ((string)($it['alt_mode'] ?? 'choice') === 'auto') {
                 $autoGroups[$g] = true;
+            }
+            $tl = (string)($it['type_label'] ?? '');
+            if ($tl !== '') {
+                $groupOptions[$g][$tl] = true;
             }
         }
         $requirements = [];
@@ -1484,11 +1495,14 @@ class ZhlBundleBookPresenter
                 continue; // Packliste + optionale Positionen blocken weder Kalender noch Slots.
             }
             $group = (isset($it['alt_group']) && $it['alt_group'] !== '') ? (string)$it['alt_group'] : null;
-            // E1: Bei einer gültigen Wahl in einer choice-Gruppe nur die gewählte Option berücksichtigen.
+            // E1: Bei einer GÜLTIGEN Wahl in einer choice-Gruppe nur die gewählte Option berücksichtigen.
+            // „Gültig" = die Wahl ist eine echte Option der Gruppe; eine unbekannte Wahl wird ignoriert
+            // (alle Optionen bleiben), damit eine gefälschte Eingabe nicht die ganze Gruppe wegfiltert.
             if ($group !== null && empty($autoGroups[$group])
                 && isset($altChoices[$group]) && $altChoices[$group] !== ''
+                && isset($groupOptions[$group][(string)$altChoices[$group]])
                 && (string)$altChoices[$group] !== (string)$it['type_label']) {
-                continue; // nicht gewählte Option dieser Gruppe → ignorieren.
+                continue; // gültige Wahl, aber nicht DIESE Option → ignorieren.
             }
             $ids = $it['specific_resource_id'] !== null
                 ? [(int)$it['specific_resource_id']]

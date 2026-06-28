@@ -23,6 +23,10 @@
 const TARGET_USER = 312;
 const WINDOW_START = '2026-06-30';
 const WINDOW_END = '2026-07-07';
+// Titel-Heuristik: die stornierte Buchung hiess „Aufnahme …". Damit NICHT ein anderer Storno desselben
+// Users im selben Fenster faelschlich als Treffer zaehlt, wird jede Fundzeile gegen dieses Muster
+// markiert (MATCH/andere). Leerer Wert = kein Titelfilter.
+const TITLE_NEEDLE = 'Aufnahme';
 
 function pdoFrom(array $db): PDO
 {
@@ -75,7 +79,30 @@ function out(string $s): void
 $cfg = loadConfig();
 $pdo = $cfg['pdo'] ?? pdoFrom($cfg['db']);
 
-out('=== Task-F READ-ONLY Verifikation — ' . strtoupper($cfg['kind']) . ' ===');
+// Robuste DB-Erkennung NICHT allein per Pfad: gegen das tatsächliche Schema gegenprüfen, damit ein
+// meet-Container mit zufällig vorhandener config.php nicht als media fehlklassifiziert wird.
+$tables = [];
+foreach ($pdo->query('SHOW TABLES')->fetchAll(PDO::FETCH_COLUMN) as $t) {
+    $tables[strtolower((string)$t)] = true;
+}
+$looksMedia = isset($tables['reservation_series']) && isset($tables['zhl_cancelled_booking']);
+$looksMeet = isset($tables['bookings']) && !isset($tables['reservation_series']);
+if ($looksMedia) {
+    $cfg['kind'] = 'media';
+} elseif ($looksMeet) {
+    $cfg['kind'] = 'meet';
+}
+
+out('=== Task-F READ-ONLY Verifikation — ' . strtoupper($cfg['kind']) . ' (Schema-bestätigt) ===');
+
+/** Titel gegen die Heuristik markieren. */
+function titleMark(string $title): string
+{
+    if (TITLE_NEEDLE === '') {
+        return '';
+    }
+    return (stripos($title, TITLE_NEEDLE) !== false) ? ' [MATCH „' . TITLE_NEEDLE . '"]' : ' [anderer Titel]';
+}
 
 if ($cfg['kind'] === 'media') {
     // 1) Noch lebende Reservierungen von user 312 im Fenster? (jede Zeile = BUG: nicht storniert)
@@ -90,7 +117,7 @@ if ($cfg['kind'] === 'media') {
     $live = $st->fetchAll();
     out('[1] Lebende Reservierungen user ' . TARGET_USER . ' im Fenster: ' . count($live) . ' (Erwartung 0)');
     foreach ($live as $r) {
-        out('    BUG? series=' . $r['series_id'] . ' ref=' . $r['reference_number'] . ' "' . $r['title'] . '" ' . $r['start_date'] . '..' . $r['end_date']);
+        out('    BUG? series=' . $r['series_id'] . ' ref=' . $r['reference_number'] . ' "' . $r['title'] . '"' . titleMark((string)$r['title']) . ' ' . $r['start_date'] . '..' . $r['end_date']);
     }
 
     // 2) Storno-Schnappschuss vorhanden?
@@ -102,11 +129,17 @@ if ($cfg['kind'] === 'media') {
     $snap = $st->fetchAll();
     out('[2] Storno-Schnappschüsse (zhl_cancelled_booking): ' . count($snap) . ' (Erwartung >=1)');
     $refs = [];
+    $matchRefs = [];
     foreach ($snap as $r) {
         $refs[] = $r['reference_number'];
-        out('    ref=' . $r['reference_number'] . ' "' . $r['title'] . '" geräte=' . $r['device_count']
+        if (TITLE_NEEDLE === '' || stripos((string)$r['title'], TITLE_NEEDLE) !== false) {
+            $matchRefs[] = $r['reference_number'];
+        }
+        out('    ref=' . $r['reference_number'] . ' "' . $r['title'] . '"' . titleMark((string)$r['title']) . ' geräte=' . $r['device_count']
             . ' ' . $r['start_utc'] . '..' . $r['end_utc'] . ' storniert ' . $r['cancelled_at']);
     }
+    out('    → Titel-Treffer „' . TITLE_NEEDLE . '": ' . count($matchRefs) . ' von ' . count($snap)
+        . ' (das ist die gesuchte Storno-Buchung; andere sind separate Stornos desselben Users).');
 
     // 3) Übergabe-Zeilen zu den gefundenen refs aufgeräumt?
     if ($refs) {
@@ -158,6 +191,8 @@ if ($cfg['kind'] === 'media') {
             }
             out('    id=' . $r['id'] . ' type=' . $r['meeting_type'] . ' status=' . $r['status'] . ' start=' . $r['s']);
         }
+        out('    Präzise Verknüpfung: die hier gelisteten booking-IDs gegen die media-Ausgabe [3]');
+        out('    (Spalte tp_booking) abgleichen — so ist eindeutig, welche Termine zur Storno-Buchung gehören.');
         out('FAZIT meet: ' . ($active === 0 ? 'KONSISTENT (alle zugehörigen Termine cancelled).' : ('PRÜFEN — ' . $active . ' NICHT stornierte Termine.')));
     }
 }

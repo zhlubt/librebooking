@@ -22,9 +22,13 @@ ssh zhl-media 'php' < docs/zhl/verify-storno-30-06.php
 # meet (zhl_meet): zugehörige Terminplaner-Termine status='cancelled'?
 ssh zhl-meet  'php' < docs/zhl/verify-storno-30-06.php
 ```
-Das Skript ist reines SELECT (kein INSERT/UPDATE/DELETE), erkennt die DB selbst (media via
-`config/config.php`, meet via `db.php`/Konstanten) und sucht die Buchung über **user 312 +
-Zeitraum 30.6.–7.7.2026**. Erwartete Befunde:
+Das Skript ist reines SELECT (kein INSERT/UPDATE/DELETE), erkennt die DB **schema-bestätigt**
+(`SHOW TABLES`: media = `reservation_series`+`zhl_cancelled_booking`, meet = `bookings` ohne
+`reservation_series` — robuster als reine Pfad-Heuristik, Codex-Fix) und sucht die Buchung über
+**user 312 + Zeitraum 30.6.–7.7.2026**. Jede Fundzeile wird zusätzlich gegen die **Titel-Heuristik
+„Aufnahme"** markiert (`[MATCH]`/`[anderer Titel]`), damit ein anderer Storno desselben Users im
+selben Fenster nicht fälschlich als Treffer zählt (Codex-Fix). Die meet-booking-IDs sind über die
+media-Ausgabe `[3]` (`tp_booking`) eindeutig der Storno-Buchung zuzuordnen. Erwartete Befunde:
 
 | Prüfung | Quelle | Erwartung bei korrektem Storno |
 |---|---|---|

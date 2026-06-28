@@ -1,0 +1,9 @@
+# VORLAGE — curl-Config für den LaunchAgent de.zhl.media-cron.
+# Echte Datei: ~/Library/Application Support/zhl/media-cron.conf  (chmod 600, NICHT committen).
+# Token = $zhlCronToken aus config/zhl-cron.php auf media. Via Header → nicht in URL/Access-Logs.
+# Reichweite: ?only=zhl_einfuehrung_report.php = nur Wochenreport. Für ALLE Cron-Jobs ?only weglassen.
+url = "https://media.zhl-ubt.de/Web/zhl-cron.php?only=zhl_einfuehrung_report.php"
+header = "X-Zhl-Cron-Token: REPLACE_WITH_ZHL_CRON_TOKEN"
+silent
+show-error
+fail

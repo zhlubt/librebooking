@@ -48,9 +48,17 @@ $jobs = [
     // 'sessioncleanup.php', 'deleteolddata.php'  -> seltener, separat planen
 ];
 
+// Optional: nur EINEN Job laufen lassen (?only=<dateiname.php>), gegen die feste Liste gewhitelistet.
+// Erlaubt einen Scheduler, der gezielt nur z.B. den Wochenreport anstößt, ohne die übrigen Jobs
+// (Reminder/Mahnungen) auszulösen. Unbekannte Werte → keine Jobs (sicher).
+$only = (string)($_GET['only'] ?? '');
+if ($only !== '') {
+    $jobs = in_array($only, $jobs, true) ? [$only] : [];
+}
+
 $php = PHP_BINARY ?: 'php';
 $ranAt = gmdate('Y-m-d H:i:s') . ' UTC';
-echo "zhl-cron $ranAt\n";
+echo "zhl-cron $ranAt" . ($only !== '' ? " (only=$only)" : '') . "\n";
 
 foreach ($jobs as $job) {
     $script = ZHL_ROOT . '/Jobs/' . $job;

@@ -136,6 +136,9 @@ class ZhlTermineAdminPage extends SecurePage
     </style>
 </head>
 <body>
+<div class="container pt-3" style="max-width:1200px">
+  <a class="btn btn-sm btn-outline-secondary" href="zhl-dashboard.php"><i class="bi bi-arrow-left"></i> Zurück zum Dashboard</a>
+</div>
 <div class="container py-4" style="max-width:1200px">
   <div class="d-flex justify-content-between align-items-center mb-1 flex-wrap gap-2">
     <h1 class="h4 mb-0"><i class="bi bi-calendar2-week text-success"></i> Geplante Termine</h1>
@@ -145,26 +148,6 @@ class ZhlTermineAdminPage extends SecurePage
     </div>
   </div>
   <p class="text-muted mb-3">Übergaben, Rückgaben und Einführungen im Überblick — mit Buchungslink und Mailkontakt zum Ausleihenden.</p>
-
-  <?php if ($calUrl !== ''): ?>
-    <div class="alert alert-light border d-flex align-items-center justify-content-between flex-wrap gap-2 py-2">
-      <span><i class="bi bi-calendar-plus text-success"></i>
-        <strong>Outlook-Kalender abonnieren:</strong>
-        diese Termine + Videostudio-Buchungen als laufend aktualisierter Kalender.</span>
-      <span class="d-flex gap-2">
-        <input class="form-control form-control-sm" style="min-width:320px" readonly
-               onclick="this.select()" value="<?= $h($calUrl) ?>">
-        <a class="btn btn-sm btn-zhl" href="<?= $h(str_replace(['https://','http://'], 'webcal://', $calUrl)) ?>">
-          <i class="bi bi-calendar-check"></i> Abonnieren
-        </a>
-      </span>
-    </div>
-  <?php else: ?>
-    <div class="alert alert-warning border py-2 small">
-      <i class="bi bi-exclamation-triangle"></i> Kalender-Abo noch nicht aktiv —
-      <code>config/zhl-calendar.php</code> mit einem <code>key</code> anlegen (siehe <code>config/zhl-calendar.example.php</code>).
-    </div>
-  <?php endif; ?>
 
   <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
     <div class="btn-group btn-group-sm" role="group" aria-label="Zeitraum">
@@ -262,6 +245,23 @@ class ZhlTermineAdminPage extends SecurePage
         </tbody>
       </table>
     </div></div>
+  <?php endif; ?>
+
+  <?php if ($calUrl !== ''): ?>
+    <div class="mt-4 pt-3 border-top text-muted small d-flex align-items-center flex-wrap gap-2">
+      <span><i class="bi bi-calendar-plus"></i>
+        <strong>Outlook-Kalender abonnieren</strong> — diese Termine + Videostudio-Buchungen, laufend aktualisiert:</span>
+      <input class="form-control form-control-sm" style="min-width:300px;max-width:480px" readonly
+             onclick="this.select()" value="<?= $h($calUrl) ?>">
+      <a class="btn btn-sm btn-outline-secondary" href="<?= $h(str_replace(['https://', 'http://'], 'webcal://', $calUrl)) ?>">
+        <i class="bi bi-calendar-check"></i> Abonnieren
+      </a>
+    </div>
+  <?php else: ?>
+    <div class="mt-4 pt-3 border-top text-muted small">
+      <i class="bi bi-exclamation-triangle"></i> Kalender-Abo noch nicht aktiv —
+      <code>config/zhl-calendar.php</code> mit einem <code>key</code> anlegen (siehe <code>config/zhl-calendar.example.php</code>).
+    </div>
   <?php endif; ?>
 </div>
 <script src="assets/vendor/bootstrap/5.3.3/js/bootstrap.bundle.min.js"></script>

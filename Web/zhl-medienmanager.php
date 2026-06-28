@@ -115,6 +115,9 @@ class ZhlMedienmanagerPage extends SecurePage
     </style>
 </head>
 <body>
+<div class="container pt-3" style="max-width:1100px">
+  <a class="btn btn-sm btn-outline-secondary" href="zhl-dashboard.php"><i class="bi bi-arrow-left"></i> Zurück zum Dashboard</a>
+</div>
 <div class="container py-4" style="max-width:1100px">
   <div class="d-flex justify-content-between align-items-center mb-1 flex-wrap gap-2">
     <h1 class="h4 mb-0"><i class="bi bi-truck text-success"></i> Medienmanager — Rückgaben</h1>

@@ -38,6 +38,8 @@ class ZhlBundleBookPresenter
     private $postedEinfSlot = '';
     /** B-remove: vom Nutzer abgewählte (entfernte) Bundle-Positions-IDs — für Re-Render nach POST-Fehler. */
     private $removedIds = [];
+    /** Task C: gecachte buchbare/sichtbare Ressourcen-IDs (allowedResourceIds), pro Request. */
+    private $allowedCache = null;
 
     public function __construct($page)
     {
@@ -669,10 +671,15 @@ class ZhlBundleBookPresenter
         $db = ServiceLocator::GetDatabase();
         $tz = $user->Timezone;
 
-        // Leitgerät = erstes erforderliches Main-Item (specific_resource_id oder Typ) → Kalender-Proxy.
+        // Leitgerät = erstes erforderliches Main-Item (specific_resource_id oder Typ) → Schedule/Layout-Anker.
+        // $mainItems bleibt UNGEFILTERT für die Anzeige (B-remove zeigt alle Positionen mit Häkchen);
+        // der Kalender bewertet aber nur die aktuell BEHALTENEN Positionen (keep-gefilterte Kopie).
         $mainItems = $this->itemsForPhase($bundle, 'main');
         $leitId = $this->leitResourceId($db, $user, $mainItems);
-        $cal = $leitId > 0 ? $this->monthGrid($user, $leitId, $aroundYmd) : null;
+        // Task C: Pool-bewusster Kalender über ALLE behaltenen Pflichtpositionen (nicht nur das Leitgerät).
+        // applyKeepFilter setzt $this->removedIds; das wird unten beim Anzeige-keep-Flag genutzt.
+        $calItems = $this->applyKeepFilter($mainItems);
+        $cal = $leitId > 0 ? $this->monthGridForBundle($user, $db, $calItems, $leitId, $aroundYmd) : null;
 
         // Pflicht-Reservierungs-Attribute (z. B. Haftpflichtversicherung) — wie Einzelbuchung.
         $attributes = [];
@@ -1252,12 +1259,39 @@ class ZhlBundleBookPresenter
         return $labels;
     }
 
-    // --- Monats-Kalender (Tagesmodus, Proxy über das Leitgerät) ---
+    // --- Monats-Kalender (Tagesmodus) ---
+    // Task C: Der frühere Leitgerät-only monthGrid() wurde durch monthGridForBundle() ersetzt
+    // (pool-bewusst über ALLE Pflichtpositionen). Siehe unten.
 
-    private function monthGrid(UserSession $user, int $rid, string $aroundYmd): array
+    private function dayHasReservablePeriod($layout, $day): bool
+    {
+        foreach ($layout->GetLayout($day, false) as $p) {
+            if (method_exists($p, 'IsReservable') && $p->IsReservable() && $p->BeginDate() !== null && $p->EndDate() !== null) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Task C — Pool-bewusster Monats-Kalender fürs Bundle: ein Tag ist nur dann „frei", wenn JEDE
+     * Pflichtposition des Bundles an diesem Tag erfüllbar ist (genug freie Einheiten je Geräte-Typ).
+     * Pool-/alt_group-Positionen gelten als erfüllbar, sobald EINE Option genug freie Einheiten hat.
+     *
+     * Bisher zeigte der Kalender nur die Belegung des Leitgeräts → ein Tag konnte „frei" wirken,
+     * obwohl ein anderes Pflichtgerät belegt war (Nutzer-Bug). Reuse der Resolver-Wahrheitsquellen:
+     * gleiche Typ-Auflösung (resourceIdsOfType / specific_resource_id) wie der Buchungs-Resolver.
+     *
+     * Schedule/Layout/Zeitachse bleiben am Leitgerät verankert (alle Verleih-Geräte liegen auf
+     * Schedule 5 — gleiche Periodengrenzen; Leitgerät-Layout ist repräsentativ wie zuvor).
+     *
+     * @param array[] $mainItems  bereits keep-gefilterte Main-Items
+     * @param int     $leitId     Leitgerät (für Schedule/Layout-Referenz)
+     */
+    private function monthGridForBundle(UserSession $user, $db, array $mainItems, int $leitId, string $aroundYmd): array
     {
         $tz = $user->Timezone;
-        $scheduleId = $this->resourceScheduleId(ServiceLocator::GetDatabase(), $rid);
+        $scheduleId = $this->resourceScheduleId($db, $leitId);
         $earliestYmd = Date::Now()->ToTimezone($tz)->Format('Y-m-d');
         $refYmd = ($aroundYmd > $earliestYmd) ? $aroundYmd : $earliestYmd;
         $ref = Date::Parse($refYmd . ' 00:00:00', $tz)->ToTimezone($tz);
@@ -1266,9 +1300,58 @@ class ZhlBundleBookPresenter
         $firstOfMonth = Date::Parse(sprintf('%04d-%02d-01 00:00:00', $year, $month), $tz);
         $dow = (int)$firstOfMonth->Format('N');
         $gridStart = $firstOfMonth->AddDays(-($dow - 1));
-
-        $items = (new ResourceAvailability(new ReservationViewRepository()))->GetItemsBetween($gridStart, $gridStart->AddDays(42), [$rid]);
+        $gridEnd = $gridStart->AddDays(42);
         $layout = (new ScheduleRepository())->GetLayout($scheduleId, new ScheduleLayoutFactory($tz));
+
+        // Codex-Fix: Kandidaten auf dieselbe Basis wie der Resolver bringen — nur Geräte, die der User
+        // BUCHEN darf und die nicht HIDDEN sind (sonst zeigt der Kalender frei, was der POST ablehnt).
+        $allowed = $this->allowedResourceIds($user);
+
+        // Pflichtpositionen aufbauen. Jede Position ist eine ANFORDERUNG mit alternativen Options-Sets:
+        // - normale Position: genau ein Options-Set {ids, qty}.
+        // - alt_group: je Mitglied-Option ein eigenes Set; die Anforderung gilt als erfüllt, sobald
+        //   EINE Option für sich genug freie, disjunkte Einheiten hat (Codex-Fix: KEINE Union/qty=max —
+        //   das mischte Optionen und konnte fälschlich „frei" zeigen, obwohl der Resolver pro Einzel-
+        //   Option scheitert). Spiegelt den Resolver, der genau eine Option auflöst.
+        $requirements = [];    // [ [ ['ids'=>int[],'qty'=>int], ...optionsets ], ... ]
+        $altReq = [];          // group => index in $requirements
+        $allIds = [];
+        foreach ($mainItems as $it) {
+            $qty = (int)$it['quantity'];
+            if ($qty <= 0 || (int)$it['required'] !== 1) {
+                continue; // Packliste + optionale Positionen blocken den Kalender nicht.
+            }
+            $ids = $it['specific_resource_id'] !== null
+                ? [(int)$it['specific_resource_id']]
+                : $this->resourceIdsOfType($db, (string)$it['type_label']);
+            // Nur buchbare, sichtbare Kandidaten zulassen (wie Resolver).
+            $ids = array_values(array_filter(array_map('intval', $ids), fn($r) => isset($allowed[$r])));
+            $optionSet = ['ids' => $ids, 'qty' => $qty];
+            $group = (isset($it['alt_group']) && $it['alt_group'] !== '') ? (string)$it['alt_group'] : null;
+            if ($group !== null) {
+                if (!isset($altReq[$group])) {
+                    $altReq[$group] = count($requirements);
+                    $requirements[] = [$optionSet];
+                } else {
+                    $requirements[$altReq[$group]][] = $optionSet;
+                }
+            } else {
+                $requirements[] = [$optionSet];
+            }
+            foreach ($ids as $rid) {
+                $allIds[(int)$rid] = true;
+            }
+        }
+        $allIds = array_map('intval', array_keys($allIds));
+
+        // Belegung aller Kandidaten-Einheiten EINMAL über das Gitter-Fenster laden, nach Ressource indexieren.
+        $byResource = [];
+        if (!empty($allIds)) {
+            $items = (new ResourceAvailability(new ReservationViewRepository()))->GetItemsBetween($gridStart, $gridEnd, $allIds);
+            foreach ($items as $it) {
+                $byResource[(int)$it->GetResourceId()][] = $it;
+            }
+        }
 
         $weeks = [];
         for ($w = 0; $w < 6; $w++) {
@@ -1284,14 +1367,8 @@ class ZhlBundleBookPresenter
                 } elseif (!$this->dayHasReservablePeriod($layout, $day)) {
                     $state = 'closed';
                 } else {
-                    $busy = false;
-                    foreach ($items as $it) {
-                        if ($it->GetStartDate()->LessThan($day->AddDays(1)) && $it->GetEndDate()->GreaterThan($day)) {
-                            $busy = true;
-                            break;
-                        }
-                    }
-                    $state = $busy ? 'busy' : 'free';
+                    $dayEnd = $day->AddDays(1);
+                    $state = $this->allRequirementsFreeInWindow($requirements, $byResource, $day, $dayEnd) ? 'free' : 'busy';
                 }
                 $row[] = ['date' => $ymd, 'dom' => (int)$local->Format('j'), 'inMonth' => $inMonth, 'state' => $state, 'weekend' => $weekend];
             }
@@ -1307,14 +1384,94 @@ class ZhlBundleBookPresenter
         ];
     }
 
-    private function dayHasReservablePeriod($layout, $day): bool
+    /**
+     * Task C/B — Sind im Fenster [$winBegin,$winEnd) ALLE Anforderungen erfüllbar?
+     *
+     * Jede Anforderung hat ein oder mehrere alternative Options-Sets (alt_group → je Option ein Set).
+     * Sie gilt als erfüllt, sobald MINDESTENS EIN Options-Set für sich genug freie, disjunkte Einheiten
+     * hat (KEINE Mischung über Optionen hinweg — spiegelt den Resolver, der genau eine Option auflöst).
+     * Die Zuteilung ist über Anforderungen hinweg GLOBAL DISJUNKT (eine vergebene Einheit zählt für keine
+     * andere). Gierig in Anforderungs-Reihenfolge wie der Resolver (kein Backtracking; bewusst, Codex ok).
+     *
+     * @param array[]                        $requirements [ [ ['ids'=>int[],'qty'=>int], ...optionsets ], ... ]
+     * @param array<int,IReservedItemView[]> $byResource   resource_id → belegende Items
+     */
+    private function allRequirementsFreeInWindow(array $requirements, array $byResource, $winBegin, $winEnd): bool
     {
-        foreach ($layout->GetLayout($day, false) as $p) {
-            if (method_exists($p, 'IsReservable') && $p->IsReservable() && $p->BeginDate() !== null && $p->EndDate() !== null) {
-                return true;
+        $used = []; // global disjunkt: bereits vergebene Einheiten
+        foreach ($requirements as $optionSets) {
+            $satisfied = false;
+            foreach ($optionSets as $set) {
+                $qty = (int)$set['qty'];
+                $picked = [];
+                foreach ($set['ids'] as $rid) {
+                    $rid = (int)$rid;
+                    if (isset($used[$rid])) {
+                        continue;
+                    }
+                    if ($this->unitFreeInWindow($byResource[$rid] ?? [], $winBegin, $winEnd)) {
+                        $picked[] = $rid;
+                        if (count($picked) >= $qty) {
+                            break;
+                        }
+                    }
+                }
+                if (count($picked) >= $qty) {
+                    // Diese Option erfüllt die Anforderung → ihre Einheiten global als vergeben markieren.
+                    foreach ($picked as $rid) {
+                        $used[$rid] = true;
+                    }
+                    $satisfied = true;
+                    break;
+                }
+            }
+            if (!$satisfied) {
+                return false;
             }
         }
-        return false;
+        return true;
+    }
+
+    /**
+     * Task C — Vom User buchbare, nicht-versteckte Ressourcen-IDs (gleiche Basis wie der Resolver:
+     * GetAllResources(false,$user) + CanBook + nicht HIDDEN). Pro Request einmal aufgelöst.
+     * @return array<int,bool> resource_id => true
+     */
+    private function allowedResourceIds(UserSession $user): array
+    {
+        if ($this->allowedCache !== null) {
+            return $this->allowedCache;
+        }
+        $resourceService = new ResourceService(
+            new ResourceRepository(),
+            new SchedulePermissionService(PluginManager::Instance()->LoadPermission()),
+            new AttributeService(new AttributeRepository()),
+            new UserRepository(),
+            new AccessoryRepository()
+        );
+        $out = [];
+        foreach ($resourceService->GetAllResources(false, $user) as $r) {
+            if ((int)$r->GetStatusId() === ResourceStatus::HIDDEN) {
+                continue;
+            }
+            if (!$r->CanBook) {
+                continue;
+            }
+            $out[(int)$r->GetId()] = true;
+        }
+        $this->allowedCache = $out;
+        return $out;
+    }
+
+    /** Ist eine Einheit (gegebene belegende Items) im Fenster [$winBegin,$winEnd) durchgehend frei? */
+    private function unitFreeInWindow(array $items, $winBegin, $winEnd): bool
+    {
+        foreach ($items as $it) {
+            if ($it->GetStartDate()->LessThan($winEnd) && $it->GetEndDate()->GreaterThan($winBegin)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private function scheduleDayBounds(UserSession $user, int $scheduleId, string $dayYmd): array

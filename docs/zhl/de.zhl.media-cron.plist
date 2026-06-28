@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  VORLAGE — ZHL media Web-Cron-Scheduler (macOS launchd).
+
+  Einrichtung:
+    1. curl-Config mit dem echten Token anlegen (NICHT im Repo), chmod 600:
+         ~/Library/Application Support/zhl/media-cron.conf   (siehe media-cron.conf.example)
+    2. Diese Datei nach ~/Library/LaunchAgents/de.zhl.media-cron.plist kopieren.
+    3. launchctl load -w ~/Library/LaunchAgents/de.zhl.media-cron.plist
+
+  Reichweite ist über die curl-Config (?only=zhl_einfuehrung_report.php) bewusst auf den
+  Wochenreport begrenzt — Reminder/Mahnungen laufen NICHT mit, solange media nicht die echte
+  Prod ist. Zum Aktivieren aller Jobs: den ?only=-Parameter in der Config entfernen.
+  Nur wirksam, solange der Mac läuft (Montags-Versand greift, sobald der Mac Mo ab 08:00 an ist).
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>de.zhl.media-cron</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/bin/curl</string>
+        <string>--config</string>
+        <string>/Users/paul/Library/Application Support/zhl/media-cron.conf</string>
+    </array>
+    <key>StartInterval</key>
+    <integer>300</integer>
+    <key>StandardOutPath</key>
+    <string>/tmp/zhl-media-cron.log</string>
+    <key>StandardErrorPath</key>
+    <string>/tmp/zhl-media-cron.err</string>
+    <key>RunAtLoad</key>
+    <true/>
+</dict>
+</plist>

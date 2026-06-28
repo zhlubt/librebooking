@@ -138,6 +138,9 @@ class ZhlBookingsPresenter
                 'toLabel' => $fmt($r['desired_end'] ?? null),
                 'projectTitle' => (string)($r['project_title'] ?? ''),
                 'createdLabel' => $fmt($r['created_at'] ?? null),
+                'status' => (string)($r['status'] ?? 'open'),
+                'isOffered' => ((string)($r['status'] ?? '')) === 'offered',
+                'token' => (string)($r['accept_token'] ?? ''),
             ];
         }
         return $out;

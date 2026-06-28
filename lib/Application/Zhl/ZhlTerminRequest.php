@@ -110,7 +110,7 @@ class ZhlTerminRequest
         $out = [];
         try {
             $cmd = new AdHocCommand(
-                "SELECT * FROM zhl_termin_request WHERE user_id = @uid AND status = 'open' ORDER BY created_at DESC"
+                "SELECT * FROM zhl_termin_request WHERE user_id = @uid AND status IN ('open','offered') ORDER BY created_at DESC"
             );
             $cmd->AddParameter(new Parameter('@uid', $userId));
             $reader = $db->Query($cmd);
@@ -160,16 +160,376 @@ class ZhlTerminRequest
         }
     }
 
-    /** Anzahl offener Anfragen (Admin-Badge). */
+    /** Anzahl offener (noch zu bearbeitender) Anfragen für das Admin-Badge: open ODER offered. */
     public static function CountOpen($db): int
     {
         try {
-            $reader = $db->Query(new AdHocCommand("SELECT COUNT(*) AS n FROM zhl_termin_request WHERE status = 'open'"));
+            $reader = $db->Query(new AdHocCommand("SELECT COUNT(*) AS n FROM zhl_termin_request WHERE status IN ('open','offered')"));
             $row = $reader->GetRow();
             $reader->Free();
             return (int)($row['n'] ?? 0);
         } catch (Throwable $e) {
             return 0;
         }
+    }
+
+    // =============================================================================================
+    // SPEC-EINFUEHRUNG-AUSHANDLUNG — Aushandlung: Angebote, Token, Auswahl, Storno
+    // =============================================================================================
+
+    /** Anfragen, die der Admin bearbeiten soll: open (neu) ODER offered (Angebote raus, wartet). */
+    public static function ListActionable($db): array
+    {
+        $out = [];
+        try {
+            $reader = $db->Query(new AdHocCommand(
+                'SELECT t.*, u.fname, u.lname, u.email FROM zhl_termin_request t ' .
+                'LEFT JOIN users u ON u.user_id = t.user_id ' .
+                "WHERE t.status IN ('open','offered') ORDER BY t.created_at ASC"
+            ));
+            while ($row = $reader->GetRow()) {
+                $out[] = $row;
+            }
+            $reader->Free();
+        } catch (Throwable $e) {
+            Log::Error('ZHL-TerminRequest: ListActionable fehlgeschlagen: %s', $e);
+        }
+        return $out;
+    }
+
+    /** Token erzeugen, falls noch keiner gesetzt ist. @return string|null der (vorhandene/neue) Token. */
+    public static function EnsureToken($db, int $id): ?string
+    {
+        $req = self::Get($db, $id);
+        if ($req === null) {
+            return null;
+        }
+        $tok = trim((string)($req['accept_token'] ?? ''));
+        if ($tok !== '') {
+            return $tok;
+        }
+        try {
+            $tok = bin2hex(random_bytes(20)); // 160 Bit
+            $cmd = new AdHocCommand('UPDATE zhl_termin_request SET accept_token = @tokval WHERE id = @reqid AND accept_token IS NULL');
+            $cmd->AddParameter(new Parameter('@tokval', $tok));
+            $cmd->AddParameter(new Parameter('@reqid', $id));
+            $db->Execute($cmd);
+            // Read-after: falls parallel ein anderer Token gesetzt wurde, gewinnt der DB-Stand.
+            $fresh = self::Get($db, $id);
+            return $fresh !== null ? (string)($fresh['accept_token'] ?? '') : null;
+        } catch (Throwable $e) {
+            Log::Error('ZHL-TerminRequest: EnsureToken(%d) fehlgeschlagen: %s', $id, $e);
+            return null;
+        }
+    }
+
+    /** Anfrage per login-freiem Token. @return array|null (inkl. Nutzer-Name/Mail). */
+    public static function GetByToken($db, string $token): ?array
+    {
+        if ($token === '') {
+            return null;
+        }
+        try {
+            $cmd = new AdHocCommand(
+                'SELECT t.*, u.fname, u.lname, u.email, u.language, u.timezone FROM zhl_termin_request t ' .
+                'LEFT JOIN users u ON u.user_id = t.user_id WHERE t.accept_token = @tokval'
+            );
+            $cmd->AddParameter(new Parameter('@tokval', $token));
+            $reader = $db->Query($cmd);
+            $row = $reader->GetRow();
+            $reader->Free();
+            return $row === false ? null : $row;
+        } catch (Throwable $e) {
+            Log::Error('ZHL-TerminRequest: GetByToken fehlgeschlagen: %s', $e);
+            return null;
+        }
+    }
+
+    /**
+     * Termin-Angebot anlegen.
+     * @param array{request_id:int,instructor_uid:int,instructor_name:string,created_by_uid:int,
+     *              start_utc:string,end_utc:string,note:?string} $d
+     */
+    public static function AddOffer($db, array $d): int
+    {
+        try {
+            $cmd = new AdHocCommand(
+                'INSERT INTO zhl_termin_offer ' .
+                '(request_id, instructor_uid, instructor_name, created_by_uid, start_utc, end_utc, note, status, ics_sequence, created_at) ' .
+                "VALUES (@reqid, @insuid, @insname, @cruid, @startts, @endts, @notetxt, 'open', 0, @createdts)"
+            );
+            $cmd->AddParameter(new Parameter('@reqid', (int)$d['request_id']));
+            $cmd->AddParameter(new Parameter('@insuid', (int)$d['instructor_uid']));
+            $cmd->AddParameter(new Parameter('@insname', mb_substr((string)$d['instructor_name'], 0, 190)));
+            $cmd->AddParameter(new Parameter('@cruid', (int)$d['created_by_uid']));
+            $cmd->AddParameter(new Parameter('@startts', (string)$d['start_utc']));
+            $cmd->AddParameter(new Parameter('@endts', (string)$d['end_utc']));
+            $cmd->AddParameter(new Parameter('@notetxt', ($d['note'] ?? null) !== null && trim((string)$d['note']) !== '' ? mb_substr((string)$d['note'], 0, 500) : null));
+            $cmd->AddParameter(new Parameter('@createdts', gmdate('Y-m-d H:i:s')));
+            return (int)$db->ExecuteInsert($cmd);
+        } catch (Throwable $e) {
+            Log::Error('ZHL-TerminRequest: AddOffer fehlgeschlagen: %s', $e);
+            return 0;
+        }
+    }
+
+    /** Einzelnes Angebot (inkl. Instructor-Mail für ICS). @return array|null */
+    public static function GetOffer($db, int $offerId): ?array
+    {
+        try {
+            $cmd = new AdHocCommand(
+                'SELECT o.*, u.email AS instructor_email, u.language AS instructor_language ' .
+                'FROM zhl_termin_offer o LEFT JOIN users u ON u.user_id = o.instructor_uid WHERE o.id = @offid'
+            );
+            $cmd->AddParameter(new Parameter('@offid', $offerId));
+            $reader = $db->Query($cmd);
+            $row = $reader->GetRow();
+            $reader->Free();
+            return $row === false ? null : $row;
+        } catch (Throwable $e) {
+            Log::Error('ZHL-TerminRequest: GetOffer(%d) fehlgeschlagen: %s', $offerId, $e);
+            return null;
+        }
+    }
+
+    /**
+     * Angebote einer Anfrage. $onlyStatus z. B. 'open' für die Auswahlseite.
+     * @return array[]
+     */
+    public static function ListOffers($db, int $requestId, ?string $onlyStatus = null): array
+    {
+        $out = [];
+        try {
+            $sql = 'SELECT o.*, u.email AS instructor_email FROM zhl_termin_offer o ' .
+                'LEFT JOIN users u ON u.user_id = o.instructor_uid WHERE o.request_id = @reqid';
+            if ($onlyStatus !== null) {
+                $sql .= ' AND o.status = @statval';
+            }
+            $sql .= ' ORDER BY o.start_utc ASC, o.id ASC';
+            $cmd = new AdHocCommand($sql);
+            $cmd->AddParameter(new Parameter('@reqid', $requestId));
+            if ($onlyStatus !== null) {
+                $cmd->AddParameter(new Parameter('@statval', $onlyStatus));
+            }
+            $reader = $db->Query($cmd);
+            while ($row = $reader->GetRow()) {
+                $out[] = $row;
+            }
+            $reader->Free();
+        } catch (Throwable $e) {
+            Log::Error('ZHL-TerminRequest: ListOffers(%d) fehlgeschlagen: %s', $requestId, $e);
+        }
+        return $out;
+    }
+
+    /** Anzahl offener (wählbarer) Angebote einer Anfrage. */
+    public static function CountOpenOffers($db, int $requestId): int
+    {
+        try {
+            $cmd = new AdHocCommand("SELECT COUNT(*) AS n FROM zhl_termin_offer WHERE request_id = @reqid AND status = 'open'");
+            $cmd->AddParameter(new Parameter('@reqid', $requestId));
+            $reader = $db->Query($cmd);
+            $row = $reader->GetRow();
+            $reader->Free();
+            return (int)($row['n'] ?? 0);
+        } catch (Throwable $e) {
+            return 0;
+        }
+    }
+
+    /** Angebot zurückziehen (nur aus 'open'). */
+    public static function WithdrawOffer($db, int $offerId, int $requestId): void
+    {
+        try {
+            $cmd = new AdHocCommand(
+                "UPDATE zhl_termin_offer SET status = 'withdrawn', withdrawn_at = @wts " .
+                "WHERE id = @offid AND request_id = @reqid AND status = 'open'"
+            );
+            $cmd->AddParameter(new Parameter('@wts', gmdate('Y-m-d H:i:s')));
+            $cmd->AddParameter(new Parameter('@offid', $offerId));
+            $cmd->AddParameter(new Parameter('@reqid', $requestId));
+            $db->Execute($cmd);
+        } catch (Throwable $e) {
+            Log::Error('ZHL-TerminRequest: WithdrawOffer(%d) fehlgeschlagen: %s', $offerId, $e);
+        }
+    }
+
+    /** Request auf 'offered' setzen (nach „Angebote senden"); nur aus open/offered. */
+    public static function MarkOffered($db, int $requestId): void
+    {
+        try {
+            $cmd = new AdHocCommand("UPDATE zhl_termin_request SET status = 'offered' WHERE id = @reqid AND status IN ('open','offered')");
+            $cmd->AddParameter(new Parameter('@reqid', $requestId));
+            $db->Execute($cmd);
+        } catch (Throwable $e) {
+            Log::Error('ZHL-TerminRequest: MarkOffered(%d) fehlgeschlagen: %s', $requestId, $e);
+        }
+    }
+
+    /**
+     * GEWINNER-CLAIM für die Bestätigung (genau einmal, ohne affected-rows):
+     * Das Angebot wird nur aus 'open' → 'chosen' geschaltet UND dabei mit unserem zufälligen $icsUid
+     * (Nonce + zugleich finale iCalendar-UID) markiert. Nur die eine UPDATE, deren WHERE noch greift,
+     * setzt unseren Wert; der Gewinner liest seinen eigenen $icsUid zurück.
+     * @return bool true NUR für den Aufruf, der das Angebot tatsächlich gewonnen hat.
+     */
+    public static function ClaimOffer($db, int $requestId, int $offerId, string $icsUid): bool
+    {
+        try {
+            $cmd = new AdHocCommand(
+                "UPDATE zhl_termin_offer SET status = 'chosen', chosen_at = @cts, ics_uid = @icsu, ics_sequence = 0 " .
+                "WHERE id = @offid AND request_id = @reqid AND status = 'open'"
+            );
+            $cmd->AddParameter(new Parameter('@cts', gmdate('Y-m-d H:i:s')));
+            $cmd->AddParameter(new Parameter('@icsu', $icsUid));
+            $cmd->AddParameter(new Parameter('@offid', $offerId));
+            $cmd->AddParameter(new Parameter('@reqid', $requestId));
+            $db->Execute($cmd);
+        } catch (Throwable $e) {
+            Log::Error('ZHL-TerminRequest: ClaimOffer(%d) fehlgeschlagen: %s', $offerId, $e);
+            return false;
+        }
+        $o = self::GetOffer($db, $offerId);
+        return $o !== null && ($o['status'] ?? '') === 'chosen' && (string)($o['ics_uid'] ?? '') === $icsUid;
+    }
+
+    /** Request nach gewonnenem Claim auf 'confirmed' setzen + gewähltes Angebot vermerken. */
+    public static function SetConfirmed($db, int $requestId, int $offerId): void
+    {
+        try {
+            $cmd = new AdHocCommand(
+                "UPDATE zhl_termin_request SET status = 'confirmed', chosen_offer_id = @offid, confirmed_at = @cts " .
+                "WHERE id = @reqid AND status = 'offered'"
+            );
+            $cmd->AddParameter(new Parameter('@offid', $offerId));
+            $cmd->AddParameter(new Parameter('@cts', gmdate('Y-m-d H:i:s')));
+            $cmd->AddParameter(new Parameter('@reqid', $requestId));
+            $db->Execute($cmd);
+        } catch (Throwable $e) {
+            Log::Error('ZHL-TerminRequest: SetConfirmed(%d) fehlgeschlagen: %s', $requestId, $e);
+        }
+    }
+
+    /**
+     * Bestätigung rückabwickeln (nur der Gewinner ruft das, z. B. bei Reservierungs-Konflikt):
+     * Angebot zurück auf 'open' (UID/chosen_at gelöscht), Request zurück auf 'offered'.
+     */
+    public static function UndoConfirm($db, int $requestId, int $offerId): void
+    {
+        try {
+            $c1 = new AdHocCommand("UPDATE zhl_termin_offer SET status = 'open', chosen_at = NULL, ics_uid = NULL WHERE id = @offid AND request_id = @reqid AND status = 'chosen'");
+            $c1->AddParameter(new Parameter('@offid', $offerId));
+            $c1->AddParameter(new Parameter('@reqid', $requestId));
+            $db->Execute($c1);
+            $c2 = new AdHocCommand("UPDATE zhl_termin_request SET status = 'offered', chosen_offer_id = NULL, confirmed_at = NULL WHERE id = @reqid AND status = 'confirmed'");
+            $c2->AddParameter(new Parameter('@reqid', $requestId));
+            $db->Execute($c2);
+        } catch (Throwable $e) {
+            Log::Error('ZHL-TerminRequest: UndoConfirm(%d) fehlgeschlagen: %s', $requestId, $e);
+        }
+    }
+
+    /** Übrige noch offenen Angebote zurückziehen (nachdem eines gewählt wurde). */
+    public static function WithdrawOtherOpenOffers($db, int $requestId, int $keepOfferId): void
+    {
+        try {
+            $cmd = new AdHocCommand("UPDATE zhl_termin_offer SET status = 'withdrawn', withdrawn_at = @wts WHERE request_id = @reqid AND status = 'open' AND id <> @keepid");
+            $cmd->AddParameter(new Parameter('@wts', gmdate('Y-m-d H:i:s')));
+            $cmd->AddParameter(new Parameter('@reqid', $requestId));
+            $cmd->AddParameter(new Parameter('@keepid', $keepOfferId));
+            $db->Execute($cmd);
+        } catch (Throwable $e) {
+            Log::Error('ZHL-TerminRequest: WithdrawOtherOpenOffers(%d) fehlgeschlagen: %s', $requestId, $e);
+        }
+    }
+
+    /** Referenz der nativen Einführungs-Reservierung am Request speichern (für späteren Storno). */
+    public static function SetReservationRef($db, int $requestId, string $ref): void
+    {
+        try {
+            $cmd = new AdHocCommand('UPDATE zhl_termin_request SET einf_reservation_ref = @resref WHERE id = @reqid');
+            $cmd->AddParameter(new Parameter('@resref', mb_substr($ref, 0, 32)));
+            $cmd->AddParameter(new Parameter('@reqid', $requestId));
+            $db->Execute($cmd);
+        } catch (Throwable $e) {
+            Log::Error('ZHL-TerminRequest: SetReservationRef(%d) fehlgeschlagen: %s', $requestId, $e);
+        }
+    }
+
+    /**
+     * Nutzer zieht eine NOCH NICHT bestätigte Anfrage zurück (aus 'offered' oder 'open'):
+     * Request → 'cancelled', alle offenen Angebote → 'withdrawn'. Kein ICS (nichts bestätigt).
+     */
+    public static function WithdrawRequest($db, int $requestId, int $onlyForUser = 0): void
+    {
+        try {
+            $sql = "UPDATE zhl_termin_request SET status = 'cancelled', handled_at = @hts WHERE id = @reqid AND status IN ('open','offered')";
+            if ($onlyForUser > 0) {
+                $sql .= ' AND user_id = @ownerid';
+            }
+            $c1 = new AdHocCommand($sql);
+            $c1->AddParameter(new Parameter('@hts', gmdate('Y-m-d H:i:s')));
+            $c1->AddParameter(new Parameter('@reqid', $requestId));
+            if ($onlyForUser > 0) {
+                $c1->AddParameter(new Parameter('@ownerid', $onlyForUser));
+            }
+            $db->Execute($c1);
+            $c2 = new AdHocCommand("UPDATE zhl_termin_offer SET status = 'withdrawn', withdrawn_at = @wts WHERE request_id = @reqid AND status = 'open'");
+            $c2->AddParameter(new Parameter('@wts', gmdate('Y-m-d H:i:s')));
+            $c2->AddParameter(new Parameter('@reqid', $requestId));
+            $db->Execute($c2);
+        } catch (Throwable $e) {
+            Log::Error('ZHL-TerminRequest: WithdrawRequest(%d) fehlgeschlagen: %s', $requestId, $e);
+        }
+    }
+
+    /**
+     * Bestätigten Termin stornieren (nur aus 'confirmed'): Request → 'cancelled', gewähltes Angebot
+     * → 'withdrawn' + ics_sequence=1 (für CANCEL-ICS mit gleicher UID). Best effort, ohne
+     * affected-rows; ein extrem seltener simultaner Doppel-Storno führt höchstens zu einer doppelten
+     * (idempotenten) CANCEL-Mail.
+     */
+    public static function CancelConfirmed($db, int $requestId): void
+    {
+        try {
+            $c1 = new AdHocCommand("UPDATE zhl_termin_request SET status = 'cancelled', handled_at = @hts WHERE id = @reqid AND status = 'confirmed'");
+            $c1->AddParameter(new Parameter('@hts', gmdate('Y-m-d H:i:s')));
+            $c1->AddParameter(new Parameter('@reqid', $requestId));
+            $db->Execute($c1);
+            $c2 = new AdHocCommand("UPDATE zhl_termin_offer SET status = 'withdrawn', withdrawn_at = @wts, ics_sequence = 1 WHERE request_id = @reqid AND status = 'chosen'");
+            $c2->AddParameter(new Parameter('@wts', gmdate('Y-m-d H:i:s')));
+            $c2->AddParameter(new Parameter('@reqid', $requestId));
+            $db->Execute($c2);
+        } catch (Throwable $e) {
+            Log::Error('ZHL-TerminRequest: CancelConfirmed(%d) fehlgeschlagen: %s', $requestId, $e);
+        }
+    }
+
+    /**
+     * Aktive Application-Admins (für das „Einführung macht"-Dropdown).
+     * @return array[] [{user_id, fname, lname, email}]
+     */
+    public static function ListAdmins($db): array
+    {
+        $out = [];
+        try {
+            $cmd = new AdHocCommand(
+                'SELECT u.user_id, u.fname, u.lname, u.email FROM users u ' .
+                'WHERE u.status_id = 1 AND u.user_id IN (' .
+                '  SELECT ug.user_id FROM user_groups ug ' .
+                '  INNER JOIN group_roles gr ON ug.group_id = gr.group_id ' .
+                '  INNER JOIN roles r ON r.role_id = gr.role_id AND r.role_level = @rolelvl' .
+                ') GROUP BY u.user_id ORDER BY u.lname ASC, u.fname ASC'
+            );
+            $cmd->AddParameter(new Parameter('@rolelvl', RoleLevel::APPLICATION_ADMIN));
+            $reader = $db->Query($cmd);
+            while ($row = $reader->GetRow()) {
+                $out[] = $row;
+            }
+            $reader->Free();
+        } catch (Throwable $e) {
+            Log::Error('ZHL-TerminRequest: ListAdmins fehlgeschlagen: %s', $e);
+        }
+        return $out;
     }
 }

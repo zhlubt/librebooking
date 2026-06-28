@@ -30,13 +30,11 @@ class ZhlBookingsPage extends SecurePage implements IZhlBookingsPage
             $this->EnforceCSRFCheck();
             $reqId = (int)$this->GetForm('req_id');
             if ($reqId > 0) {
-                ZhlTerminRequest::SetStatus(
+                // Owner-gegatet (kein Storno fremder Anfragen); gilt für open UND offered und zieht
+                // zugleich noch offene Angebote zurück.
+                ZhlTerminRequest::WithdrawRequest(
                     ServiceLocator::GetDatabase(),
                     $reqId,
-                    'cancelled',
-                    (int)$user->UserId,
-                    'Vom Nutzer zurückgezogen.',
-                    null,
                     (int)$user->UserId
                 );
             }

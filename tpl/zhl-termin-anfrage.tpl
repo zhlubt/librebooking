@@ -11,10 +11,10 @@
 			</div>
 		</div>
 		<div class="zhl-book-card" style="max-width:560px;">
-			<p class="zhl-sub">Vielen Dank! Deine Wunschtermin-Anfrage ist beim ZHL-Medien-Team eingegangen.</p>
+			<p class="zhl-sub">Vielen Dank! Dein Einführungs-Terminwunsch ist beim ZHL-Medien-Team eingegangen.</p>
 			<div class="zhl-ueb-item ok" style="margin:10px 0;display:block;">
 				<strong>Wie geht es weiter?</strong>
-				<span class="zhl-muted zhl-small">Das Team meldet sich mit einem passenden Termin oder einer Rückfrage. Eine Kopie der Anfrage ging an deine E-Mail-Adresse. Du kannst offene Anfragen unter „Meine Buchungen" einsehen und zurückziehen.</span>
+				<span class="zhl-muted zhl-small">Das Team schlägt dir per E-Mail konkrete <strong>Einführungstermine</strong> vor — du wählst einen aus und bekommst eine Kalendereinladung. Das Gerät selbst buchst du anschließend separat (ab dem Ende der Einführung). Eine Kopie der Anfrage ging an deine E-Mail-Adresse; offene Anfragen kannst du unter „Meine Buchungen" zurückziehen.</span>
 			</div>
 			<div class="zhl-book-actions" style="display:flex; gap:10px; flex-wrap:wrap;">
 				<a class="zhl-btn" href="{$Path}zhl-bookings.php"><svg class="zhl-ic" style="width:1.05em;height:1.05em;vertical-align:-0.16em;flex:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> Meine Buchungen</a>
@@ -26,8 +26,8 @@
 		<div class="zhl-dash-head">
 			<div>
 				<div class="zhl-uplabel">Medienausleihe ZHL</div>
-				<h1 class="zhl-h1">Wunschtermin anfragen</h1>
-				<p class="zhl-sub">Kein passender Termin frei? Sag uns deinen <strong>Wunsch-Zeitraum</strong> — das ZHL-Medien-Team stimmt sich mit dir ab und trägt die Buchung ein.</p>
+				<h1 class="zhl-h1">Wunschtermin für eine Einführung</h1>
+				<p class="zhl-sub">Kein passender Einführungstermin frei? Sag uns, <strong>wann es dir grob passt</strong> — das ZHL-Medien-Team schlägt dir konkrete Einführungstermine vor, du wählst einen aus.</p>
 			</div>
 		</div>
 
@@ -46,7 +46,7 @@
 				<h2 class="zhl-h2">{$Label|escape}</h2>
 				<div class="zhl-ueb-item" style="margin-top:12px;display:block;">
 					<strong><svg class="zhl-ic" style="width:1.05em;height:1.05em;vertical-align:-0.16em;flex:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg> Hinweis</strong>
-					<span class="zhl-muted zhl-small">Eine Anfrage <strong>reserviert das Gerät nicht</strong> automatisch — sie ist ein Wunsch, den das Team verbindlich mit dir abstimmt. Die normalen Mindest-Vorlaufzeiten gelten weiter; kurzfristige Termine kann nur das Team eintragen.</span>
+					<span class="zhl-muted zhl-small">Diese Anfrage betrifft die <strong>Einführung</strong> und <strong>reserviert das Gerät nicht</strong>. Das Team bietet dir konkrete Einführungstermine an; nach deiner Auswahl bekommst du eine Kalendereinladung. Die <strong>Geräte-Buchung selbst</strong> nimmst du danach separat vor (ab dem Ende der Einführung).</span>
 				</div>
 			</div>
 
@@ -54,7 +54,7 @@
 				{csrf_token}
 				{if $Kind == 'bundle'}<input type="hidden" name="bundle" value="{$CtxId}">{else}<input type="hidden" name="rid" value="{$CtxId}">{/if}
 
-				<div class="zhl-uplabel">Wunsch-Zeitraum</div>
+				<div class="zhl-uplabel">Gewünschter Zeitraum (wann passt es dir grob?)</div>
 				<div style="display:flex; gap:12px; flex-wrap:wrap; margin-bottom:16px;">
 					<div class="zhl-field" style="flex:1; min-width:140px;">
 						<label>Von <span class="zhl-req">*</span></label>

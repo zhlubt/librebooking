@@ -165,20 +165,21 @@ class ZhlTerminAnfragePresenter
             }
             $name = trim($user->FirstName . ' ' . $user->LastName);
             $lines = [
-                'Es liegt eine neue Wunschtermin-Anfrage für die Medienausleihe vor.',
+                'Es liegt ein neuer Einführungs-Terminwunsch für die Medienausleihe vor.',
                 '',
-                'Bitte im Admin-Bereich bearbeiten (Anfragen → „Als Admin buchen" oder „Ablehnen"):',
+                'Bitte im Admin-Bereich bearbeiten: Termine anbieten (mit „wer macht die Einführung")',
+                'und dem Nutzer zur Auswahl schicken — oder ablehnen, wenn das Gerät nicht verfügbar ist:',
                 '  ' . $this->absoluteBase() . 'zhl-termin-anfrage-admin.php',
                 '',
-                ($ctx['kind'] === 'bundle' ? 'Bundle:        ' : 'Gerät:         ') . $ctx['label'],
-                'Wunsch-Zeitraum: ' . $startStr . ' bis ' . $endStr,
-                'Projekt:       ' . ($projectTitle !== '' ? $projectTitle : '—'),
-                'Anfragende(r): ' . $name . ' <' . $user->Email . '>',
+                ($ctx['kind'] === 'bundle' ? 'Bundle:          ' : 'Gerät:           ') . $ctx['label'],
+                'Gewünschter Zeitraum: ' . $startStr . ' bis ' . $endStr,
+                'Projekt:         ' . ($projectTitle !== '' ? $projectTitle : '—'),
+                'Anfragende(r):   ' . $name . ' <' . $user->Email . '>',
                 '',
                 'Nachricht:',
                 ($message !== '' ? $message : '(keine)'),
                 '',
-                'Hinweis: Diese Anfrage hält das Gerät NICHT — bitte zeitnah einen Termin abstimmen.',
+                'Hinweis: Diese Anfrage hält das Gerät NICHT — bitte konkrete Einführungstermine anbieten.',
                 '',
                 'ZHL Medienausleihe',
             ];
@@ -188,7 +189,7 @@ class ZhlTerminAnfragePresenter
             if (trim((string)$user->Email) !== '') {
                 $cc[] = new EmailAddress($user->Email, $name !== '' ? $name : $user->Email);
             }
-            $subject = 'ZHL Medienausleihe — Wunschtermin-Anfrage: ' . $ctx['label'];
+            $subject = 'ZHL Medienausleihe — Einführungs-Terminwunsch: ' . $ctx['label'];
             $lang = !empty($user->LanguageCode) ? $user->LanguageCode : null;
             ServiceLocator::GetEmailService()->Send(new ZhlTerminRequestEmail($toList, $cc, $subject, $body, $lang));
         } catch (Throwable $e) {

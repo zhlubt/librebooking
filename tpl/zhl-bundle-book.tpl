@@ -292,6 +292,11 @@
 		var selDay = '';
 		vm.days.forEach(function (d) { if ((d.slots || []).some(function (s) { return s.slot_id === sel; })) { selDay = d.date; } });
 		var note = combined ? '<div class="zhl-ueb-item ok" style="margin:8px 0;"><strong>✓ Ein Termin genügt</strong> <span class="zhl-muted zhl-small">Dieser Termin ist zugleich der Abholtermin — du bekommst die Geräte direkt im Anschluss.</span></div>' : '';
+		// Task A: Mehrere einführungspflichtige Geräte-Typen → EIN gemeinsamer Termin deckt alle ab.
+		if (vm.coveredDevices && vm.coveredDevices.length > 1) {
+			var devList = vm.coveredDevices.map(function (n) { return esc(n); }).join(', ');
+			note += '<div class="zhl-ueb-item ok" style="margin:8px 0;"><strong>✓ Eine Einführung für mehrere Geräte</strong> <span class="zhl-muted zhl-small">Dieser eine Termin führt dich in alle einführungspflichtigen Geräte dieses Bundles ein: ' + devList + '.</span></div>';
+		}
 		var h = '<div class="zhl-uplabel" style="margin-top:16px;">Einführung' + (combined ? ' &amp; Abholung' : '') + '</div>' + note + '<div class="zhl-einf-pick zhl-pickup">' +
 			'<div class="zhl-einf-head">' + (combined ? 'Termin für Einführung + Abholung' : 'Einführungstermin wählen') + ' <span class="zhl-req">*</span></div><div class="zhl-pickup-daybar">';
 		vm.days.forEach(function (d, i) { var act = (selDay ? d.date === selDay : i === 0); h += '<button type="button" class="zhl-pickup-day' + (act ? ' active' : '') + '" data-day="' + esc(d.date) + '">' + esc(d.label) + '</button>'; });

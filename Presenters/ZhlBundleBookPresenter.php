@@ -475,8 +475,28 @@ class ZhlBundleBookPresenter
                 // Termin zuerst lokal speichern, dann Zertifikats-Bestätigung anstoßen.
                 try {
                     $einfBookingId = isset($book['booking_id']) ? (string)$book['booking_id'] : null;
-                    $this->persistEinfuehrung($db, $mainRef, (int)$einfPlan['resourceId'], (int)$einfPlan['member_id'], $einfBookingId, $einfPlan['start_utc'], $einfPlan['end_utc']);
-                    $this->createCertConfirmation($db, (int)$user->UserId, $einfPlan['resourceId']);
+                    // Task A: NICHT nur das erste Gerät bestätigen — der EINE gebuchte Einführungs-Termin
+                    // deckt ALLE einführungspflichtigen Geräte-Typen des Bundles ab. Pro distinktem
+                    // Zertifikatstyp eine eigene einf-Zeile (Detailseite je Gerät) + cert_confirmation.
+                    // $einfPlan['resourceId'] (auf die final reservierte Einheit nachgezogen, Schritt 6b)
+                    // bleibt das Repräsentativ-Gerät für die „Zusammen"-Übergabe weiter unten.
+                    // Ziele frisch gegen die FINAL reservierten Einheiten auflösen (nach Pool-Fallback 6b).
+                    // Codex-Fix: KEIN Rückfall auf $einfPlan['resourceId'], falls leer — sonst entstünden
+                    // einf-/Cert-Artefakte für eine Einheit, die nach dem Ausweichen evtl. gar nicht mehr
+                    // reserviert oder bereits zertifiziert ist. Leer ⇒ nichts hinterlegen (Termin steht).
+                    $einfTargets = $this->allResourcesNeedingEinf($db, $user, $mainResourceIds);
+                    // Codex-Fix: pro Ziel eigenes try/catch — ein Fehler bei EINEM Gerät darf die
+                    // Bestätigung der übrigen Geräte-Typen nicht verhindern (Task-A-Zweck).
+                    foreach ($einfTargets as $et) {
+                        $etRid = (int)$et['resourceId'];
+                        try {
+                            $this->persistEinfuehrung($db, $mainRef, $etRid, (int)$einfPlan['member_id'], $einfBookingId, $einfPlan['start_utc'], $einfPlan['end_utc']);
+                            $this->createCertConfirmation($db, (int)$user->UserId, $etRid);
+                        } catch (Throwable $te) {
+                            Log::Error('ZHL-Bundle Einführung-Ziel fehlgeschlagen (ref=%s, res=%s): %s', $mainRef, $etRid, $te);
+                            $postWarnings[] = 'Die Aufnahme ist gebucht, aber die Einführungs-Bestätigung für ein Gerät (#' . $etRid . ') konnte nicht hinterlegt werden — bitte beim ZHL-Team melden.';
+                        }
+                    }
                     // „Zusammen": der gebuchte Einführungstermin ist zugleich der Übergabetermin →
                     // Übergabe-Zeilen (pickup + return) aus dem Einführungs-Slot ableiten, geschlüsselt
                     // auf das Übergabe-Repräsentativ-Gerät (wie der normale Pickup). KEIN separater Abhol-Slot.
@@ -1056,6 +1076,63 @@ class ZhlBundleBookPresenter
         return null;
     }
 
+    /**
+     * Task A — ALLE aufgelösten Geräte, die eine Einführung brauchen (notwendig + User nicht
+     * zertifiziert), reduziert auf je EIN Repräsentativ-Gerät pro abgedecktem Zertifikatstyp.
+     *
+     * Modellentscheidung (Codex-/SPEC-konform, SPEC-BUNDLE-BOOKING §Codex-Entscheidungen Z.113
+     * „Einführung/Zertifikat für ALLE Items prüfen, nicht nur das Primärgerät"):
+     *   - Es gibt GENAU EINEN gemeinsamen Einführungs-TERMIN für das ganze Bundle (alle
+     *     einführungspflichtigen Geräte teilen sich den Terminplaner-Typ „Einführung in Medien",
+     *     member 2 — der Einweiser führt in EINER Session in alle Geräte ein). Mehrere
+     *     Terminplaner-Slots wären eine Zumutung für den Studierenden und fachlich unnötig.
+     *   - ABER: pro DISTINKTEM Zertifikatstyp braucht es eine eigene zhl_cert_confirmation und eine
+     *     eigene einf-Zeile in zhl_booking_handover. Bisheriger Bug: nur das ERSTE Gerät bekam beides,
+     *     ein zweiter einführungspflichtiger Geräte-Typ (z. B. Pocket 6K + Gimbal → zwei cert_types)
+     *     blieb unbestätigt.
+     *   - Geräte OHNE konfigurierten Zertifikatstyp (kein zhl_cert_type_resource-Eintrag) bekommen
+     *     dennoch je Gerät eine einf-Zeile (Schlüssel = resource_id), damit die Detailseite den
+     *     Termin je Gerät zeigt; createCertConfirmation ist dort ein No-op (kein Typ gefunden).
+     *
+     * @return array[] Liste von ['resourceId'=>int] + ueb-Feldern, dedupliziert auf je ein Gerät
+     *                 pro Zertifikatstyp (Geräte ohne Typ einzeln).
+     */
+    private function allResourcesNeedingEinf($db, UserSession $user, array $resourceIds): array
+    {
+        $out = [];
+        $seenCertTypes = [];   // cert_type_id => true (pro Typ nur EIN Repräsentativ-Gerät)
+        foreach ($resourceIds as $rid) {
+            $rid = (int)$rid;
+            $ueb = $this->lookupUebergabe($db, $rid);
+            if ($ueb['einfuehrung'] !== 'notwendig' || $this->userIsCertified($db, $user->UserId, $rid)) {
+                continue;
+            }
+            $ctid = $this->certTypeIdForResource($db, $rid);
+            if ($ctid > 0) {
+                if (isset($seenCertTypes[$ctid])) {
+                    continue; // dieser Zertifikatstyp ist bereits durch ein anderes Gerät abgedeckt
+                }
+                $seenCertTypes[$ctid] = true;
+            }
+            $out[] = ['resourceId' => $rid] + $ueb;
+        }
+        return $out;
+    }
+
+    /**
+     * Task A — Zertifikatstyp-ID, die dieses Gerät abdeckt (oder 0). Spiegelt die Auswahl in
+     * createCertConfirmation, damit die Deduplizierung exakt zum dort angelegten Datensatz passt.
+     */
+    private function certTypeIdForResource($db, int $rid): int
+    {
+        $cmd = new AdHocCommand('SELECT t.id FROM zhl_cert_type_resource ctr JOIN zhl_cert_type t ON t.id = ctr.cert_type_id WHERE ctr.resource_id = @r AND t.active = 1 ORDER BY t.id LIMIT 1');
+        $cmd->AddParameter(new Parameter('@r', $rid));
+        $reader = $db->Query($cmd);
+        $row = $reader->GetRow();
+        $reader->Free();
+        return $row ? (int)$row['id'] : 0;
+    }
+
     /** Erstes aufgelöstes Gerät, das abgeholt werden muss (abholen/abholen_persoenlich). */
     private function firstResourceNeedingPickup($db, array $resourceIds): ?array
     {
@@ -1109,6 +1186,9 @@ class ZhlBundleBookPresenter
             'memberId' => $f['memberId'],
             'earliestLabel' => $f['earliestLabel'],
             'blocked' => empty($f['slots']),
+            // Task A: Wie viele einführungspflichtige Geräte-Typen deckt dieser EINE Termin ab?
+            // (>1 → Hinweis im Picker, dass ein gemeinsamer Termin alle Geräte abdeckt.)
+            'coveredDevices' => $this->einfCoveredDeviceLabels($db, $user, $mainItems),
         ];
     }
 
@@ -1136,6 +1216,40 @@ class ZhlBundleBookPresenter
             }
         }
         return 0;
+    }
+
+    /**
+     * Task A — Anzeige-Labels der einführungspflichtigen Geräte-Typen des Bundles (für den Hinweis,
+     * dass der EINE gemeinsame Einführungs-Termin mehrere Geräte abdeckt). Ein Typ gilt als
+     * einführungspflichtig, sobald irgendeine Einheit des Typs einfuehrung='notwendig' trägt — und
+     * nur, wenn der User für diese Einheit NICHT bereits zertifiziert ist (sonst kein Pflichtgrund).
+     * @return string[] distinkte Typ-Labels in Item-Reihenfolge
+     */
+    private function einfCoveredDeviceLabels($db, UserSession $user, array $mainItems): array
+    {
+        $labels = [];
+        foreach ($mainItems as $it) {
+            if ((int)$it['quantity'] <= 0) {
+                continue;
+            }
+            $candidates = [];
+            if ($it['specific_resource_id'] !== null) {
+                $candidates[] = (int)$it['specific_resource_id'];
+            } else {
+                $candidates = $this->resourceIdsOfType($db, (string)$it['type_label']);
+            }
+            foreach ($candidates as $rid) {
+                $ueb = $this->lookupUebergabe($db, (int)$rid);
+                if ($ueb['einfuehrung'] === 'notwendig' && !$this->userIsCertified($db, $user->UserId, (int)$rid)) {
+                    $label = (string)$it['type_label'];
+                    if ($label !== '' && !in_array($label, $labels, true)) {
+                        $labels[] = $label;
+                    }
+                    break; // ein Treffer je Item genügt
+                }
+            }
+        }
+        return $labels;
     }
 
     // --- Monats-Kalender (Tagesmodus, Proxy über das Leitgerät) ---

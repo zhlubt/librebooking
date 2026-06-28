@@ -53,11 +53,12 @@ function zhl_ta_base(): string
 $db = ServiceLocator::GetDatabase();
 
 $token = (string)($_REQUEST['token'] ?? '');
-if (!preg_match('/^[a-f0-9]{20,64}$/', $token)) {
-    http_response_code(404);
-    $req = null;
-} else {
+$req = null;
+if (preg_match('/^[a-f0-9]{20,64}$/', $token)) {
     $req = ZhlTerminRequest::GetByToken($db, $token);
+}
+if ($req === null) {
+    http_response_code(404);
 }
 
 $error = null;

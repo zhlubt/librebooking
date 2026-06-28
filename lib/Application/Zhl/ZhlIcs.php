@@ -53,7 +53,7 @@ class ZhlIcs
         }
         $orgEmail = trim((string)($d['organizer_email'] ?? ''));
         if ($orgEmail !== '') {
-            $cn = self::esc((string)($d['organizer_name'] ?? $orgEmail));
+            $cn = self::paramVal((string)($d['organizer_name'] ?? $orgEmail));
             $lines[] = 'ORGANIZER;CN=' . $cn . ':mailto:' . $orgEmail;
         }
         foreach (($d['attendees'] ?? []) as $att) {
@@ -61,9 +61,8 @@ class ZhlIcs
             if ($aEmail === '') {
                 continue;
             }
-            $aName = self::esc((string)($att[0] ?? $aEmail));
-            $part = $isCancel ? 'NEEDS-ACTION' : 'NEEDS-ACTION';
-            $lines[] = 'ATTENDEE;CN=' . $aName . ';ROLE=REQ-PARTICIPANT;PARTSTAT=' . $part . ';RSVP=FALSE:mailto:' . $aEmail;
+            $aName = self::paramVal((string)($att[0] ?? $aEmail));
+            $lines[] = 'ATTENDEE;CN=' . $aName . ';ROLE=REQ-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=FALSE:mailto:' . $aEmail;
         }
         $lines[] = 'STATUS:' . ($isCancel ? 'CANCELLED' : 'CONFIRMED');
         if ($isCancel) {
@@ -87,7 +86,7 @@ class ZhlIcs
         return gmdate('Ymd\THis\Z', $ts);
     }
 
-    /** RFC-5545-Text-Escaping für Property-Werte. */
+    /** RFC-5545-Text-Escaping für Property-Werte (TEXT). */
     private static function esc(string $s): string
     {
         $s = str_replace('\\', '\\\\', $s);
@@ -96,25 +95,46 @@ class ZhlIcs
         return $s;
     }
 
-    /** Content-Line-Folding auf 75 Oktette (Fortsetzungszeilen mit führendem Space). */
+    /**
+     * Parameterwert (z. B. CN). Enthält der Wert ;,:" oder Steuerzeichen, wird er in DQUOTE gesetzt;
+     * enthaltene DQUOTE/Newlines werden entfernt (RFC 5545 erlaubt kein " im quoted string).
+     */
+    private static function paramVal(string $s): string
+    {
+        $s = str_replace(["\r", "\n", '"'], ' ', $s);
+        if (preg_match('/[;:,]/', $s)) {
+            return '"' . $s . '"';
+        }
+        return $s;
+    }
+
+    /**
+     * Content-Line-Folding auf max. 75 Oktette, OHNE Multibyte-Zeichen zu zerschneiden
+     * (Fortsetzungszeilen mit führendem Space). Zählt Bytes, bricht aber nur an Zeichengrenzen.
+     */
     private static function fold(string $line): string
     {
         if (strlen($line) <= 75) {
             return $line;
         }
+        $chars = preg_split('//u', $line, -1, PREG_SPLIT_NO_EMPTY);
+        if ($chars === false) {
+            return $line; // im Zweifel ungefaltet (gültiges UTF-8 vorausgesetzt)
+        }
         $out = '';
         $chunk = '';
-        $len = strlen($line);
-        for ($i = 0; $i < $len; $i++) {
-            $chunk .= $line[$i];
-            // Auf 74 begrenzen, damit mit dem späteren CRLF + Space sauber gefaltet wird.
-            if (strlen($chunk) >= 74) {
-                $out .= ($out === '' ? '' : "\r\n ") . $chunk;
+        $first = true;
+        foreach ($chars as $ch) {
+            // 73 Byte je Segment, damit Folge-Segmente (mit führendem Space) sicher <= 75 bleiben.
+            if (strlen($chunk) + strlen($ch) > 73) {
+                $out .= ($first ? '' : "\r\n ") . $chunk;
+                $first = false;
                 $chunk = '';
             }
+            $chunk .= $ch;
         }
         if ($chunk !== '') {
-            $out .= ($out === '' ? '' : "\r\n ") . $chunk;
+            $out .= ($first ? '' : "\r\n ") . $chunk;
         }
         return $out;
     }

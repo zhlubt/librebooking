@@ -120,13 +120,24 @@ class ZhlEinfuehrungReservation
         if ($uid <= 0) {
             return null;
         }
+        require_once(ROOT_DIR . 'Domain/Values/RoleLevel.php');
         try {
-            $cmd = new AdHocCommand('SELECT fname, lname, email, timezone, language FROM users WHERE user_id = @uid');
+            // Revalidieren: muss JETZT noch aktiver Application-Admin sein (nicht nur zur Angebots-Zeit),
+            // bevor wir eine Admin-Session (IsAdmin=true) für einen login-freien Submit konstruieren.
+            $cmd = new AdHocCommand(
+                'SELECT u.fname, u.lname, u.email, u.timezone, u.language FROM users u ' .
+                'WHERE u.user_id = @uid AND u.status_id = 1 AND u.user_id IN (' .
+                '  SELECT ug.user_id FROM user_groups ug ' .
+                '  INNER JOIN group_roles gr ON ug.group_id = gr.group_id ' .
+                '  INNER JOIN roles r ON r.role_id = gr.role_id AND r.role_level = @rolelvl)'
+            );
             $cmd->AddParameter(new Parameter('@uid', $uid));
+            $cmd->AddParameter(new Parameter('@rolelvl', RoleLevel::APPLICATION_ADMIN));
             $reader = $db->Query($cmd);
             $row = $reader->GetRow();
             $reader->Free();
             if ($row === false) {
+                Log::Error('ZHL-Einf-Reservierung: uid %d ist kein aktiver Admin (mehr) — Aktion abgebrochen.', $uid);
                 return null;
             }
             $s = new UserSession($uid);

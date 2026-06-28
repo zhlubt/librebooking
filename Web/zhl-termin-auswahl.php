@@ -87,12 +87,19 @@ if ($req !== null && ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                 $error = 'Dieser Termin ist nicht mehr verfügbar. Bitte einen anderen wählen.';
             } else {
                 // Gewinner-Claim: zufällige UID dient zugleich als Nonce.
+                // (1) Offer-Gate: genau ein Gewinner für DIESES Angebot (deckt Doppel-Submit desselben
+                //     Angebots ab). (2) Request-Gate: genau ein Gewinner pro ANFRAGE (deckt zwei parallel
+                //     bestätigte VERSCHIEDENE Angebote ab) — der Verlierer zieht sein Angebot zurück.
                 $icsUid = 'zhl-einf-' . bin2hex(random_bytes(16)) . '@media.zhl-ubt.de';
-                $won = ZhlTerminRequest::ClaimOffer($db, $rid, $offerId, $icsUid);
-                if (!$won) {
+                $wonOffer = ZhlTerminRequest::ClaimOffer($db, $rid, $offerId, $icsUid);
+                if (!$wonOffer) {
                     $error = 'Dieser Termin wurde gerade vergeben oder die Anfrage ist bereits bestätigt.';
+                } elseif (!ZhlTerminRequest::ClaimRequest($db, $rid, $offerId)) {
+                    // Offer gewonnen, aber ein anderes Angebot hat die Anfrage zuerst bekommen.
+                    ZhlTerminRequest::WithdrawChosenOffer($db, $offerId, $rid);
+                    $error = 'Für diese Anfrage wurde bereits ein anderer Termin bestätigt.';
                 } else {
-                    ZhlTerminRequest::SetConfirmed($db, $rid, $offerId);
+                    $offer['ics_uid'] = $icsUid; // gerade gesetzte UID für die Einladung übernehmen
                     // §6: Stunde am Gerät reservieren (nur Slot-Geräte). Konflikt → rückgängig.
                     $rsv = ZhlEinfuehrungReservation::Reserve($db, $req, $offer);
                     if (!$rsv['skipped'] && $rsv['error'] !== null) {

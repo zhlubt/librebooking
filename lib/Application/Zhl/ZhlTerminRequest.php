@@ -393,20 +393,43 @@ class ZhlTerminRequest
         return $o !== null && ($o['status'] ?? '') === 'chosen' && (string)($o['ics_uid'] ?? '') === $icsUid;
     }
 
-    /** Request nach gewonnenem Claim auf 'confirmed' setzen + gewähltes Angebot vermerken. */
-    public static function SetConfirmed($db, int $requestId, int $offerId): void
+    /**
+     * REQUEST-Gate für die Bestätigung (genau ein Gewinner pro ANFRAGE, auch wenn parallel zwei
+     * VERSCHIEDENE Angebote bestätigt werden): nur aus 'offered' UND solange noch kein Angebot gewählt
+     * ist. Nach dem (per-Angebot atomaren) ClaimOffer aufrufen. Read-after bestimmt den Gewinner über
+     * chosen_offer_id.
+     * @return bool true NUR für den Aufruf, dessen Angebot die Anfrage bekommen hat.
+     */
+    public static function ClaimRequest($db, int $requestId, int $offerId): bool
     {
         try {
             $cmd = new AdHocCommand(
                 "UPDATE zhl_termin_request SET status = 'confirmed', chosen_offer_id = @offid, confirmed_at = @cts " .
-                "WHERE id = @reqid AND status = 'offered'"
+                "WHERE id = @reqid AND status = 'offered' AND chosen_offer_id IS NULL"
             );
             $cmd->AddParameter(new Parameter('@offid', $offerId));
             $cmd->AddParameter(new Parameter('@cts', gmdate('Y-m-d H:i:s')));
             $cmd->AddParameter(new Parameter('@reqid', $requestId));
             $db->Execute($cmd);
         } catch (Throwable $e) {
-            Log::Error('ZHL-TerminRequest: SetConfirmed(%d) fehlgeschlagen: %s', $requestId, $e);
+            Log::Error('ZHL-TerminRequest: ClaimRequest(%d) fehlgeschlagen: %s', $requestId, $e);
+            return false;
+        }
+        $r = self::Get($db, $requestId);
+        return $r !== null && ($r['status'] ?? '') === 'confirmed' && (int)($r['chosen_offer_id'] ?? 0) === $offerId;
+    }
+
+    /** Ein Angebot zurückziehen (z. B. wenn es zwar den Offer-Claim, aber den Request-Claim verlor). */
+    public static function WithdrawChosenOffer($db, int $offerId, int $requestId): void
+    {
+        try {
+            $cmd = new AdHocCommand("UPDATE zhl_termin_offer SET status = 'withdrawn', withdrawn_at = @wts, ics_uid = NULL WHERE id = @offid AND request_id = @reqid AND status = 'chosen'");
+            $cmd->AddParameter(new Parameter('@wts', gmdate('Y-m-d H:i:s')));
+            $cmd->AddParameter(new Parameter('@offid', $offerId));
+            $cmd->AddParameter(new Parameter('@reqid', $requestId));
+            $db->Execute($cmd);
+        } catch (Throwable $e) {
+            Log::Error('ZHL-TerminRequest: WithdrawChosenOffer(%d) fehlgeschlagen: %s', $offerId, $e);
         }
     }
 
@@ -421,8 +444,11 @@ class ZhlTerminRequest
             $c1->AddParameter(new Parameter('@offid', $offerId));
             $c1->AddParameter(new Parameter('@reqid', $requestId));
             $db->Execute($c1);
-            $c2 = new AdHocCommand("UPDATE zhl_termin_request SET status = 'offered', chosen_offer_id = NULL, confirmed_at = NULL WHERE id = @reqid AND status = 'confirmed'");
+            // Nur den eigenen, gerade bestätigten Stand zurückdrehen (chosen_offer_id-gegatet),
+            // damit ein paralleler Submit eine fremde erfolgreiche Bestätigung nicht aufhebt.
+            $c2 = new AdHocCommand("UPDATE zhl_termin_request SET status = 'offered', chosen_offer_id = NULL, confirmed_at = NULL WHERE id = @reqid AND status = 'confirmed' AND chosen_offer_id = @offid");
             $c2->AddParameter(new Parameter('@reqid', $requestId));
+            $c2->AddParameter(new Parameter('@offid', $offerId));
             $db->Execute($c2);
         } catch (Throwable $e) {
             Log::Error('ZHL-TerminRequest: UndoConfirm(%d) fehlgeschlagen: %s', $requestId, $e);
@@ -480,6 +506,35 @@ class ZhlTerminRequest
             $db->Execute($c2);
         } catch (Throwable $e) {
             Log::Error('ZHL-TerminRequest: WithdrawRequest(%d) fehlgeschlagen: %s', $requestId, $e);
+        }
+    }
+
+    /**
+     * Admin lehnt die Anfrage ab (Gerät nicht verfügbar). Aus 'open' ODER 'offered'; zieht offene
+     * Angebote zurück. @return bool true, wenn die Anfrage tatsächlich abgelehnt wurde (sonst war sie
+     * schon abgeschlossen → keine Mail schicken).
+     */
+    public static function DeclineRequest($db, int $requestId, int $adminId, ?string $note): bool
+    {
+        $before = self::Get($db, $requestId);
+        if ($before === null || !in_array((string)($before['status'] ?? ''), ['open', 'offered'], true)) {
+            return false;
+        }
+        try {
+            $c1 = new AdHocCommand("UPDATE zhl_termin_request SET status = 'declined', handled_at = @hts, handled_by = @hby, admin_note = @note WHERE id = @reqid AND status IN ('open','offered')");
+            $c1->AddParameter(new Parameter('@hts', gmdate('Y-m-d H:i:s')));
+            $c1->AddParameter(new Parameter('@hby', $adminId));
+            $c1->AddParameter(new Parameter('@note', $note !== null && $note !== '' ? mb_substr($note, 0, 500) : 'Abgelehnt.'));
+            $c1->AddParameter(new Parameter('@reqid', $requestId));
+            $db->Execute($c1);
+            $c2 = new AdHocCommand("UPDATE zhl_termin_offer SET status = 'withdrawn', withdrawn_at = @wts WHERE request_id = @reqid AND status = 'open'");
+            $c2->AddParameter(new Parameter('@wts', gmdate('Y-m-d H:i:s')));
+            $c2->AddParameter(new Parameter('@reqid', $requestId));
+            $db->Execute($c2);
+            return true;
+        } catch (Throwable $e) {
+            Log::Error('ZHL-TerminRequest: DeclineRequest(%d) fehlgeschlagen: %s', $requestId, $e);
+            return false;
         }
     }
 

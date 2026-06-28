@@ -96,13 +96,16 @@ class ZhlTerminAnfrageAdminPage extends SecurePage
                     $flashErr = 'Diese Anfrage ist bereits abgeschlossen.';
                 } else {
                     $note = trim((string)($_POST['decline_note'] ?? ''));
-                    ZhlTerminRequest::SetStatus($db, $id, 'declined', (int)$session->UserId, $note !== '' ? $note : 'Abgelehnt.');
-                    $this->notifyUserDecline($db, $req, $note);
-                    zhl_audit_log(array_merge(zhl_audit_actor($session), [
-                        'action' => 'termin.request.decline', 'entity_type' => 'request', 'entity_id' => (string)$id,
-                        'detail' => ['note' => $note],
-                    ]));
-                    $flash = 'Anfrage abgelehnt und Nutzer benachrichtigt.';
+                    if (ZhlTerminRequest::DeclineRequest($db, $id, (int)$session->UserId, $note)) {
+                        $this->notifyUserDecline($db, $req, $note);
+                        zhl_audit_log(array_merge(zhl_audit_actor($session), [
+                            'action' => 'termin.request.decline', 'entity_type' => 'request', 'entity_id' => (string)$id,
+                            'detail' => ['note' => $note],
+                        ]));
+                        $flash = 'Anfrage abgelehnt und Nutzer benachrichtigt.';
+                    } else {
+                        $flashErr = 'Anfrage konnte nicht abgelehnt werden (bereits abgeschlossen).';
+                    }
                 }
             }
         }

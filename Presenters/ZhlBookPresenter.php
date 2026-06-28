@@ -496,6 +496,12 @@ class ZhlBookPresenter
             if (empty($errors)) {
                 $errors = ['Die Buchung konnte nicht angelegt werden.'];
             }
+            // E (Pool-TOCTOU-Härtung): Zwischen pickFreeUnit() (Lese-Prüfung) und dem nativen Persist kann
+            // eine andere Buchung dieselbe Einheit gegriffen haben → die native Validierung lehnt ab. Bei
+            // einem Pool >1 dem Nutzer einen klaren Wiederhol-Hinweis geben (statt nur der nativen Meldung).
+            if (count($this->poolResourceIds($user, $resource)) > 1) {
+                $errors[] = 'Hinweis: Eventuell wurde das Gerät gerade von jemand anderem gebucht. Bitte den Zeitraum erneut wählen oder die Seite neu laden — dann wird automatisch eine andere freie Einheit geprüft.';
+            }
             $this->bindForm($user, $resource, $beginDate, $beginTime, $endDate, $endTime, $choice, $errors, $attrValues, $projectTitle, $pickupSlot, $fulfillment, $hpValues);
             return;
         }

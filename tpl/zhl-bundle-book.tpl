@@ -322,6 +322,16 @@
 		boxes.forEach(function (b) { if (b.checked) { qs += '&keep_item%5B%5D=' + encodeURIComponent(b.value); } });
 		return qs;
 	}
+	// E1: gewählte Alternativ-Optionen (choice-Gruppen) mitgeben, damit der Server die Abhol-/Einführungs-
+	// Slots nur gegen die TATSÄCHLICH gewählte Option filtert (sonst gilt ein Slot als frei, sobald
+	// IRGENDEINE Option der Gruppe frei ist — auch die nicht gewählte). Auto-Gruppen haben keine Radios.
+	function altQuery() {
+		var qs = '';
+		document.querySelectorAll('input[type="radio"][name^="alt_"]:checked').forEach(function (r) {
+			qs += '&' + encodeURIComponent(r.name) + '=' + encodeURIComponent(r.value);
+		});
+		return qs;
+	}
 	function loadSlots(startYmd) {
 		if (!slotBox || !startYmd) { return; }
 		var bid = slotBox.getAttribute('data-bid');
@@ -335,7 +345,7 @@
 		if (einfWrap) { einfWrap.innerHTML = ''; }
 		if (needsSlot) { setSubmitBlocked(true, 'Termine werden geladen …'); }
 		if (hint) { hint.innerHTML = '<svg class="zhl-ic" style="width:1.05em;height:1.05em;vertical-align:-0.16em;flex:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> Termine werden geladen …'; hint.style.display = ''; }
-		fetch(window.location.pathname + '?ajax=slots&bid=' + encodeURIComponent(bid) + '&start=' + encodeURIComponent(startYmd) + '&end=' + encodeURIComponent(endYmd) + '&mode=' + encodeURIComponent(curMode()) + keepQuery(), { headers: { 'X-Requested-With': 'fetch' } })
+		fetch(window.location.pathname + '?ajax=slots&bid=' + encodeURIComponent(bid) + '&start=' + encodeURIComponent(startYmd) + '&end=' + encodeURIComponent(endYmd) + '&mode=' + encodeURIComponent(curMode()) + keepQuery() + altQuery(), { headers: { 'X-Requested-With': 'fetch' } })
 			.then(function (r) { if (!r.ok) { throw new Error('http'); } return r.json(); })
 			.then(function (j) {
 				if (token !== fetchToken) { return; } // veraltete Antwort verwerfen
@@ -355,6 +365,15 @@
 	// können sich dadurch ändern). Nutzt den aktuell gewählten Aufnahme-Start (Hidden dayStart).
 	document.querySelectorAll('.zhl-keep-list input[name="keep_item[]"]').forEach(function (b) {
 		b.addEventListener('change', function () {
+			var ds = document.getElementById('dayStart');
+			if (ds && ds.value) { loadSlots(ds.value); }
+		});
+	});
+
+	// E1: Wechselt der Nutzer eine Alternativ-Option (Stativ↔Gimbal o.ä.), die Slots neu gegen die
+	// nun gewählte Option filtern (ein zuvor passender Slot kann mit der anderen Option belegt sein).
+	document.querySelectorAll('input[type="radio"][name^="alt_"]').forEach(function (r) {
+		r.addEventListener('change', function () {
 			var ds = document.getElementById('dayStart');
 			if (ds && ds.value) { loadSlots(ds.value); }
 		});

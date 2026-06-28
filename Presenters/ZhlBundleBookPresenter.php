@@ -123,9 +123,13 @@ class ZhlBundleBookPresenter
         // B-remove: Abhol-/Einführungstermine GEGEN die aktuell behaltenen Positionen berechnen — wählt
         // der Nutzer das einzige einführungs-/abholpflichtige Gerät ab, liefert das VM null (kein Pflicht-Slot).
         $mainItems = $this->applyKeepFilter($this->itemsForPhase($bundle, 'main'));
+        // E1: Die in der UI gewählten Alternativ-Optionen (choice-Gruppen) mitführen, damit der Slot-Filter
+        // nur gegen die TATSÄCHLICH gewählte Option prüft — konsistent mit dem Resolver (löst genau eine
+        // Option auf). Ohne diese Wahl gälte ein Slot als frei, sobald IRGENDEINE Option der Gruppe frei ist.
+        $altChoices = $this->collectAltChoices($bundle);
         echo json_encode([
-            'pickup' => $this->buildPickupVm($db, $user, $mainItems, $start, $end, $tz),
-            'einf' => $this->buildEinfVm($db, $user, $mainItems, $start, $end, $tz, $mode),
+            'pickup' => $this->buildPickupVm($db, $user, $mainItems, $start, $end, $tz, $altChoices),
+            'einf' => $this->buildEinfVm($db, $user, $mainItems, $start, $end, $tz, $mode, $altChoices),
         ], JSON_UNESCAPED_UNICODE);
     }
 
@@ -889,7 +893,8 @@ class ZhlBundleBookPresenter
         }
         $out = [];
         foreach (array_keys($groups) as $g) {
-            $v = isset($_POST['alt_' . $g]) ? trim((string)$_POST['alt_' . $g]) : '';
+            // $_REQUEST: POST beim verbindlichen Buchen, GET beim AJAX-Slot-Filter (E1) — gleiche Wahl.
+            $v = isset($_REQUEST['alt_' . $g]) ? trim((string)$_REQUEST['alt_' . $g]) : '';
             if ($v !== '') {
                 $out[$g] = $v;
             }
@@ -1165,7 +1170,7 @@ class ZhlBundleBookPresenter
     }
 
     /** Pickup-VM für die Anzeige (Proxy über die Typ-Geräte des Bundles). */
-    private function buildPickupVm($db, UserSession $user, array $mainItems, string $aroundYmd, string $loanEndYmd, $tz): ?array
+    private function buildPickupVm($db, UserSession $user, array $mainItems, string $aroundYmd, string $loanEndYmd, $tz, array $altChoices = []): ?array
     {
         $rid = $this->firstTypeResourceNeeding($db, $mainItems, 'pickup');
         if ($rid <= 0) {
@@ -1177,7 +1182,8 @@ class ZhlBundleBookPresenter
         // Task B: Abhol-Slots, deren Abholtag die Bundle-Geräte nicht durchgehend bis Nutzungsende frei
         // lässt, gar nicht erst anbieten (Reservierung beginnt am Abholtag → der native Save würde sie sonst
         // ablehnen). Filtert gegen die aufgelösten Pflicht-Ressourcen über [Abholtag … Nutzungsende].
-        $slots = $this->filterSlotsByBundleAvailability($db, $user, $mainItems, $f['slots'], $loanEndYmd, $tz);
+        // E1: $altChoices schränkt choice-Gruppen auf die gewählte Option ein (konsistent mit dem Resolver).
+        $slots = $this->filterSlotsByBundleAvailability($db, $user, $mainItems, $f['slots'], $loanEndYmd, $tz, $altChoices);
         $mandatory = !$user->IsAdmin;
         return [
             'mandatory' => $mandatory,
@@ -1189,7 +1195,7 @@ class ZhlBundleBookPresenter
         ];
     }
 
-    private function buildEinfVm($db, UserSession $user, array $mainItems, string $aroundYmd, string $loanEndYmd, $tz, string $mode = 'zusammen'): ?array
+    private function buildEinfVm($db, UserSession $user, array $mainItems, string $aroundYmd, string $loanEndYmd, $tz, string $mode = 'zusammen', array $altChoices = []): ?array
     {
         $rid = $this->firstTypeResourceNeeding($db, $mainItems, 'einf');
         if ($rid <= 0) {
@@ -1207,7 +1213,7 @@ class ZhlBundleBookPresenter
         // Personentermin ohne Gerätebindung (Reservierung erst ab separatem Abholtag) → NICHT filtern.
         $combinedEligible = ($mode === 'zusammen') && $this->firstTypeResourceNeeding($db, $mainItems, 'pickup') > 0;
         $slots = $combinedEligible
-            ? $this->filterSlotsByBundleAvailability($db, $user, $mainItems, $f['slots'], $loanEndYmd, $tz)
+            ? $this->filterSlotsByBundleAvailability($db, $user, $mainItems, $f['slots'], $loanEndYmd, $tz, $altChoices)
             : $f['slots'];
         return [
             'certified' => false,
@@ -1449,12 +1455,26 @@ class ZhlBundleBookPresenter
      * normale Position = ein Set; alt_group = je Mitglied-Option ein Set. Kandidaten sind auf die
      * Resolver-Basis gefiltert (buchbar + nicht HIDDEN).
      *
-     * @param array[] $mainItems keep-gefilterte Main-Items
+     * E1: $altChoices (group => gewählter type_label) schränkt eine choice-Gruppe auf GENAU die gewählte
+     * Option ein — exakt wie der Resolver, der nur die gewählte Option auflöst. Ohne (gültige) Wahl bzw.
+     * für auto-Gruppen bleiben ALLE Optionen als Alternativ-Sets erhalten (Gruppe frei, sobald eine frei).
+     *
+     * @param array[]            $mainItems  keep-gefilterte Main-Items
+     * @param array<string,string> $altChoices group => gewählter type_label (leer = keine Einschränkung)
      * @return array{0: array[], 1: int[]}  [requirements, allCandidateIds]
      */
-    private function bundleRequirements($db, UserSession $user, array $mainItems): array
+    private function bundleRequirements($db, UserSession $user, array $mainItems, array $altChoices = []): array
     {
         $allowed = $this->allowedResourceIds($user);
+        // E1: auto-Gruppen NICHT auf eine Wahl einschränken — dort pickt der Resolver automatisch die erste
+        // freie Option nach Priorität; eine User-Wahl gibt es nicht (Radios sind ausgeblendet).
+        $autoGroups = [];
+        foreach ($mainItems as $it) {
+            $g = (isset($it['alt_group']) && $it['alt_group'] !== '') ? (string)$it['alt_group'] : null;
+            if ($g !== null && (string)($it['alt_mode'] ?? 'choice') === 'auto') {
+                $autoGroups[$g] = true;
+            }
+        }
         $requirements = [];
         $altReq = [];   // group => index in $requirements
         $allIds = [];
@@ -1463,12 +1483,18 @@ class ZhlBundleBookPresenter
             if ($qty <= 0 || (int)$it['required'] !== 1) {
                 continue; // Packliste + optionale Positionen blocken weder Kalender noch Slots.
             }
+            $group = (isset($it['alt_group']) && $it['alt_group'] !== '') ? (string)$it['alt_group'] : null;
+            // E1: Bei einer gültigen Wahl in einer choice-Gruppe nur die gewählte Option berücksichtigen.
+            if ($group !== null && empty($autoGroups[$group])
+                && isset($altChoices[$group]) && $altChoices[$group] !== ''
+                && (string)$altChoices[$group] !== (string)$it['type_label']) {
+                continue; // nicht gewählte Option dieser Gruppe → ignorieren.
+            }
             $ids = $it['specific_resource_id'] !== null
                 ? [(int)$it['specific_resource_id']]
                 : $this->resourceIdsOfType($db, (string)$it['type_label']);
             $ids = array_values(array_filter(array_map('intval', $ids), fn($r) => isset($allowed[$r])));
             $optionSet = ['ids' => $ids, 'qty' => $qty];
-            $group = (isset($it['alt_group']) && $it['alt_group'] !== '') ? (string)$it['alt_group'] : null;
             if ($group !== null) {
                 if (!isset($altReq[$group])) {
                     $altReq[$group] = count($requirements);
@@ -1500,12 +1526,12 @@ class ZhlBundleBookPresenter
      * @param string  $loanEndYmd Nutzungs-End-Tag (Y-m-d)
      * @return array[] gefilterte Slots
      */
-    private function filterSlotsByBundleAvailability($db, UserSession $user, array $mainItems, array $slots, string $loanEndYmd, $tz): array
+    private function filterSlotsByBundleAvailability($db, UserSession $user, array $mainItems, array $slots, string $loanEndYmd, $tz, array $altChoices = []): array
     {
         if (empty($slots)) {
             return $slots;
         }
-        [$requirements, $allIds] = $this->bundleRequirements($db, $user, $mainItems);
+        [$requirements, $allIds] = $this->bundleRequirements($db, $user, $mainItems, $altChoices);
         if (empty($requirements) || empty($allIds)) {
             return $slots; // keine buchbaren Pflichtgeräte → nichts zu prüfen.
         }

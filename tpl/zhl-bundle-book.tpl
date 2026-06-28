@@ -242,7 +242,9 @@
 		else if (pBlock && needPickup) { setSubmitBlocked(true, 'Kein Abholtermin verfügbar — bitte anderen Zeitraum wählen.'); }
 		else { setSubmitBlocked(false); }
 	}
-	hmRadios.forEach(function (r) { r.addEventListener('change', applyMode); });
+	// Modus-Wechsel (zusammen/getrennt): erst neu rendern; im Tagesmodus zusätzlich Slots neu laden,
+	// da der Einführungs-Slot-Filter (Task B) serverseitig vom Modus abhängt.
+	hmRadios.forEach(function (r) { r.addEventListener('change', function () { applyMode(); var ds = document.getElementById('dayStart'); if (ds && ds.value) { loadSlots(ds.value); } }); });
 	function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]; }); }
 
 	// --- Termine (Abholung/Einführung) per AJAX zum gewählten Start laden — ohne Reload. ---
@@ -323,6 +325,9 @@
 	function loadSlots(startYmd) {
 		if (!slotBox || !startYmd) { return; }
 		var bid = slotBox.getAttribute('data-bid');
+		// Task B: Nutzungs-Ende mitgeben → der Server filtert Abhol-/Einführungs-Slots gegen die
+		// Geräte-Verfügbarkeit über [Abholtag … Nutzungsende].
+		var endYmd = (dEnd && dEnd.value) ? dEnd.value : startYmd;
 		var needsSlot = (slotBox.getAttribute('data-einf-active') === '1') || (slotBox.getAttribute('data-pickup-mandatory') === '1');
 		var token = ++fetchToken;
 		// Während des Ladens: alte (zum alten Datum gehörende) Termine entfernen + bei Pflicht-Terminen Submit sperren.
@@ -330,7 +335,7 @@
 		if (einfWrap) { einfWrap.innerHTML = ''; }
 		if (needsSlot) { setSubmitBlocked(true, 'Termine werden geladen …'); }
 		if (hint) { hint.innerHTML = '<svg class="zhl-ic" style="width:1.05em;height:1.05em;vertical-align:-0.16em;flex:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> Termine werden geladen …'; hint.style.display = ''; }
-		fetch(window.location.pathname + '?ajax=slots&bid=' + encodeURIComponent(bid) + '&start=' + encodeURIComponent(startYmd) + keepQuery(), { headers: { 'X-Requested-With': 'fetch' } })
+		fetch(window.location.pathname + '?ajax=slots&bid=' + encodeURIComponent(bid) + '&start=' + encodeURIComponent(startYmd) + '&end=' + encodeURIComponent(endYmd) + '&mode=' + encodeURIComponent(curMode()) + keepQuery(), { headers: { 'X-Requested-With': 'fetch' } })
 			.then(function (r) { if (!r.ok) { throw new Error('http'); } return r.json(); })
 			.then(function (j) {
 				if (token !== fetchToken) { return; } // veraltete Antwort verwerfen

@@ -561,6 +561,66 @@ class ZhlTerminRequest
     }
 
     /**
+     * Nutzer für die Ressource als „eingeführt" markieren (SPEC §: nach Termin-Zusage sofort buchbar).
+     * Gewährt das/die zur Ressource gehörende(n) Zertifikat(e) (zhl_cert_grant, unbegrenzt) und
+     * aktualisiert die Projektion zhl_certificate für genau diesen Nutzer. Idempotent (UNIQUE/UPSERT).
+     * @return bool true, wenn ein Zertifikatstyp existierte und gewährt wurde (sonst false = Gerät ohne
+     *              Zertifikats-Einführung → Aufrufer kann das vermerken).
+     */
+    public static function GrantCertificateForResource($db, int $userId, int $resourceId, int $grantedBy = 0): bool
+    {
+        try {
+            $cmd = new AdHocCommand(
+                'SELECT ctr.cert_type_id FROM zhl_cert_type_resource ctr ' .
+                'JOIN zhl_cert_type t ON t.id = ctr.cert_type_id AND t.active = 1 ' .
+                'WHERE ctr.resource_id = @resid'
+            );
+            $cmd->AddParameter(new Parameter('@resid', $resourceId));
+            $reader = $db->Query($cmd);
+            $typeIds = [];
+            while ($row = $reader->GetRow()) {
+                $typeIds[] = (int)$row['cert_type_id'];
+            }
+            $reader->Free();
+            if (empty($typeIds)) {
+                return false;
+            }
+            $now = gmdate('Y-m-d H:i:s');
+            foreach ($typeIds as $tid) {
+                $ins = new AdHocCommand(
+                    'INSERT INTO zhl_cert_grant (user_id, cert_type_id, granted_at, expires_at, granted_by) ' .
+                    'VALUES (@uid, @ctid, @gat, NULL, @gby) ' .
+                    'ON DUPLICATE KEY UPDATE expires_at = NULL'
+                );
+                $ins->AddParameter(new Parameter('@uid', $userId));
+                $ins->AddParameter(new Parameter('@ctid', $tid));
+                $ins->AddParameter(new Parameter('@gat', $now));
+                $ins->AddParameter(new Parameter('@gby', $grantedBy > 0 ? $grantedBy : null));
+                $db->Execute($ins);
+            }
+            // Projektion zhl_certificate für DIESEN Nutzer neu ableiten (wie zhl-cert-confirm rebuildProjection,
+            // aber user-gescoped statt global).
+            $proj = new AdHocCommand(
+                'INSERT INTO zhl_certificate (user_id, resource_id, granted_at, expires_at) ' .
+                'SELECT g.user_id, ctr.resource_id, MIN(g.granted_at), ' .
+                '  CASE WHEN SUM(g.expires_at IS NULL) > 0 THEN NULL ELSE MAX(g.expires_at) END ' .
+                'FROM zhl_cert_grant g ' .
+                'JOIN zhl_cert_type_resource ctr ON ctr.cert_type_id = g.cert_type_id ' .
+                'JOIN zhl_cert_type t ON t.id = g.cert_type_id AND t.active = 1 ' .
+                'WHERE g.user_id = @uid ' .
+                'GROUP BY g.user_id, ctr.resource_id ' .
+                'ON DUPLICATE KEY UPDATE granted_at = VALUES(granted_at), expires_at = VALUES(expires_at)'
+            );
+            $proj->AddParameter(new Parameter('@uid', $userId));
+            $db->Execute($proj);
+            return true;
+        } catch (Throwable $e) {
+            Log::Error('ZHL-TerminRequest: GrantCertificateForResource(u=%d,res=%d) fehlgeschlagen: %s', $userId, $resourceId, $e);
+            return false;
+        }
+    }
+
+    /**
      * Aktive Application-Admins (für das „Einführung macht"-Dropdown).
      * @return array[] [{user_id, fname, lname, email}]
      */

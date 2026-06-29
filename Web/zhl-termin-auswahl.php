@@ -111,6 +111,9 @@ if ($req !== null && ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                         if (($rsv['ref'] ?? null) !== null && $rsv['ref'] !== '') {
                             ZhlTerminRequest::SetReservationRef($db, $rid, (string)$rsv['ref']);
                         }
+                        // Nutzer sofort als „eingeführt" markieren → er kann das Gerät direkt buchen
+                        // (Buchungsseite zeigt „bereits eingeführt", kein Einführungs-Picker mehr).
+                        ZhlTerminRequest::GrantCertificateForResource($db, (int)$req['user_id'], (int)$req['resource_id'], (int)$offer['instructor_uid']);
                         zhl_ta_send_invite($db, $req, $offer, $token, $tz);
                         header('Location: zhl-termin-auswahl.php?token=' . urlencode($token) . '&done=1');
                         exit;

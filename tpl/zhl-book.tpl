@@ -286,7 +286,7 @@
 							<div class="zhl-ueb-item" style="margin-top:8px;display:block;">
 								<strong><svg class="zhl-ic" style="width:1.05em;height:1.05em;vertical-align:-0.16em;flex:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> Kein passender Einführungstermin dabei?</strong>
 								<span class="zhl-muted zhl-small">Frag einen Wunschtermin für die Einführung an — das ZHL-Medien-Team schlägt dir konkrete Termine vor, du wählst einen aus.</span>
-								<div style="margin-top:8px;"><a class="zhl-btn zhl-btn-ghost zhl-btn-sm" href="{$Path}zhl-termin-anfrage.php?rid={$ResourceId}&amp;pt={$ProjectTitle|escape:'url'}"><svg class="zhl-ic" style="width:1.05em;height:1.05em;vertical-align:-0.16em;flex:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> Einführungstermin anfragen</a></div>
+								<div style="margin-top:8px;"><a class="zhl-btn zhl-btn-ghost zhl-btn-sm" target="_blank" rel="noopener" href="{$Path}zhl-termin-anfrage.php?rid={$ResourceId}&amp;pt={$ProjectTitle|escape:'url'}"><svg class="zhl-ic" style="width:1.05em;height:1.05em;vertical-align:-0.16em;flex:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> Einführungstermin anfragen</a></div>
 							</div>
 						{/if}
 					{/if}
@@ -361,10 +361,10 @@
 					<div class="zhl-ueb-item req" style="margin-top:14px;display:block;">
 						<strong>Kein passender Einführungstermin frei?</strong>
 						<span class="zhl-muted zhl-small">Frag einen Wunschtermin für die <strong>Einführung</strong> an — das ZHL-Medien-Team schlägt dir konkrete Termine vor, du wählst einen aus. Das Gerät buchst du danach selbst.</span>
-						<div style="margin-top:8px;"><a class="zhl-btn zhl-btn-ghost zhl-btn-sm" href="{$Path}zhl-termin-anfrage.php?rid={$ResourceId}&amp;pt={$ProjectTitle|escape:'url'}"><svg class="zhl-ic" style="width:1.05em;height:1.05em;vertical-align:-0.16em;flex:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> Einführungstermin anfragen</a></div>
+						<div style="margin-top:8px;"><a class="zhl-btn zhl-btn-ghost zhl-btn-sm" target="_blank" rel="noopener" href="{$Path}zhl-termin-anfrage.php?rid={$ResourceId}&amp;pt={$ProjectTitle|escape:'url'}"><svg class="zhl-ic" style="width:1.05em;height:1.05em;vertical-align:-0.16em;flex:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> Einführungstermin anfragen</a></div>
 					</div>
 				{/if}
-				<p class="zhl-note">Verfügbarkeit, Vorlauf und Konflikte werden beim Buchen verbindlich geprüft. Ist eine Einführung nötig, wird der gewählte Termin direkt im Terminplaner gebucht; danach wird die Reservierung angelegt. <a href="{$Path}zhl-termin-anfrage.php?rid={$ResourceId}">Kein passender Einführungstermin? Einführungstermin anfragen.</a></p>
+				<p class="zhl-note">Verfügbarkeit, Vorlauf und Konflikte werden beim Buchen verbindlich geprüft. Ist eine Einführung nötig, wird der gewählte Termin direkt im Terminplaner gebucht; danach wird die Reservierung angelegt. <a href="{$Path}zhl-termin-anfrage.php?rid={$ResourceId}" target="_blank" rel="noopener">Kein passender Einführungstermin? Einführungstermin anfragen.</a></p>
 			</form>
 		</div>
 	{/if}

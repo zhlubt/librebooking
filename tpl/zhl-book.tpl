@@ -280,6 +280,15 @@
 							</div>
 						{/if}
 						</div>{* /#zhl-einf-wrap *}
+						{if !$Einf.certified}
+							{* Immer sichtbar für nicht-eingeführte Nutzer (auch wenn Slots frei sind): Wunschtermin-Anfrage
+							   für die Einführung. Außerhalb von #zhl-einf-wrap, damit das Slot-JS es nicht überschreibt. *}
+							<div class="zhl-ueb-item" style="margin-top:8px;display:block;">
+								<strong><svg class="zhl-ic" style="width:1.05em;height:1.05em;vertical-align:-0.16em;flex:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> Kein passender Einführungstermin dabei?</strong>
+								<span class="zhl-muted zhl-small">Frag einen Wunschtermin für die Einführung an — das ZHL-Medien-Team schlägt dir konkrete Termine vor, du wählst einen aus.</span>
+								<div style="margin-top:8px;"><a class="zhl-btn zhl-btn-ghost zhl-btn-sm" href="{$Path}zhl-termin-anfrage.php?rid={$ResourceId}&amp;pt={$ProjectTitle|escape:'url'}"><svg class="zhl-ic" style="width:1.05em;height:1.05em;vertical-align:-0.16em;flex:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> Einführungstermin anfragen</a></div>
+							</div>
+						{/if}
 					{/if}
 
 					{* --- Block C: persönliche Rückgabe (Slot-Picker, SPEC-RUECKGABE) — spiegelbildlich zur Abholung --- *}

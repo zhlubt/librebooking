@@ -30,7 +30,9 @@ const TITLE_NEEDLE = 'Aufnahme';
 
 function pdoFrom(array $db): PDO
 {
-    $host = $db['hostname'] ?? $db['host'] ?? 'localhost';
+    // LibreBooking speichert den DB-Host unter 'hostspec' (Wert i.d.R. 'mariadb', nur im Container
+    // auflösbar); Terminplaner/andere unter 'hostname'/'host'. Reihenfolge entsprechend.
+    $host = $db['hostspec'] ?? $db['hostname'] ?? $db['host'] ?? 'localhost';
     $name = $db['name'] ?? $db['database'] ?? '';
     $dsn = "mysql:host={$host};dbname={$name};charset=utf8mb4";
     return new PDO($dsn, $db['user'] ?? '', $db['password'] ?? '', [
@@ -106,11 +108,11 @@ function titleMark(string $title): string
 
 if ($cfg['kind'] === 'media') {
     // 1) Noch lebende Reservierungen von user 312 im Fenster? (jede Zeile = BUG: nicht storniert)
+    // Eigentümer hängt an reservation_series.owner_id (reservation_users hat KEINE series_id).
     $sql = "SELECT s.series_id, i.reference_number, s.title, i.start_date, i.end_date
               FROM reservation_series s
               JOIN reservation_instances i ON i.series_id = s.series_id
-              JOIN reservation_users u ON u.series_id = s.series_id AND u.reservation_user_level = 1
-             WHERE u.user_id = :uid
+             WHERE s.owner_id = :uid
                AND i.start_date < :wend AND i.end_date > :wstart";
     $st = $pdo->prepare($sql);
     $st->execute([':uid' => TARGET_USER, ':wstart' => WINDOW_START . ' 00:00:00', ':wend' => WINDOW_END . ' 23:59:59']);

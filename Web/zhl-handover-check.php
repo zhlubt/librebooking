@@ -19,6 +19,7 @@ define('ROOT_DIR', '../');
 require_once(ROOT_DIR . 'Pages/SecurePage.php');
 require_once(__DIR__ . '/zhl-handover-lib.php');
 require_once(__DIR__ . '/zhl-audit-lib.php');
+require_once(__DIR__ . '/zhl-return-lib.php');
 
 class ZhlHandoverCheckPage extends SecurePage
 {
@@ -180,6 +181,12 @@ class ZhlHandoverCheckPage extends SecurePage
             }
 
             $pdo->commit();
+
+            // Selbst-Rückgabe-Meldungen (SPEC-SELBSTRUECKGABE) zu dieser Rückgabe als bestätigt
+            // markieren — best effort, nur bei type='return'. Kippt den Abschluss nie.
+            if ($type === 'return') {
+                zhl_return_confirm_for_handover_keys($token, $ref, $resourceId ?: null, $checkId);
+            }
 
             zhl_audit_log(array_merge(zhl_audit_actor($session), [
                 'action' => 'handover.checked',

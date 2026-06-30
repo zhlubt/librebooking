@@ -169,6 +169,7 @@ class ZhlUebergabeAdminPage extends SecurePage
     </h1>
     <div class="d-flex gap-2">
       <a class="btn btn-outline-secondary btn-sm" href="zhl-typeinfo-admin.php"><i class="bi bi-info-circle"></i> Info-Material</a>
+      <a class="btn btn-outline-secondary btn-sm" href="zhl-return-locations-admin.php"><i class="bi bi-geo-alt"></i> Ablageorte</a>
       <a class="btn btn-outline-secondary btn-sm" href="zhl-audit.php"><i class="bi bi-journal-text"></i> Audit-Log</a>
       <button class="btn btn-success btn-sm" type="submit"><i class="bi bi-save"></i> Alle Änderungen speichern</button>
     </div>

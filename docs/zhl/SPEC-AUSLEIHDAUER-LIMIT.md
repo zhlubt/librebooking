@@ -1,6 +1,6 @@
 # SPEC-AUSLEIHDAUER-LIMIT
 
-**Status:** v2 — Codex-reviewt (3 Blocker + 5 „Sollte" eingearbeitet, siehe §9)
+**Status:** v3 — implementiert, Codex-Code-Review eingearbeitet, **DEPLOYT auf media 2026-06-30** (Migration 031 angewandt, Smoke-Test grün, Live-Render bestätigt 14/5).
 **Branch:** `feat/zhl-ausleihdauer-limit`
 **Kontext:** LibreBooking-ZHL-Fork, media.zhl-ubt.de. Ergänzt das Buchungs-Feature
 ([ZhlBookPresenter.php](../../Presenters/ZhlBookPresenter.php), [tpl/zhl-book.tpl](../../tpl/zhl-book.tpl)).

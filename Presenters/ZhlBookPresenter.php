@@ -13,6 +13,8 @@ require_once(ROOT_DIR . 'Presenters/ZhlReservationFacade.php');
 require_once(ROOT_DIR . 'Presenters/ZhlHauspostEmail.php');
 require_once(ROOT_DIR . 'Presenters/ZhlMediaInfoEmail.php');
 require_once(ROOT_DIR . 'lib/Application/Zhl/ZhlTypeInfo.php');
+require_once(ROOT_DIR . 'lib/Application/Zhl/ZhlSettings.php');
+require_once(ROOT_DIR . 'lib/Application/Zhl/ZhlDauerAusnahme.php');
 require_once(ROOT_DIR . 'Web/zhl-audit-lib.php');
 
 /**
@@ -158,6 +160,10 @@ class ZhlBookPresenter
             'abholort_hauspost' => trim((string)$this->post('abholort_hauspost')),
         ];
 
+        // Für die Ausleihdauer-Prüfung: rohe Nutzungs-Tage (Tagesmodus). NULL = Stundenmodus → ceil(h/24).
+        $usageDayStart = null;
+        $usageDayEnd = null;
+
         if ($ueb['booking_mode'] === 'slot') {
             $beginDate = $this->postDate('slotDay', $tz);
             $endDate = $beginDate;
@@ -186,6 +192,9 @@ class ZhlBookPresenter
             }
             $beginDate = $dayStartRaw;
             $dayEnd = $dayEndRaw;
+            // Rohe Nutzungs-Tage für die Dauer-Prüfung (vor der „endNextDay"-Mitternachts-Korrektur).
+            $usageDayStart = $dayStartRaw;
+            $usageDayEnd = $dayEndRaw;
             // Zeiten an die buchbaren Schedule-Grenzen ausrichten (sonst lehnt SchedulePeriodRule ab).
             // Start-Grenze aus dayStart, End-Grenze aus dayEnd (Wochentage können andere Perioden haben).
             $startBounds = $this->scheduleDayBounds($user, $resource, $beginDate);
@@ -447,6 +456,9 @@ class ZhlBookPresenter
             }
         }
 
+        // Ausleihdauer-Limit bindet an die URSPRÜNGLICH angeklickte Einheit (vor der Pool-Zuteilung).
+        $origRid = $rid;
+
         // --- Pool-Zuteilung (SPEC-POOL-FALLBACK): die angeklickte Einheit kann im gewählten Fenster
         //     belegt sein, während eine gleichtypige Einheit frei ist. Wir reservieren die erste freie
         //     Einheit (Präferenz: die angeklickte). Keine frei → klare Meldung statt nativem Konflikt.
@@ -470,6 +482,72 @@ class ZhlBookPresenter
             }
         }
 
+        // --- SPEC-AUSLEIHDAUER-LIMIT: Nutzungsdauer + Abhol-/Rückgabe-Puffer begrenzen (Admins ausgenommen).
+        //     Misst die NUTZUNG (nicht das blockierte Fenster): D_nutz ≤ max_nutzung, P_vor/P_nach ≤ max_puffer.
+        //     Ein gültiger Ausnahme-Grant (Token) hebt das Limit für genau diese Buchung auf (atomar
+        //     eingelöst VOR dem Save; Save-Fehler → Grant wieder freigeben). Verfügbarkeit/Konflikt bleibt
+        //     unberührt (greift erst beim Save). ---
+        $ausnahmeClaim = null; // ['token'=>…, 'nonce'=>…] wenn ein Grant eingelöst wurde
+        if (!$user->IsAdmin) {
+            $lim = $this->zhlDurationLimits($ueb);
+            $usageStartDay = $usageDayStart !== null ? $usageDayStart : $beginDate;
+            $usageEndDay = $usageDayEnd !== null ? $usageDayEnd : $endDate;
+            if ($usageDayStart !== null && $usageDayEnd !== null) {
+                $dNutz = $this->zhlDayDiff($tz, $usageDayStart, $usageDayEnd);
+            } else {
+                $aSec = Date::Parse($beginDate . ' ' . $beginTime, $tz)->Timestamp();
+                $bSec = Date::Parse($endDate . ' ' . $endTime, $tz)->Timestamp();
+                $dNutz = (int)ceil(max(0, $bSec - $aSec) / 86400);
+            }
+            // Puffer: Abholtag (combined → Einführungs-Slot) vor Nutzungsstart; Rückgabetag nach Nutzungsende.
+            $pVor = 0;
+            $pNach = 0;
+            $pickupUtc = null;
+            if ($combined && $einfPlan !== null && !empty($einfPlan['start_utc'])) {
+                $pickupUtc = (string)$einfPlan['start_utc'];
+            } elseif ($pickupPlan !== null && !empty($pickupPlan['start_utc'])) {
+                $pickupUtc = (string)$pickupPlan['start_utc'];
+            }
+            if ($pickupUtc !== null) {
+                $pd = Date::Parse($pickupUtc, 'UTC')->ToTimezone($tz)->Format('Y-m-d');
+                $pVor = max(0, $this->zhlDayDiff($tz, $pd, $usageStartDay));
+            }
+            if ($returnPlan !== null && !empty($returnPlan['start_utc'])) {
+                $rd = Date::Parse((string)$returnPlan['start_utc'], 'UTC')->ToTimezone($tz)->Format('Y-m-d');
+                $pNach = max(0, $this->zhlDayDiff($tz, $usageEndDay, $rd));
+            }
+            $violated = ($dNutz > $lim['nutzung']) || ($pVor > $lim['puffer']) || ($pNach > $lim['puffer']);
+            if ($violated) {
+                $usageBeginUtc = Date::Parse($beginDate . ' ' . $beginTime, $tz)->ToTimezone('UTC')->Format('Y-m-d H:i:s');
+                $usageEndUtc = Date::Parse($endDate . ' ' . $endTime, $tz)->ToTimezone('UTC')->Format('Y-m-d H:i:s');
+                $tok = (string)$this->post('ausnahme_token');
+                $granted = false;
+                if (preg_match('/^[a-f0-9]{20,64}$/', $tok)
+                    && ZhlDauerAusnahme::IsValidFor($db, $tok, (int)$user->UserId, $origRid, $usageBeginUtc, $usageEndUtc)) {
+                    $nonce = bin2hex(random_bytes(20));
+                    if (ZhlDauerAusnahme::ClaimGrant($db, $tok, (int)$user->UserId, $origRid, $nonce)) {
+                        $granted = true;
+                        $ausnahmeClaim = ['token' => $tok, 'nonce' => $nonce];
+                    }
+                }
+                if (!$granted) {
+                    $msgs = [];
+                    if ($dNutz > $lim['nutzung']) {
+                        $msgs[] = 'Die Nutzungsdauer (' . $dNutz . ' Tage) überschreitet das Maximum von ' . $lim['nutzung'] . ' Tagen.';
+                    }
+                    if ($pVor > $lim['puffer']) {
+                        $msgs[] = 'Der Abstand zwischen Abholung und Nutzungsbeginn (' . $pVor . ' Tage) überschreitet ' . $lim['puffer'] . ' Tage.';
+                    }
+                    if ($pNach > $lim['puffer']) {
+                        $msgs[] = 'Der Abstand zwischen Nutzungsende und Rückgabe (' . $pNach . ' Tage) überschreitet ' . $lim['puffer'] . ' Tage.';
+                    }
+                    $msgs[] = 'Brauchst du das Gerät länger oder mit größerem Puffer? Stelle über „Sonderfreigabe anfragen" eine begründete Anfrage — das ZHL-Team prüft sie individuell.';
+                    $this->bindForm($user, $resource, $beginDate, $beginTime, $endDate, $endTime, $choice, $msgs, $attrValues, $projectTitle, $pickupSlot, $fulfillment, $hpValues);
+                    return;
+                }
+            }
+        }
+
         // --- Phase B: native Reservierung SPEICHERN. Erst NACH Erfolg werden Terminplaner-Slots gebucht
         //     → schlägt das Speichern fehl (Pflichtfeld, Vorlauf, Konflikt), wird KEIN Termin gebucht. ---
         $facade = new ZhlReservationFacade($user->UserId, $rid, $titel, $desc, $reservBeginDate, $reservBeginTime, $reservEndDate, $reservEndTime, $facadeAttrs);
@@ -480,10 +558,17 @@ class ZhlBookPresenter
             $presenter->HandleReservation($series);
         } catch (Exception $ex) {
             Log::Error('ZHL-Buchung fehlgeschlagen: %s', $ex);
+            if ($ausnahmeClaim !== null) {
+                ZhlDauerAusnahme::ReleaseGrant($db, $ausnahmeClaim['token'], $ausnahmeClaim['nonce']);
+            }
             $this->bindForm($user, $resource, $beginDate, $beginTime, $endDate, $endTime, $choice, ['Unerwarteter Fehler beim Buchen. Bitte erneut versuchen.'], $attrValues, $projectTitle, $pickupSlot, $fulfillment, $hpValues);
             return;
         }
         if (!$facade->WasSaved()) {
+            // Save misslungen (z. B. Konflikt) → eingelösten Ausnahme-Grant wieder freigeben (wiederverwendbar).
+            if ($ausnahmeClaim !== null) {
+                ZhlDauerAusnahme::ReleaseGrant($db, $ausnahmeClaim['token'], $ausnahmeClaim['nonce']);
+            }
             $errors = $facade->GetErrors();
             if (empty($errors)) {
                 $errors = ['Die Buchung konnte nicht angelegt werden.'];
@@ -492,6 +577,10 @@ class ZhlBookPresenter
             return;
         }
         $ref = (string)$facade->ReferenceNumber();
+        // Ausnahme-Grant ist verbraucht — Reservierungsnummer nachtragen (Bookkeeping, best effort).
+        if ($ausnahmeClaim !== null) {
+            ZhlDauerAusnahme::SetUsedReference($db, $ausnahmeClaim['token'], $ausnahmeClaim['nonce'], $ref);
+        }
 
         // --- Phase C: NACH erfolgreichem Save die Terminplaner-Slots buchen (Einführung, dann Abholung).
         //     Scheitert hier etwas (Slot zwischenzeitlich weg), bleibt die Reservierung bestehen → Hinweis. ---
@@ -811,8 +900,19 @@ class ZhlBookPresenter
             $handoverModeView = ($ueb['einfuehrung'] === 'notwendig') ? 'zusammen' : 'getrennt';
         }
 
+        // Ausleihdauer-Limit: effektive Werte für Hinweistext + Token-Durchschleusung (Sonderfreigabe).
+        $durLimits = $this->zhlDurationLimits($ueb);
+        $ausnahmeToken = '';
+        $rawTok = (string)($_REQUEST['ausnahme_token'] ?? '');
+        if (preg_match('/^[a-f0-9]{20,64}$/', $rawTok)) {
+            $ausnahmeToken = $rawTok;
+        }
+
         $this->page->BindBooking([
             'resourceId' => $rid,
+            'maxNutzungDays' => $durLimits['nutzung'],
+            'maxPufferDays' => $durLimits['puffer'],
+            'ausnahmeToken' => $ausnahmeToken,
             'scheduleId' => (int)$resource->ScheduleId,
             'resourceName' => (string)$resource->GetName(),
             'resourceType' => $type,
@@ -2210,8 +2310,8 @@ class ZhlBookPresenter
 
     private function lookupUebergabe($db, int $rid): array
     {
-        $def = ['abholung' => 'abholen', 'abholort' => null, 'einfuehrung' => 'keine', 'einfuehrung_typ' => null, 'tp_member_id' => null, 'vorlauf_toleranz_h' => 0, 'booking_mode' => 'day', 'hauspost_allowed' => false, 'rueckgabe' => 'abgeben', 'rueckgabeort' => null];
-        $cmd = new AdHocCommand('SELECT abholung, abholort, einfuehrung, einfuehrung_typ, tp_member_id, vorlauf_toleranz_h, booking_mode, hauspost_allowed, rueckgabe, rueckgabeort FROM zhl_uebergabe WHERE resource_id = @r LIMIT 1');
+        $def = ['abholung' => 'abholen', 'abholort' => null, 'einfuehrung' => 'keine', 'einfuehrung_typ' => null, 'tp_member_id' => null, 'vorlauf_toleranz_h' => 0, 'booking_mode' => 'day', 'hauspost_allowed' => false, 'rueckgabe' => 'abgeben', 'rueckgabeort' => null, 'max_nutzung_tage' => null, 'max_puffer_tage' => null];
+        $cmd = new AdHocCommand('SELECT abholung, abholort, einfuehrung, einfuehrung_typ, tp_member_id, vorlauf_toleranz_h, booking_mode, hauspost_allowed, rueckgabe, rueckgabeort, max_nutzung_tage, max_puffer_tage FROM zhl_uebergabe WHERE resource_id = @r LIMIT 1');
         $cmd->AddParameter(new Parameter('@r', $rid));
         $reader = $db->Query($cmd);
         $row = $reader->GetRow();
@@ -2230,7 +2330,31 @@ class ZhlBookPresenter
             'hauspost_allowed' => (bool)($row['hauspost_allowed'] ?? false),
             'rueckgabe' => (string)($row['rueckgabe'] ?? 'abgeben'),
             'rueckgabeort' => $row['rueckgabeort'] !== null && $row['rueckgabeort'] !== '' ? (string)$row['rueckgabeort'] : null,
+            'max_nutzung_tage' => $row['max_nutzung_tage'] !== null ? (int)$row['max_nutzung_tage'] : null,
+            'max_puffer_tage' => $row['max_puffer_tage'] !== null ? (int)$row['max_puffer_tage'] : null,
         ];
+    }
+
+    /** Effektive Ausleihdauer-Limits: Gerät-Override (zhl_uebergabe) sonst globaler Default (zhl_settings). */
+    private function zhlDurationLimits(array $ueb): array
+    {
+        $maxN = ($ueb['max_nutzung_tage'] ?? null) !== null && (int)$ueb['max_nutzung_tage'] > 0
+            ? (int)$ueb['max_nutzung_tage'] : ZhlSettings::GetInt('ausleih_max_nutzung_tage', 14);
+        $maxP = ($ueb['max_puffer_tage'] ?? null) !== null && (int)$ueb['max_puffer_tage'] >= 0
+            ? (int)$ueb['max_puffer_tage'] : ZhlSettings::GetInt('ausleih_max_puffer_tage', 5);
+        return ['nutzung' => max(1, $maxN), 'puffer' => max(0, $maxP)];
+    }
+
+    /** Ganztags-Differenz (lokale Mitternacht zu Mitternacht) in Tagen — Nächte-Zählung. */
+    private function zhlDayDiff(string $tz, string $fromYmd, string $toYmd): int
+    {
+        try {
+            $a = Date::Parse($fromYmd . ' 00:00:00', $tz)->Timestamp();
+            $b = Date::Parse($toYmd . ' 00:00:00', $tz)->Timestamp();
+            return (int)round(($b - $a) / 86400);
+        } catch (Throwable $e) {
+            return 0;
+        }
     }
 
     /** Notiz für die Reservierungs-Beschreibung aus der Übergabe-Konfiguration. */

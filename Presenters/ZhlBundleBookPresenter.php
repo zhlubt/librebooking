@@ -9,6 +9,7 @@ require_once(ROOT_DIR . 'lib/Application/Schedule/namespace.php');
 require_once(ROOT_DIR . 'lib/Application/Attributes/namespace.php');
 require_once(ROOT_DIR . 'lib/Application/Reservation/namespace.php');
 require_once(ROOT_DIR . 'lib/Application/Zhl/ZhlBundleResolver.php');
+require_once(ROOT_DIR . 'lib/Application/Zhl/ZhlSettings.php');
 require_once(ROOT_DIR . 'Presenters/Reservation/ReservationPresenterFactory.php');
 require_once(ROOT_DIR . 'Presenters/ZhlReservationFacade.php');
 require_once(ROOT_DIR . 'Presenters/ZhlMediaInfoEmail.php');
@@ -426,6 +427,18 @@ class ZhlBundleBookPresenter
                 $spanDays = (int)ceil($durSec / 86400);
                 $hint = ($reservBeginDate !== $dayStartRaw) ? ' (zählt ab Abholtag ' . $reservBeginDate . ', da das Gerät ab der Übergabe vergeben ist)' : '';
                 $this->bindForm($user, $bundle, $dayStartRaw, $projectTitle, $altChoices, ['Der Buchungszeitraum (~' . $spanDays . ' Tage' . $hint . ') ist länger als für dieses Bundle erlaubt (max. ' . $maxDaysDisp . ' Tage). Bitte kürzer wählen oder einen späteren Abholtermin nehmen.'], $afterDays, $afterChosen, $attrValues);
+                return;
+            }
+        }
+
+        // --- 7b. ZHL-Ausleihdauer-Limit (SPEC-AUSLEIHDAUER-LIMIT §5): Nutzungsdauer (Tage, Nächte-Zählung
+        //        dayStart→dayEnd) ≤ kleinstes effektives max_nutzung_tage der Bundle-Geräte. Admins ausgenommen.
+        //        Ausnahme-Anfragen für Bundles sind (Iteration 1) nicht automatisiert → Hinweis aufs ZHL-Team. ---
+        if (!$user->IsAdmin) {
+            $maxNutzung = $this->bundleMaxNutzungDays($db, $mainResourceIds);
+            $usageDays = (int)round((Date::Parse($dayEndRaw . ' 00:00:00', $tz)->Timestamp() - Date::Parse($dayStartRaw . ' 00:00:00', $tz)->Timestamp()) / 86400);
+            if ($maxNutzung > 0 && $usageDays > $maxNutzung) {
+                $this->bindForm($user, $bundle, $dayStartRaw, $projectTitle, $altChoices, ['Die Nutzungsdauer (' . $usageDays . ' Tage) überschreitet das Maximum von ' . $maxNutzung . ' Tagen für dieses Bundle. Bitte kürzer wählen oder für einen Sonderfall das ZHL-Medien-Team kontaktieren.'], $afterDays, $afterChosen, $attrValues);
                 return;
             }
         }
@@ -1012,6 +1025,33 @@ class ZhlBundleBookPresenter
         $row = $reader->GetRow();
         $reader->Free();
         return $row && $row['m'] !== null ? (int)$row['m'] : 0;
+    }
+
+    /**
+     * Kleinste effektive max. Nutzungsdauer (Tage) über die Bundle-Geräte: Gerät-Override
+     * (zhl_uebergabe.max_nutzung_tage) sonst globaler Default (zhl_settings). 0 = keine Geräte.
+     */
+    private function bundleMaxNutzungDays($db, array $resourceIds): int
+    {
+        $ids = array_values(array_filter(array_map('intval', $resourceIds), fn($i) => $i > 0));
+        if (empty($ids)) {
+            return 0;
+        }
+        $global = max(1, ZhlSettings::GetInt('ausleih_max_nutzung_tage', 14));
+        $in = implode(',', $ids);
+        $cmd = new AdHocCommand(
+            'SELECT r.resource_id, u.max_nutzung_tage FROM resources r ' .
+            'LEFT JOIN zhl_uebergabe u ON u.resource_id = r.resource_id ' .
+            'WHERE r.resource_id IN (' . $in . ')'
+        );
+        $reader = $db->Query($cmd);
+        $min = 0;
+        while ($row = $reader->GetRow()) {
+            $eff = ($row['max_nutzung_tage'] !== null && (int)$row['max_nutzung_tage'] > 0) ? (int)$row['max_nutzung_tage'] : $global;
+            $min = ($min === 0) ? $eff : min($min, $eff);
+        }
+        $reader->Free();
+        return $min;
     }
 
     /**

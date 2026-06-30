@@ -69,6 +69,8 @@ class ZhlUebergabeAdminPage extends SecurePage
             $hp = is_array($_POST['hauspost'] ?? null) ? $_POST['hauspost'] : [];
             $aort = is_array($_POST['abholort'] ?? null) ? $_POST['abholort'] : [];
             $rort = is_array($_POST['rueckgabeort'] ?? null) ? $_POST['rueckgabeort'] : [];
+            $nut = is_array($_POST['max_nutzung'] ?? null) ? $_POST['max_nutzung'] : [];
+            $puf = is_array($_POST['max_puffer'] ?? null) ? $_POST['max_puffer'] : [];
 
             // Nur echte, aktive Geräte zulassen (gegen DB gegengeprüft).
             $valid = [];
@@ -76,11 +78,12 @@ class ZhlUebergabeAdminPage extends SecurePage
                 $valid[(int)$r['resource_id']] = true;
             }
             $up = $pdo->prepare(
-                'INSERT INTO zhl_uebergabe (resource_id, abholung, rueckgabe, einfuehrung, hauspost_allowed, abholort, rueckgabeort, updated_at)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, NOW())
+                'INSERT INTO zhl_uebergabe (resource_id, abholung, rueckgabe, einfuehrung, hauspost_allowed, abholort, rueckgabeort, max_nutzung_tage, max_puffer_tage, updated_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
                  ON DUPLICATE KEY UPDATE abholung = VALUES(abholung), rueckgabe = VALUES(rueckgabe),
                      einfuehrung = VALUES(einfuehrung), hauspost_allowed = VALUES(hauspost_allowed),
-                     abholort = VALUES(abholort), rueckgabeort = VALUES(rueckgabeort), updated_at = NOW()'
+                     abholort = VALUES(abholort), rueckgabeort = VALUES(rueckgabeort),
+                     max_nutzung_tage = VALUES(max_nutzung_tage), max_puffer_tage = VALUES(max_puffer_tage), updated_at = NOW()'
             );
             $n = 0;
             $pdo->beginTransaction();
@@ -95,7 +98,11 @@ class ZhlUebergabeAdminPage extends SecurePage
                     $hpv = !empty($hp[$rid]) ? 1 : 0;
                     $ao = trim((string)($aort[$rid] ?? ''));
                     $ro = trim((string)($rort[$rid] ?? ''));
-                    $up->execute([$rid, $a, $rg, $e, $hpv, $ao === '' ? null : mb_substr($ao, 0, 200), $ro === '' ? null : mb_substr($ro, 0, 200)]);
+                    $mn = trim((string)($nut[$rid] ?? ''));
+                    $mp = trim((string)($puf[$rid] ?? ''));
+                    $mnv = ($mn === '' || !ctype_digit($mn)) ? null : max(1, min(3650, (int)$mn));
+                    $mpv = ($mp === '' || !ctype_digit($mp)) ? null : max(0, min(365, (int)$mp));
+                    $up->execute([$rid, $a, $rg, $e, $hpv, $ao === '' ? null : mb_substr($ao, 0, 200), $ro === '' ? null : mb_substr($ro, 0, 200), $mnv, $mpv]);
                     $n++;
                 }
                 $pdo->commit();
@@ -114,7 +121,8 @@ class ZhlUebergabeAdminPage extends SecurePage
         $rows = $pdo->query(
             "SELECT r.resource_id AS rid, r.name AS name,
                     COALESCE(cav.attribute_value, '(ohne Geräte-Typ)') AS typ,
-                    u.abholung, u.rueckgabe, u.einfuehrung, u.hauspost_allowed, u.abholort, u.rueckgabeort
+                    u.abholung, u.rueckgabe, u.einfuehrung, u.hauspost_allowed, u.abholort, u.rueckgabeort,
+                    u.max_nutzung_tage, u.max_puffer_tage
              FROM resources r
              LEFT JOIN custom_attribute_values cav
                     ON cav.entity_id = r.resource_id AND cav.custom_attribute_id = " . self::TYP_ATTR_ID . "
@@ -169,6 +177,7 @@ class ZhlUebergabeAdminPage extends SecurePage
     </h1>
     <div class="d-flex gap-2">
       <a class="btn btn-outline-secondary btn-sm" href="zhl-typeinfo-admin.php"><i class="bi bi-info-circle"></i> Info-Material</a>
+      <a class="btn btn-outline-secondary btn-sm" href="zhl-return-locations-admin.php"><i class="bi bi-geo-alt"></i> Ablageorte</a>
       <a class="btn btn-outline-secondary btn-sm" href="zhl-audit.php"><i class="bi bi-journal-text"></i> Audit-Log</a>
       <button class="btn btn-success btn-sm" type="submit"><i class="bi bi-save"></i> Alle Änderungen speichern</button>
     </div>
@@ -212,6 +221,8 @@ class ZhlUebergabeAdminPage extends SecurePage
               <th class="text-center">Hauspost</th>
               <th>Abholort</th>
               <th>Rückgabeort</th>
+              <th class="text-center" title="Max. Nutzungsdauer in Tagen — leer = globaler Standard">Max&nbsp;Tage</th>
+              <th class="text-center" title="Max. Versatz Abholung/Rückgabe je Seite in Tagen — leer = globaler Standard">Puffer</th>
             </tr>
           </thead>
           <tbody>
@@ -247,6 +258,8 @@ class ZhlUebergabeAdminPage extends SecurePage
               </td>
               <td><input class="form-control form-control-sm" type="text" name="abholort[<?= $rid ?>]" maxlength="200" value="<?= $h($d['abholort']) ?>" placeholder="z. B. Raum 4.2.38"></td>
               <td><input class="form-control form-control-sm" type="text" name="rueckgabeort[<?= $rid ?>]" maxlength="200" value="<?= $h($d['rueckgabeort']) ?>" placeholder="z. B. Rückgaberegal"></td>
+              <td><input class="form-control form-control-sm text-center" type="number" min="1" max="3650" name="max_nutzung[<?= $rid ?>]" value="<?= $d['max_nutzung_tage'] !== null ? (int)$d['max_nutzung_tage'] : '' ?>" placeholder="Std" style="width:72px"></td>
+              <td><input class="form-control form-control-sm text-center" type="number" min="0" max="365" name="max_puffer[<?= $rid ?>]" value="<?= $d['max_puffer_tage'] !== null ? (int)$d['max_puffer_tage'] : '' ?>" placeholder="Std" style="width:64px"></td>
             </tr>
           <?php endforeach; ?>
           </tbody>

@@ -18,6 +18,7 @@ declare(strict_types=1);
 define('ROOT_DIR', '../');
 require_once(ROOT_DIR . 'Pages/SecurePage.php');
 require_once(__DIR__ . '/zhl-handover-lib.php');
+require_once(__DIR__ . '/zhl-return-lib.php');
 
 class ZhlResourceReturnPage extends SecurePage
 {
@@ -69,6 +70,7 @@ class ZhlResourceReturnPage extends SecurePage
 
         $borrower = '';
         $confirmQs = '';
+        $self = $open ? zhl_return_self_for_handover((int)$open['id']) : null;
         if ($open) {
             $ref = (string)($open['reference_number'] ?? '');
             $token = (string)($open['handover_token'] ?? '');
@@ -130,6 +132,19 @@ class ZhlResourceReturnPage extends SecurePage
           <dt class="col-sm-4">Rückgabeort</dt>
           <dd class="col-sm-8"><?= ($open['rueckgabeort'] ?? '') !== '' ? $h((string)$open['rueckgabeort']) : '—' ?></dd>
         </dl>
+
+        <?php if ($self !== null): ?>
+          <div class="alert alert-info">
+            <i class="bi bi-box-arrow-in-down"></i>
+            <strong>Vom Nutzer selbst abgelegt</strong> am
+            <?= $h($fmtLocal($self['reported_at'] ?? null)) ?> Uhr
+            <?php if (($self['location_label'] ?? '') !== ''): ?>am <strong><?= $h((string)$self['location_label']) ?></strong><?php endif; ?>.
+            <?php if (($self['note'] ?? '') !== ''): ?><br><span class="small">Notiz: <?= $h((string)$self['note']) ?></span><?php endif; ?>
+            <?php if (($self['photo_path'] ?? '') !== ''): ?>
+              <br><a class="small" href="zhl-return-photo.php?id=<?= (int)$self['id'] ?>" target="_blank" rel="noopener"><i class="bi bi-image"></i> Foto-Nachweis ansehen</a>
+            <?php endif; ?>
+          </div>
+        <?php endif; ?>
 
         <p class="small text-muted">
           Mit „Rückgabe bestätigen" öffnen Sie die Checkliste, erfassen Zustand und Vollständigkeit

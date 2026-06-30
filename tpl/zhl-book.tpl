@@ -60,6 +60,7 @@
 				{csrf_token}
 				<input type="hidden" name="resourceId" value="{$ResourceId}">
 				<input type="hidden" name="scheduleId" value="{$ScheduleId}">
+				{if $AusnahmeToken}<input type="hidden" name="ausnahme_token" value="{$AusnahmeToken|escape}">{/if}
 
 				<div class="zhl-uplabel">Projekt</div>
 				<div class="zhl-field" style="margin-bottom:16px;">
@@ -365,6 +366,11 @@
 					</div>
 				{/if}
 				<p class="zhl-note">Verfügbarkeit, Vorlauf und Konflikte werden beim Buchen verbindlich geprüft. Ist eine Einführung nötig, wird der gewählte Termin direkt im Terminplaner gebucht; danach wird die Reservierung angelegt. <a href="{$Path}zhl-termin-anfrage.php?rid={$ResourceId}" target="_blank" rel="noopener">Kein passender Einführungstermin? Einführungstermin anfragen.</a></p>
+					{if $AusnahmeToken}
+						<p class="zhl-note"><svg class="zhl-ic" style="width:1.05em;height:1.05em;vertical-align:-0.16em;flex:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="10"/></svg> <strong>Sonderfreigabe aktiv:</strong> Für diese Buchung wurde eine längere Ausleihe genehmigt. Wähle dein zugesagtes Fenster und buche.</p>
+					{else}
+						<p class="zhl-note">Ausleihen sind standardmäßig auf max. <strong>{$MaxNutzungDays}&nbsp;Tage</strong> Nutzung begrenzt (Abholung/Rückgabe je bis zu {$MaxPufferDays}&nbsp;Tage Versatz). Brauchst du länger? <a href="{$Path}zhl-dauer-ausnahme.php?rid={$ResourceId}&amp;pt={$ProjectTitle|escape:'url'}" target="_blank" rel="noopener">Sonderfreigabe anfragen</a> — das ZHL-Team prüft deine Begründung.</p>
+					{/if}
 			</form>
 		</div>
 	{/if}
@@ -549,6 +555,26 @@
 	var ffHauspost = document.querySelector('.zhl-ff-hauspost');
 	var hpTitel = document.querySelector('.zhl-hp-titel');
 	var projTitle = document.querySelector('input[name=projectTitle]');
+	// --- Projekt-Titel über die Zeitraum-Navigation hinweg behalten ---
+	// „‹ Zurück" / „Weiter ›" laden die Seite per GET neu; der getippte Titel
+	// käme sonst nur aus POST und ginge verloren. Daher pro Gerät in
+	// sessionStorage merken, nach dem Neuladen wiederherstellen, beim
+	// Absenden der Buchung wieder verwerfen.
+	if (projTitle && ridEl) {
+		var titleKey = 'zhlBookTitle:' + ridEl.value;
+		try {
+			var savedTitle = sessionStorage.getItem(titleKey);
+			if (savedTitle && projTitle.value === '') { projTitle.value = savedTitle; }
+		} catch (e) { /* sessionStorage nicht verfügbar → ignorieren */ }
+		projTitle.addEventListener('input', function () {
+			try { sessionStorage.setItem(titleKey, projTitle.value); } catch (e) { /* ignorieren */ }
+		});
+		if (projTitle.form) {
+			projTitle.form.addEventListener('submit', function () {
+				try { sessionStorage.removeItem(titleKey); } catch (e) { /* ignorieren */ }
+			});
+		}
+	}
 	var hmRadios = document.querySelectorAll('.zhl-hm-radio');
 	var combinedNote = document.querySelector('.zhl-combined-note');
 	function curMode() { var v = 'getrennt'; hmRadios.forEach(function (r) { if (r.checked) { v = r.value; } }); return v; }

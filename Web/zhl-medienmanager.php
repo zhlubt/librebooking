@@ -18,6 +18,7 @@ declare(strict_types=1);
 define('ROOT_DIR', '../');
 require_once(ROOT_DIR . 'Pages/SecurePage.php');
 require_once(__DIR__ . '/zhl-handover-lib.php');
+require_once(__DIR__ . '/zhl-return-lib.php');
 
 class ZhlMedienmanagerPage extends SecurePage
 {
@@ -115,6 +116,9 @@ class ZhlMedienmanagerPage extends SecurePage
     </style>
 </head>
 <body>
+<div class="container pt-3" style="max-width:1100px">
+  <a class="btn btn-sm btn-outline-secondary" href="zhl-dashboard.php"><i class="bi bi-arrow-left"></i> Zurück zum Dashboard</a>
+</div>
 <div class="container py-4" style="max-width:1100px">
   <div class="d-flex justify-content-between align-items-center mb-1 flex-wrap gap-2">
     <h1 class="h4 mb-0"><i class="bi bi-truck text-success"></i> Medienmanager — Rückgaben</h1>
@@ -163,6 +167,7 @@ class ZhlMedienmanagerPage extends SecurePage
                 $token = (string)($r['handover_token'] ?? '');
                 $borrower = zhl_handover_borrower_name($ref !== '' ? $ref : null, $token !== '' ? $token : null);
                 $status = (string)$r['status'];
+                $self = isset($r['id']) ? zhl_return_self_for_handover((int)$r['id']) : null;
                 $qs = 'ref=' . urlencode($ref) . '&token=' . urlencode($token)
                     . '&type=return&resource=' . $resourceId; ?>
               <tr>
@@ -170,6 +175,12 @@ class ZhlMedienmanagerPage extends SecurePage
                   <?= $h((string)($r['resource_name'] ?? '—')) ?>
                   <?php if ($resourceId): ?>
                     <a class="text-muted ms-1" title="Geräte-QR drucken" href="zhl-resource-qr.php?resource=<?= $resourceId ?>"><i class="bi bi-qr-code"></i></a>
+                  <?php endif; ?>
+                  <?php if ($self !== null): ?>
+                    <br><span class="badge text-bg-info"><i class="bi bi-box-arrow-in-down"></i> selbst abgelegt<?php if (($self['location_label'] ?? '') !== ''): ?> · <?= $h((string)$self['location_label']) ?><?php endif; ?></span>
+                    <?php if (($self['photo_path'] ?? '') !== ''): ?>
+                      <a class="small ms-1" href="zhl-return-photo.php?id=<?= (int)$self['id'] ?>" target="_blank" rel="noopener"><i class="bi bi-image"></i> Foto</a>
+                    <?php endif; ?>
                   <?php endif; ?>
                 </td>
                 <td><?= $borrower !== '' ? $h($borrower) : '<span class="text-muted">unbekannt</span>' ?></td>

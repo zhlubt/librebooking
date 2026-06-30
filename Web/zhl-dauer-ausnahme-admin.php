@@ -134,9 +134,9 @@ class ZhlDauerAusnahmeAdminPage extends SecurePage
 
   <div class="alert alert-light border small">
     <i class="bi bi-info-circle text-success"></i>
-    Genehmigst du, erhält der Nutzer einen Link zum Selbstbuchen — das Dauer-Limit ist für genau diese eine
-    Buchung aufgehoben. <strong>Verfügbarkeit/Konflikte werden weiterhin geprüft.</strong> Bitte vorab prüfen,
-    ob das Gerät im Zeitraum frei ist.
+    Genehmigst du, erhält der Nutzer einen Link zum Selbstbuchen — das Dauer-Limit (Nutzungsdauer <em>und</em>
+    Abhol-/Rückgabe-Puffer) ist für genau dieses Zeitfenster aufgehoben. <strong>Verfügbarkeit/Konflikte werden
+    weiterhin geprüft.</strong> Bitte vorab prüfen, ob das Gerät im Zeitraum frei ist.
   </div>
 
   <?php if (empty($open)): ?>

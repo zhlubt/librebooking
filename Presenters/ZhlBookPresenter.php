@@ -518,8 +518,13 @@ class ZhlBookPresenter
             }
             $violated = ($dNutz > $lim['nutzung']) || ($pVor > $lim['puffer']) || ($pNach > $lim['puffer']);
             if ($violated) {
-                $usageBeginUtc = Date::Parse($beginDate . ' ' . $beginTime, $tz)->ToTimezone('UTC')->Format('Y-m-d H:i:s');
-                $usageEndUtc = Date::Parse($endDate . ' ' . $endTime, $tz)->ToTimezone('UTC')->Format('Y-m-d H:i:s');
+                // Fenster-Bindung TAG-GRANULAR (Codex BLOCKER-2): das technische $endDate kann durch
+                // Schedule-Bounds/„endNextDay" vom angefragten Zeitpunkt abweichen → gegen die NUTZUNGS-TAGE
+                // (00:00 .. 23:59:59) prüfen, nicht gegen die technischen Zeiten. Ein gültiger Grant hebt den
+                // GESAMTEN Dauer-Check (Nutzung UND Puffer) für dieses Fenster auf — gewollt: auch eine reine
+                // Puffer-Verletzung ist ein legitimer Genehmigungsgrund (Codex BLOCKER-1, bewusst).
+                $usageBeginUtc = Date::Parse($usageStartDay . ' 00:00:00', $tz)->ToTimezone('UTC')->Format('Y-m-d H:i:s');
+                $usageEndUtc = Date::Parse($usageEndDay . ' 23:59:59', $tz)->ToTimezone('UTC')->Format('Y-m-d H:i:s');
                 $tok = (string)$this->post('ausnahme_token');
                 $granted = false;
                 if (preg_match('/^[a-f0-9]{20,64}$/', $tok)

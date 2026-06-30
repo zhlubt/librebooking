@@ -433,7 +433,10 @@ class ZhlBundleBookPresenter
 
         // --- 7b. ZHL-Ausleihdauer-Limit (SPEC-AUSLEIHDAUER-LIMIT §5): Nutzungsdauer (Tage, Nächte-Zählung
         //        dayStart→dayEnd) ≤ kleinstes effektives max_nutzung_tage der Bundle-Geräte. Admins ausgenommen.
-        //        Ausnahme-Anfragen für Bundles sind (Iteration 1) nicht automatisiert → Hinweis aufs ZHL-Team. ---
+        //        Ausnahme-Anfragen für Bundles sind (Iteration 1) nicht automatisiert → Hinweis aufs ZHL-Team.
+        //        BEKANNTE GRENZE (Codex SOLLTE-1): der Abhol-/Rückgabe-Puffer wird bei Bundles NICHT separat
+        //        limitiert (nur die Nutzungsdauer); die bestehende max_duration-Prüfung deckt die Gesamtspanne
+        //        ab, wenn die Geräte ein resources.max_duration gesetzt haben. ---
         if (!$user->IsAdmin) {
             $maxNutzung = $this->bundleMaxNutzungDays($db, $mainResourceIds);
             $usageDays = (int)round((Date::Parse($dayEndRaw . ' 00:00:00', $tz)->Timestamp() - Date::Parse($dayStartRaw . ' 00:00:00', $tz)->Timestamp()) / 86400);

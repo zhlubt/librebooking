@@ -75,8 +75,10 @@ class ZhlDauerAusnahmePage extends SecurePage
             } else {
                 $defStart = $startStr;
                 $defEnd = $endStr;
-                $beginUtc = Date::Parse($startStr . ' ' . $startT, $tz)->ToTimezone('UTC')->Format('Y-m-d H:i:s');
-                $endUtc = Date::Parse($endStr . ' ' . $endT, $tz)->ToTimezone('UTC')->Format('Y-m-d H:i:s');
+                // TAG-granular speichern (00:00 .. 23:59:59 lokal): die Fenster-Bindung beim Buchen vergleicht
+                // Nutzungs-TAGE, nicht exakte Zeiten (Schedule-Bounds/endNextDay würden sonst nicht passen).
+                $beginUtc = Date::Parse($startStr . ' 00:00:00', $tz)->ToTimezone('UTC')->Format('Y-m-d H:i:s');
+                $endUtc = Date::Parse($endStr . ' 23:59:59', $tz)->ToTimezone('UTC')->Format('Y-m-d H:i:s');
                 $nutzungTage = (int)round((Date::Parse($endStr . ' 00:00:00', $tz)->Timestamp() - Date::Parse($startStr . ' 00:00:00', $tz)->Timestamp()) / 86400);
                 $id = ZhlDauerAusnahme::Create($db, [
                     'user_id' => (int)$session->UserId,

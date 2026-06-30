@@ -177,7 +177,10 @@ class ZhlDauerAusnahme
             $cmd->AddParameter(new Parameter('@note', $note !== null && $note !== '' ? mb_substr($note, 0, 500) : 'Abgelehnt.'));
             $cmd->AddParameter(new Parameter('@aid', $id));
             $db->Execute($cmd);
-            return true;
+            // Read-after (Codex SOLLTE-4): nur wenn der Status wirklich auf 'declined' steht, haben wir gewonnen
+            // — sonst hat ein paralleler Approve die Anfrage bekommen (dann keine Ablehnungs-Mail).
+            $fresh = self::Get($db, $id);
+            return $fresh !== null && (string)($fresh['status'] ?? '') === 'declined' && (int)($fresh['handled_by'] ?? 0) === $adminId;
         } catch (Throwable $e) {
             Log::Error('ZHL-DauerAusnahme: Decline(%d) fehlgeschlagen: %s', $id, $e);
             return false;
@@ -187,7 +190,12 @@ class ZhlDauerAusnahme
     /**
      * Prüft, ob der Token jetzt für (user, resource, Nutzungsfenster) gilt: approved, nicht abgelaufen,
      * gebunden an genau diesen Nutzer + diese Ressource, und das Fenster ⊆ genehmigtem (requested) Fenster.
-     * Misst NICHT erneut die Tage — die Fenster-Bindung deckt die Dauer implizit ab (Teilfenster erlaubt).
+     *
+     * TAG-granular: Anfrage UND Buchung übergeben tag-verankerte Grenzen (Start 00:00, Ende 23:59:59 lokal,
+     * je nach UTC), damit Schedule-Bounds/„endNextDay" die Bindung nicht brechen. Ein gültiger Grant hebt
+     * den GESAMTEN Dauer-Check (Nutzungsdauer UND Puffer) für dieses Fenster auf — bewusst, da auch eine
+     * reine Puffer-Verletzung ein legitimer Genehmigungsgrund ist; begrenzt bleibt es durch reale
+     * Slot-Verfügbarkeit + native Konfliktprüfung.
      */
     public static function IsValidFor($db, string $token, int $userId, int $resourceId, string $beginUtc, string $endUtc): bool
     {
@@ -230,15 +238,20 @@ class ZhlDauerAusnahme
     public static function ClaimGrant($db, string $token, int $userId, int $resourceId, string $nonce): bool
     {
         try {
+            // Ablauf im selben WHERE prüfen (nicht nur im vorgelagerten IsValidFor) — robust gegen Ablauf
+            // zwischen Check und Claim und gegen Wiederverwendung an anderer Stelle (Codex SOLLTE-3).
+            $now = gmdate('Y-m-d H:i:s');
             $cmd = new AdHocCommand(
                 "UPDATE zhl_dauer_ausnahme SET status = 'used', claim_nonce = @nonceval, used_at = @uat " .
-                "WHERE grant_token = @tokval AND status = 'approved' AND user_id = @uid AND resource_id = @resid"
+                "WHERE grant_token = @tokval AND status = 'approved' AND user_id = @uid AND resource_id = @resid " .
+                'AND (approved_until_utc IS NULL OR approved_until_utc >= @nowval)'
             );
             $cmd->AddParameter(new Parameter('@nonceval', $nonce));
-            $cmd->AddParameter(new Parameter('@uat', gmdate('Y-m-d H:i:s')));
+            $cmd->AddParameter(new Parameter('@uat', $now));
             $cmd->AddParameter(new Parameter('@tokval', $token));
             $cmd->AddParameter(new Parameter('@uid', $userId));
             $cmd->AddParameter(new Parameter('@resid', $resourceId));
+            $cmd->AddParameter(new Parameter('@nowval', $now));
             $db->Execute($cmd);
         } catch (Throwable $e) {
             Log::Error('ZHL-DauerAusnahme: ClaimGrant fehlgeschlagen: %s', $e);

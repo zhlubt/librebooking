@@ -221,5 +221,7 @@
   (function(){ try { var s = localStorage.getItem("zhlLang"); if (s === "en") applyLang("en"); } catch(e){} })();
 </script>
 {/literal}
+<!-- ZHL: "Seite in Entwicklung"-Badge + Problem-Melder (Übergangszeit) -->
+<script src="scripts/zhl-feedback.js" data-endpoint="zhl-feedback-submit.php"></script>
 </body>
 </html>

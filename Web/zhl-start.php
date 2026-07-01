@@ -762,5 +762,7 @@ $bookDate = date('Y-m-d', strtotime('+7 days'));
     });
   })();
 </script>
+<!-- ZHL: "Seite in Entwicklung"-Badge + Problem-Melder (Übergangszeit) -->
+<script src="scripts/zhl-feedback.js" data-endpoint="zhl-feedback-submit.php"></script>
 </body>
 </html>

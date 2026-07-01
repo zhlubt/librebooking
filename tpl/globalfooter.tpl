@@ -57,6 +57,9 @@
 		</script>
 	{/if}
 
+	{* ZHL: "Seite in Entwicklung"-Badge + Problem-Melder (Übergangszeit) *}
+	<script src="{$Path}scripts/zhl-feedback.js" data-endpoint="{$Path}zhl-feedback-submit.php"></script>
+
 	</body>
 
 </html>

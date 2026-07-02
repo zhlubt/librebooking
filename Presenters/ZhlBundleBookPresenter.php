@@ -731,24 +731,14 @@ class ZhlBundleBookPresenter
             if (trim($afterRef) !== '') {
                 $infos = array_merge($infos, ZhlTypeInfo::ForReference($db, $afterRef));
             }
-            $block = ZhlTypeInfo::EmailBlock($infos);
-            if ($block === '') {
-                return;
+            if (empty(ZhlTypeInfo::DedupByType($infos))) {
+                return; // kein Info-Link vorhanden → keine Begleit-Mail
             }
             $name = trim($user->FirstName . ' ' . $user->LastName);
-            $lines = [
-                ($name !== '' ? 'Hallo ' . $name . ',' : 'Hallo,'),
-                '',
-                'vielen Dank für deine Bundle-Buchung (Buchungsnummer ' . $mainRef . ').',
-                '',
-                $block,
-                '',
-                'Viele Grüße',
-                'ZHL Medienausleihe',
-            ];
+            $intro = 'vielen Dank für deine Bundle-Buchung! Hier sind die passenden Anleitungen zu deinen Medien.';
             $to = [new EmailAddress($user->Email, $name !== '' ? $name : $user->Email)];
             $lang = !empty($user->LanguageCode) ? $user->LanguageCode : null;
-            ServiceLocator::GetEmailService()->Send(new ZhlMediaInfoEmail($to, $mainRef, implode("\n", $lines), $lang));
+            ServiceLocator::GetEmailService()->Send(new ZhlMediaInfoEmail($to, $mainRef, $name, $intro, $infos, $lang));
         } catch (Throwable $e) {
             Log::Error('ZHL-D2: Bundle-Info-Mail nach Buchung fehlgeschlagen (ref=%s): %s', $mainRef, $e);
         }

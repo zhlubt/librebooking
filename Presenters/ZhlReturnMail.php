@@ -1,6 +1,7 @@
 <?php
 
 require_once(ROOT_DIR . 'lib/Email/namespace.php');
+require_once(ROOT_DIR . 'lib/Application/Zhl/ZhlEmailLayout.php');
 
 /**
  * ZHL — Rückgabe-Erinnerungen/Mahnungen (Klartext, bilingual DE/EN nach Empfänger-Sprache).
@@ -63,7 +64,11 @@ class ZhlReturnMail extends EmailMessage
     public function Body()
     {
         $text = $this->zhlEnglish ? $this->bodyEn() : $this->bodyDe();
-        return nl2br(htmlspecialchars($text, ENT_QUOTES, 'UTF-8'));
+        return ZhlEmailLayout::WrapText([
+            'eyebrow' => $this->zhlEnglish ? 'ZHL Media Lending' : 'ZHL Medienausleihe',
+            'title' => $this->Subject(),
+            'text' => $text,
+        ]);
     }
 
     private function bodyDe(): string

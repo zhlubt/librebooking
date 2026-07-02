@@ -91,27 +91,85 @@ class ZhlTypeInfo
     }
 
     /**
+     * Info-Einträge auf EINEN pro Geräte-Typ (Kategorie) reduzieren. Mehrere Einheiten desselben
+     * Typs (z. B. drei DJI Mics) teilen denselben typ-basierten Info-Link → sonst würde er mehrfach
+     * gelistet. Label wird der Geräte-Typ (Kategorie), nicht der Einzelgeräte-Name.
+     * Nur Einträge mit Info-Link; Reihenfolge = erstes Auftreten.
+     * @param array<int,array{device:string,type:string,url:string,text:string}> $infos
+     * @return array<int,array{label:string,url:string,text:string}>
+     */
+    public static function DedupByType(array $infos): array
+    {
+        $byKey = [];
+        foreach ($infos as $i) {
+            $url = trim((string)($i['url'] ?? ''));
+            if ($url === '') {
+                continue;
+            }
+            $type = trim((string)($i['type'] ?? ''));
+            // Schlüssel = Kategorie (Typ); fehlt der Typ, fällt es auf die URL zurück (statt aufs
+            // Einzelgerät), damit derselbe Link auch ohne Typ-Attribut nur einmal erscheint.
+            $key = $type !== '' ? 'type:' . $type : 'url:' . $url;
+            if (isset($byKey[$key])) {
+                continue;
+            }
+            $byKey[$key] = [
+                'label' => $type !== '' ? $type : trim((string)($i['device'] ?? '')),
+                'url' => $url,
+                'text' => trim((string)($i['text'] ?? '')),
+            ];
+        }
+        return array_values($byKey);
+    }
+
+    /**
      * Klartext-Block für die Bestätigungs-Mail. Leerer String, wenn nichts mit Info-Link dabei ist.
      * @param array<int,array{device:string,type:string,url:string,text:string}> $infos
      */
     public static function EmailBlock(array $infos): string
     {
-        $withLink = array_values(array_filter($infos, static fn ($i) => trim((string)$i['url']) !== ''));
-        if (empty($withLink)) {
+        $items = self::DedupByType($infos);
+        if (empty($items)) {
             return '';
         }
         $lines = [
             'Informieren Sie sich jetzt über die gebuchten Materialien und Medien:',
             '',
         ];
-        foreach ($withLink as $i) {
-            $line = '• ' . $i['device'] . ' → ' . $i['url'];
-            $lines[] = $line;
-            if (trim((string)$i['text']) !== '') {
+        foreach ($items as $i) {
+            $lines[] = '• ' . $i['label'] . ' → ' . $i['url'];
+            if ($i['text'] !== '') {
                 $lines[] = '   ' . $i['text'];
             }
         }
         return implode("\n", $lines);
+    }
+
+    /**
+     * HTML-Kartenliste der Info-Materialien für die gebrandete Bestätigungs-Mail (ein Eintrag pro
+     * Kategorie). Leerer String, wenn kein Info-Link vorhanden ist. E-Mail-sicheres Inline-CSS.
+     * @param array<int,array{device:string,type:string,url:string,text:string}> $infos
+     */
+    public static function EmailListHtml(array $infos): string
+    {
+        $items = self::DedupByType($infos);
+        if (empty($items)) {
+            return '';
+        }
+        $h = static fn ($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
+        $rows = '';
+        foreach ($items as $i) {
+            $text = $i['text'] !== ''
+                ? '<div style="font-size:13px;color:#6b7280;margin-top:3px;">' . $h($i['text']) . '</div>'
+                : '';
+            $rows .= '<tr><td style="padding:12px 14px;border:1px solid #e5eae8;border-radius:10px;background:#f8faf9;">'
+                . '<div style="font-size:15px;font-weight:700;color:#1f2937;">' . $h($i['label']) . '</div>'
+                . $text
+                . '<div style="margin-top:8px;"><a href="' . $h($i['url']) . '" style="display:inline-block;font-size:13px;font-weight:700;color:#ffffff;background:#009260;text-decoration:none;padding:8px 14px;border-radius:8px;">Anleitung ansehen</a></div>'
+                . '</td></tr>'
+                . '<tr><td style="height:10px;line-height:10px;font-size:0;">&nbsp;</td></tr>';
+        }
+        return '<table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="border-collapse:collapse;width:100%;">' . $rows . '</table>';
     }
 
     /**

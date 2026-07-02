@@ -1727,24 +1727,14 @@ class ZhlBookPresenter
                 return;
             }
             $infos = ZhlTypeInfo::ForReference($db, $ref);
-            $block = ZhlTypeInfo::EmailBlock($infos);
-            if ($block === '') {
-                return;
+            if (empty(ZhlTypeInfo::DedupByType($infos))) {
+                return; // kein Info-Link vorhanden → keine Begleit-Mail
             }
             $name = trim($user->FirstName . ' ' . $user->LastName);
-            $lines = [
-                ($name !== '' ? 'Hallo ' . $name . ',' : 'Hallo,'),
-                '',
-                'vielen Dank für deine Buchung (Buchungsnummer ' . $ref . ').',
-                '',
-                $block,
-                '',
-                'Viele Grüße',
-                'ZHL Medienausleihe',
-            ];
+            $intro = 'vielen Dank für deine Buchung! Hier sind die passenden Anleitungen zu deinen Medien.';
             $to = [new EmailAddress($user->Email, $name !== '' ? $name : $user->Email)];
             $lang = !empty($user->LanguageCode) ? $user->LanguageCode : null;
-            ServiceLocator::GetEmailService()->Send(new ZhlMediaInfoEmail($to, $ref, implode("\n", $lines), $lang));
+            ServiceLocator::GetEmailService()->Send(new ZhlMediaInfoEmail($to, $ref, $name, $intro, $infos, $lang));
         } catch (Throwable $e) {
             Log::Error('ZHL-D2: Info-Mail nach Buchung fehlgeschlagen (ref=%s): %s', $ref, $e);
         }

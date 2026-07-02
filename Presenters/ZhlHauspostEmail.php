@@ -1,9 +1,10 @@
 <?php
 
 require_once(ROOT_DIR . 'lib/Email/namespace.php');
+require_once(ROOT_DIR . 'lib/Application/Zhl/ZhlEmailLayout.php');
 
 /**
- * ZHL C2 — Hauspost-Versand-Benachrichtigung (Klartext, kein Smarty-Template).
+ * ZHL C2 — Hauspost-Versand-Benachrichtigung (gebrandetes HTML via ZhlEmailLayout).
  *
  * Wird beim Absenden einer Hauspost-Buchung versandt an Transport-Organisator + Medien-Team
  * (To) sowie den Ausleihenden (CC). Listet alle Formularfelder a–f2 + Buchungsnummer + Gerät
@@ -52,7 +53,10 @@ class ZhlHauspostEmail extends EmailMessage
 
     public function Body()
     {
-        // Klartext; nl2br, damit auch HTML-Clients die Zeilenumbrüche zeigen.
-        return nl2br(htmlspecialchars($this->zhlBody, ENT_QUOTES, 'UTF-8'));
+        return ZhlEmailLayout::WrapText([
+            'title' => 'Hauspost-Versand',
+            'subtitle' => $this->zhlTitel,
+            'text' => $this->zhlBody,
+        ]);
     }
 }

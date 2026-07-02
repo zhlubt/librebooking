@@ -1,6 +1,7 @@
 <?php
 
 require_once(ROOT_DIR . 'lib/Email/namespace.php');
+require_once(ROOT_DIR . 'lib/Application/Zhl/ZhlEmailLayout.php');
 
 /**
  * ZHL B — Wunschtermin-Anfrage-Mail (Klartext, kein Smarty-Template).
@@ -49,6 +50,9 @@ class ZhlTerminRequestEmail extends EmailMessage
 
     public function Body()
     {
-        return nl2br(htmlspecialchars($this->zhlBody, ENT_QUOTES, 'UTF-8'));
+        return ZhlEmailLayout::WrapText([
+            'title' => $this->zhlSubject,
+            'text' => $this->zhlBody,
+        ]);
     }
 }

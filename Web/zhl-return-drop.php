@@ -217,7 +217,13 @@ if ($location !== null && ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
 // --- Items für die Anzeige (nach erfolgreicher Meldung neu, also frisch) ---------------------------
 $items = ($user !== null && $done === null) ? zhl_return_open_items_for_user((int)$user['user_id']) : [];
 $userName = $user !== null ? trim((string)($user['fname'] ?? '') . ' ' . (string)($user['lname'] ?? '')) : '';
-$loginUrl = zhl_return_base_url() . 'index.php'; // LB-Login (Standardstart)
+// LB-Login mit Rücksprung auf DIESE Drop-Seite: ohne ?redirect= landet der Nutzer nach dem Login auf
+// dem Dashboard und der Ablageort-Kontext (loc) ginge verloren. Das Ziel ist ein relativer Pfad (gleiches
+// /Web/-Verzeichnis wie index.php) → RedirectUrlSanitizer lässt es als same-origin passieren.
+$loginUrl = zhl_return_base_url() . 'index.php';
+if ($location !== null) {
+    $loginUrl .= '?redirect=' . rawurlencode('zhl-return-drop.php?loc=' . (string)$location['qr_token']);
+}
 ?>
 <!DOCTYPE html>
 <html lang="de">

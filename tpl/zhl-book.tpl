@@ -319,7 +319,8 @@
 						{elseif $Return.mandatory}
 							<div class="zhl-ueb-item req">
 								<strong><svg class="zhl-ic" style="width:1.05em;height:1.05em;vertical-align:-0.16em;flex:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg> Kein Rückgabetermin ab deinem Ausleihende frei</strong>
-								<span class="zhl-muted zhl-small">{if $Return.earliestLabel}Frühester Termin: {$Return.earliestLabel}.{else}Aktuell ist kein Rückgabetermin verfügbar — eine Buchung ist erst möglich, sobald Termine frei sind.{/if}</span>
+								<span class="zhl-muted zhl-small">{if $Return.earliestLabel}Frühester Termin: {$Return.earliestLabel}.{else}Aktuell ist kein Rückgabetermin verfügbar.{/if} Frag einen Wunschtermin für die Rückgabe an — das ZHL-Medien-Team schlägt dir konkrete Termine vor, du wählst einen aus und bekommst eine Kalendereinladung.</span>
+									<div style="margin-top:8px;"><a class="zhl-btn zhl-btn-ghost zhl-btn-sm" target="_blank" rel="noopener" href="{$Path}zhl-termin-anfrage.php?purpose=return&amp;rid={$ResourceId}&amp;pt={$ProjectTitle|escape:'url'}"><svg class="zhl-ic" style="width:1.05em;height:1.05em;vertical-align:-0.16em;flex:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> Rückgabetermin anfragen</a></div>
 							</div>
 						{/if}
 						</div>{* /#zhl-return-wrap *}
@@ -520,8 +521,12 @@
 		var mandatory = returnWrap.getAttribute('data-mandatory') === '1';
 		if (!vm || !vm.days || !vm.days.length) {
 			if (vm && mandatory) {
+				var anfrageBase = (bookForm ? bookForm.getAttribute('action').replace(/zhl-book\.php.*$/, '') : '');
+				var anfragePt = (typeof projTitle !== 'undefined' && projTitle) ? encodeURIComponent(projTitle.value || '') : '';
+				var anfrageUrl = anfrageBase + 'zhl-termin-anfrage.php?purpose=return&rid=' + encodeURIComponent(ridEl ? ridEl.value : '') + '&pt=' + anfragePt;
 				returnWrap.innerHTML = '<div class="zhl-ueb-item req"><strong><svg class="zhl-ic" style="width:1.05em;height:1.05em;vertical-align:-0.16em;flex:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg> Kein Rückgabetermin ab deinem Ausleihende frei</strong> <span class="zhl-muted zhl-small">' +
-					(vm.earliestLabel ? 'Frühester Termin: ' + esc(vm.earliestLabel) + '.' : 'Aktuell ist kein Rückgabetermin verfügbar.') + '</span></div>';
+					(vm.earliestLabel ? 'Frühester Termin: ' + esc(vm.earliestLabel) + '.' : 'Aktuell ist kein Rückgabetermin verfügbar.') + ' Frag einen Wunschtermin für die Rückgabe an — das ZHL-Medien-Team schlägt dir konkrete Termine vor, du wählst einen aus und bekommst eine Kalendereinladung.</span>' +
+					'<div style="margin-top:8px;"><a class="zhl-btn zhl-btn-ghost zhl-btn-sm" target="_blank" rel="noopener" href="' + esc(anfrageUrl) + '"><svg class="zhl-ic" style="width:1.05em;height:1.05em;vertical-align:-0.16em;flex:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> Rückgabetermin anfragen</a></div></div>';
 				return true;
 			}
 			returnWrap.innerHTML = '';

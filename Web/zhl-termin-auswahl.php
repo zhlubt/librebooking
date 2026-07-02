@@ -60,6 +60,10 @@ if (preg_match('/^[a-f0-9]{20,64}$/', $token)) {
 if ($req === null) {
     http_response_code(404);
 }
+// Zweck (Rückgabe vs. Einführung) — steuert alle Beschriftungen auf dieser Seite.
+$pgIsReturn = ($req !== null && (($req['purpose'] ?? 'einf') === 'return'));
+$pgTerminWort = $pgIsReturn ? 'Rückgabetermin' : 'Einführungstermin';
+$pgWannWort = $pgIsReturn ? 'Rückgabe' : 'Einführung';
 
 $error = null;
 $flash = null;
@@ -91,7 +95,8 @@ if ($req !== null && ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                 // (1) Offer-Gate: genau ein Gewinner für DIESES Angebot (deckt Doppel-Submit desselben
                 //     Angebots ab). (2) Request-Gate: genau ein Gewinner pro ANFRAGE (deckt zwei parallel
                 //     bestätigte VERSCHIEDENE Angebote ab) — der Verlierer zieht sein Angebot zurück.
-                $icsUid = 'zhl-einf-' . bin2hex(random_bytes(16)) . '@media.zhl-ubt.de';
+                $isReturn = (($req['purpose'] ?? 'einf') === 'return');
+                $icsUid = ($isReturn ? 'zhl-return-' : 'zhl-einf-') . bin2hex(random_bytes(16)) . '@media.zhl-ubt.de';
                 $wonOffer = ZhlTerminRequest::ClaimOffer($db, $rid, $offerId, $icsUid);
                 if (!$wonOffer) {
                     $error = 'Dieser Termin wurde gerade vergeben oder die Anfrage ist bereits bestätigt.';
@@ -99,6 +104,14 @@ if ($req !== null && ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                     // Offer gewonnen, aber ein anderes Angebot hat die Anfrage zuerst bekommen.
                     ZhlTerminRequest::WithdrawChosenOffer($db, $offerId, $rid);
                     $error = 'Für diese Anfrage wurde bereits ein anderer Termin bestätigt.';
+                } elseif ($isReturn) {
+                    // RÜCKGABE (SPEC-RUECKGABE-ANFRAGE v3): reine Terminkoordination — KEINE §6-Reservierung,
+                    // KEIN Zertifikat, KEINE Geräte-Buchung. Nur Angebote aufräumen + Mail/ICS an alle.
+                    $offer['ics_uid'] = $icsUid;
+                    ZhlTerminRequest::WithdrawOtherOpenOffers($db, $rid, $offerId);
+                    zhl_ta_send_invite($db, $req, $offer, $token, $tz);
+                    header('Location: zhl-termin-auswahl.php?token=' . urlencode($token) . '&done=1');
+                    exit;
                 } else {
                     $offer['ics_uid'] = $icsUid; // gerade gesetzte UID für die Einladung übernehmen
                     // §6: Stunde am Gerät reservieren (nur Slot-Geräte). Konflikt → rückgängig.
@@ -132,7 +145,7 @@ if ($req !== null && $error !== null) {
     }
 }
 if (isset($_GET['done'])) {
-    $flash = 'Vielen Dank! Ihr Einführungstermin ist bestätigt.';
+    $flash = $pgIsReturn ? 'Vielen Dank! Ihr Rückgabetermin ist vereinbart.' : 'Vielen Dank! Ihr Einführungstermin ist bestätigt.';
 }
 
 /**
@@ -149,11 +162,11 @@ function zhl_ta_send_invite($db, array $req, array $offer, string $token, string
         $instructorEmail = trim((string)($offer['instructor_email'] ?? ''));
         $userName = trim(((string)($req['fname'] ?? '')) . ' ' . ((string)($req['lname'] ?? '')));
         $userEmail = trim((string)($req['email'] ?? ''));
+        $isReturn = (($req['purpose'] ?? 'einf') === 'return');
+        $terminWort = $isReturn ? 'Rückgabetermin' : 'Einführungstermin';
+        $wannWort = $isReturn ? 'Rückgabe' : 'Einführung';
+        $icsFile = $isReturn ? 'rueckgabe.ics' : 'einfuehrung.ics';
         $stornoLink = zhl_ta_base() . 'zhl-termin-storno.php?token=' . urlencode($token);
-        // CTA: Leihe ab Einführungs-Ende (lokales Datum/Uhrzeit) selbst buchen.
-        $bookStart = zhl_ta_fmt((string)$offer['end_utc'], $tz, 'Y-m-d');
-        $bookTime = zhl_ta_fmt((string)$offer['end_utc'], $tz, 'H:i');
-        $bookLink = zhl_ta_base() . 'zhl-book.php?rid=' . (int)$req['resource_id'] . '&start=' . urlencode($bookStart) . '&time=' . urlencode($bookTime);
 
         $ics = ZhlIcs::Build([
             'uid' => (string)$offer['ics_uid'],
@@ -161,8 +174,8 @@ function zhl_ta_send_invite($db, array $req, array $offer, string $token, string
             'method' => 'REQUEST',
             'start_utc' => (string)$offer['start_utc'],
             'end_utc' => (string)$offer['end_utc'],
-            'summary' => 'ZHL Einführung: ' . $label,
-            'description' => 'Einführung für die Medienausleihe.' . (($offer['note'] ?? '') !== '' ? ' Hinweis: ' . (string)$offer['note'] : ''),
+            'summary' => 'ZHL ' . $wannWort . ': ' . $label,
+            'description' => ($isReturn ? 'Persönliche Rückgabe für die Medienausleihe.' : 'Einführung für die Medienausleihe.') . (($offer['note'] ?? '') !== '' ? ' Hinweis: ' . (string)$offer['note'] : ''),
             'location' => ($offer['note'] ?? '') !== '' ? (string)$offer['note'] : 'ZHL Medien, Universität Bayreuth',
             'organizer_name' => $instructorName,
             'organizer_email' => $instructorEmail,
@@ -172,23 +185,44 @@ function zhl_ta_send_invite($db, array $req, array $offer, string $token, string
             ])),
         ]);
 
-        $lines = [
-            ($userName !== '' ? 'Hallo ' . $userName . ',' : 'Hallo,'), '',
-            'Ihr Einführungstermin für „' . $label . '" ist bestätigt:',
-            '  ' . $startLocal . '–' . $endLocal . ' Uhr',
-            '  Einführung: ' . $instructorName,
-            (($offer['note'] ?? '') !== '' ? '  Hinweis: ' . (string)$offer['note'] : ''),
-            '',
-            'Die Termineinladung für Ihren Kalender ist als Datei (einfuehrung.ics) angehängt.',
-            '',
-            'WICHTIG — Gerät separat buchen:',
-            'Bitte buchen Sie Ihre Ressource selbst ab ' . zhl_ta_fmt((string)$offer['end_utc'], $tz, 'd.m.Y H:i') . ' Uhr (wenn die Einführung zu Ende ist):',
-            '  ' . $bookLink,
-            '',
-            'Termin doch absagen? Über diesen Link wird der Termin für alle Beteiligten storniert:',
-            '  ' . $stornoLink,
-            '', 'Viele Grüße', 'ZHL Medienausleihe',
-        ];
+        if ($isReturn) {
+            $lines = [
+                ($userName !== '' ? 'Hallo ' . $userName . ',' : 'Hallo,'), '',
+                'Ihr Rückgabetermin für „' . $label . '" ist vereinbart:',
+                '  ' . $startLocal . '–' . $endLocal . ' Uhr',
+                '  Rückgabe bei: ' . $instructorName,
+                (($offer['note'] ?? '') !== '' ? '  Hinweis: ' . (string)$offer['note'] : ''),
+                '',
+                'Die Termineinladung für Ihren Kalender ist als Datei (' . $icsFile . ') angehängt.',
+                'Bitte bringen Sie das Gerät zum vereinbarten Termin zurück.',
+                '',
+                'Termin doch absagen? Über diesen Link wird der Termin für alle Beteiligten storniert:',
+                '  ' . $stornoLink,
+                '', 'Viele Grüße', 'ZHL Medienausleihe',
+            ];
+        } else {
+            // CTA: Leihe ab Einführungs-Ende (lokales Datum/Uhrzeit) selbst buchen.
+            $bookStart = zhl_ta_fmt((string)$offer['end_utc'], $tz, 'Y-m-d');
+            $bookTime = zhl_ta_fmt((string)$offer['end_utc'], $tz, 'H:i');
+            $bookLink = zhl_ta_base() . 'zhl-book.php?rid=' . (int)$req['resource_id'] . '&start=' . urlencode($bookStart) . '&time=' . urlencode($bookTime);
+            $lines = [
+                ($userName !== '' ? 'Hallo ' . $userName . ',' : 'Hallo,'), '',
+                'Ihr Einführungstermin für „' . $label . '" ist bestätigt:',
+                '  ' . $startLocal . '–' . $endLocal . ' Uhr',
+                '  Einführung: ' . $instructorName,
+                (($offer['note'] ?? '') !== '' ? '  Hinweis: ' . (string)$offer['note'] : ''),
+                '',
+                'Die Termineinladung für Ihren Kalender ist als Datei (' . $icsFile . ') angehängt.',
+                '',
+                'WICHTIG — Gerät separat buchen:',
+                'Bitte buchen Sie Ihre Ressource selbst ab ' . zhl_ta_fmt((string)$offer['end_utc'], $tz, 'd.m.Y H:i') . ' Uhr (wenn die Einführung zu Ende ist):',
+                '  ' . $bookLink,
+                '',
+                'Termin doch absagen? Über diesen Link wird der Termin für alle Beteiligten storniert:',
+                '  ' . $stornoLink,
+                '', 'Viele Grüße', 'ZHL Medienausleihe',
+            ];
+        }
         $body = implode("\n", array_filter($lines, fn($l) => $l !== null));
 
         $to = [];
@@ -202,8 +236,8 @@ function zhl_ta_send_invite($db, array $req, array $offer, string $token, string
             return;
         }
         $lang = !empty($req['language']) ? (string)$req['language'] : null;
-        $mail = new ZhlTerminRequestEmail($to, [], 'ZHL Medienausleihe — Einführungstermin bestätigt: ' . $label, $body, $lang);
-        $mail->AddStringAttachment($ics, 'einfuehrung.ics');
+        $mail = new ZhlTerminRequestEmail($to, [], 'ZHL Medienausleihe — ' . $terminWort . ' bestätigt: ' . $label, $body, $lang);
+        $mail->AddStringAttachment($ics, $icsFile);
         ServiceLocator::GetEmailService()->Send($mail);
     } catch (Throwable $e) {
         Log::Error('ZHL-TerminAuswahl: Einladung/Mail fehlgeschlagen: %s', $e);
@@ -225,7 +259,7 @@ if ($req !== null && $status === 'confirmed' && (int)($req['chosen_offer_id'] ??
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Einführungstermin wählen — ZHL Medienausleihe</title>
+    <title><?= zhl_ta_h($pgTerminWort) ?> wählen — ZHL Medienausleihe</title>
     <link rel="stylesheet" href="assets/vendor/bootstrap/5.3.3/css/bootstrap.css">
     <link rel="stylesheet" href="assets/vendor/bootstrap-icons/1.11.3/css/bootstrap-icons.min.css">
     <link rel="stylesheet" href="css/zhl-theme.css">
@@ -239,7 +273,7 @@ if ($req !== null && $status === 'confirmed' && (int)($req['chosen_offer_id'] ??
 </head>
 <body>
 <div class="container wrap py-4">
-  <h1 class="h4 mb-3"><i class="bi bi-mortarboard text-success"></i> Einführungstermin</h1>
+  <h1 class="h4 mb-3"><i class="bi <?= $pgIsReturn ? 'bi-box-arrow-in-left' : 'bi-mortarboard' ?> text-success"></i> <?= zhl_ta_h($pgTerminWort) ?></h1>
 
   <?php if ($req === null): ?>
     <div class="alert alert-danger"><i class="bi bi-x-circle"></i> Dieser Link ist ungültig oder abgelaufen.</div>
@@ -259,13 +293,17 @@ if ($req !== null && $status === 'confirmed' && (int)($req['chosen_offer_id'] ??
         <div class="card-body">
           <h2 class="h6"><i class="bi bi-calendar-check text-success"></i> Ihr Termin steht</h2>
           <p class="mb-1"><strong><?= zhl_ta_h(zhl_ta_fmt((string)$chosen['start_utc'], $tz, 'd.m.Y H:i')) ?>–<?= zhl_ta_h(zhl_ta_fmt((string)$chosen['end_utc'], $tz, 'H:i')) ?> Uhr</strong></p>
-          <p class="mb-1">Einführung: <?= zhl_ta_h((string)($chosen['instructor_name'] ?? '')) ?></p>
+          <p class="mb-1"><?= $pgIsReturn ? 'Rückgabe bei' : 'Einführung' ?>: <?= zhl_ta_h((string)($chosen['instructor_name'] ?? '')) ?></p>
           <?php if (($chosen['note'] ?? '') !== ''): ?><p class="text-muted small">Hinweis: <?= zhl_ta_h((string)$chosen['note']) ?></p><?php endif; ?>
           <hr>
-          <p class="mb-2"><strong>Nächster Schritt — Gerät buchen:</strong><br>
-            Bitte buchen Sie Ihre Ressource selbst ab <strong><?= zhl_ta_h(zhl_ta_fmt((string)$chosen['end_utc'], $tz, 'd.m.Y H:i')) ?> Uhr</strong> (wenn die Einführung zu Ende ist).</p>
-          <a class="btn btn-success btn-sm" href="zhl-book.php?rid=<?= (int)$req['resource_id'] ?>&start=<?= zhl_ta_h(zhl_ta_fmt((string)$chosen['end_utc'], $tz, 'Y-m-d')) ?>&time=<?= zhl_ta_h(zhl_ta_fmt((string)$chosen['end_utc'], $tz, 'H:i')) ?>"><i class="bi bi-box-arrow-in-right"></i> Gerät jetzt buchen</a>
-          <hr>
+          <?php if ($pgIsReturn): ?>
+            <p class="mb-2 text-muted">Bitte bringen Sie das Gerät zum vereinbarten Termin zurück. Sie (und die entgegennehmende Person) haben eine Kalendereinladung per E-Mail erhalten. Die Ausleihe selbst richtet das ZHL-Medien-Team ein.</p>
+          <?php else: ?>
+            <p class="mb-2"><strong>Nächster Schritt — Gerät buchen:</strong><br>
+              Bitte buchen Sie Ihre Ressource selbst ab <strong><?= zhl_ta_h(zhl_ta_fmt((string)$chosen['end_utc'], $tz, 'd.m.Y H:i')) ?> Uhr</strong> (wenn die Einführung zu Ende ist).</p>
+            <a class="btn btn-success btn-sm" href="zhl-book.php?rid=<?= (int)$req['resource_id'] ?>&start=<?= zhl_ta_h(zhl_ta_fmt((string)$chosen['end_utc'], $tz, 'Y-m-d')) ?>&time=<?= zhl_ta_h(zhl_ta_fmt((string)$chosen['end_utc'], $tz, 'H:i')) ?>"><i class="bi bi-box-arrow-in-right"></i> Gerät jetzt buchen</a>
+            <hr>
+          <?php endif; ?>
           <form method="post" onsubmit="return confirm('Termin wirklich für alle Beteiligten absagen?');">
             <input type="hidden" name="token" value="<?= zhl_ta_h($token) ?>">
             <input type="hidden" name="action" value="withdraw">
@@ -280,7 +318,7 @@ if ($req !== null && $status === 'confirmed' && (int)($req['chosen_offer_id'] ??
     <?php elseif ($status === 'declined'): ?>
       <div class="alert alert-secondary"><i class="bi bi-x-circle"></i> Diese Anfrage wurde leider abgelehnt. Bei Fragen wenden Sie sich an das ZHL-Medien-Team.</div>
     <?php elseif ($status === 'offered' && !empty($offers)): ?>
-      <p>Bitte wählen Sie einen Einführungstermin:</p>
+      <p>Bitte wählen Sie einen <?= zhl_ta_h($pgTerminWort) ?>:</p>
       <form method="post">
         <input type="hidden" name="token" value="<?= zhl_ta_h($token) ?>">
         <input type="hidden" name="action" value="confirm">
@@ -288,7 +326,7 @@ if ($req !== null && $status === 'confirmed' && (int)($req['chosen_offer_id'] ??
           <label class="opt">
             <input type="radio" name="offer_id" value="<?= (int)$o['id'] ?>" <?= $i === 0 ? 'checked' : '' ?> required>
             <strong><?= zhl_ta_h(zhl_ta_fmt((string)$o['start_utc'], $tz, 'd.m.Y H:i')) ?>–<?= zhl_ta_h(zhl_ta_fmt((string)$o['end_utc'], $tz, 'H:i')) ?> Uhr</strong>
-            — Einführung: <?= zhl_ta_h((string)($o['instructor_name'] ?? '')) ?>
+            — <?= zhl_ta_h($pgWannWort) ?>: <?= zhl_ta_h((string)($o['instructor_name'] ?? '')) ?>
             <?php if (($o['note'] ?? '') !== ''): ?><br><span class="text-muted small" style="margin-left:24px;"><?= zhl_ta_h((string)$o['note']) ?></span><?php endif; ?>
           </label>
         <?php endforeach; ?>

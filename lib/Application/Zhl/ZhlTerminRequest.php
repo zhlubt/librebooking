@@ -32,7 +32,8 @@ class ZhlTerminRequest
     /**
      * Neue Anfrage anlegen.
      * @param array{user_id:int,kind:string,resource_id:?int,bundle_id:?int,label:string,
-     *              desired_start:?string,desired_end:?string,project_title:string,message:?string} $d
+     *              desired_start:?string,desired_end:?string,project_title:string,message:?string,
+     *              purpose?:string} $d  purpose = 'einf' (Default) | 'return'
      * @return int neue id (0 bei Fehler)
      */
     public static function Create($db, array $d): int
@@ -40,11 +41,12 @@ class ZhlTerminRequest
         try {
             $cmd = new AdHocCommand(
                 'INSERT INTO zhl_termin_request ' .
-                '(user_id, kind, resource_id, bundle_id, label, desired_start, desired_end, project_title, message, status, created_at) ' .
-                'VALUES (@uid, @kind, @resid, @bunid, @label, @dstart, @dend, @ptitle, @msg, @stat, @created)'
+                '(user_id, kind, purpose, resource_id, bundle_id, label, desired_start, desired_end, project_title, message, status, created_at) ' .
+                'VALUES (@uid, @kind, @purpose, @resid, @bunid, @label, @dstart, @dend, @ptitle, @msg, @stat, @created)'
             );
             $cmd->AddParameter(new Parameter('@uid', (int)$d['user_id']));
             $cmd->AddParameter(new Parameter('@kind', ($d['kind'] === 'bundle' ? 'bundle' : 'single')));
+            $cmd->AddParameter(new Parameter('@purpose', (($d['purpose'] ?? 'einf') === 'return' ? 'return' : 'einf')));
             $cmd->AddParameter(new Parameter('@resid', isset($d['resource_id']) && $d['resource_id'] ? (int)$d['resource_id'] : null));
             $cmd->AddParameter(new Parameter('@bunid', isset($d['bundle_id']) && $d['bundle_id'] ? (int)$d['bundle_id'] : null));
             $cmd->AddParameter(new Parameter('@label', mb_substr((string)$d['label'], 0, 190)));

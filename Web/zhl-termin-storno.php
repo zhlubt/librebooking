@@ -53,6 +53,10 @@ function zhl_ts_send_cancel($db, array $req, array $offer, string $tz): void
         $instructorEmail = trim((string)($offer['instructor_email'] ?? ''));
         $userName = trim(((string)($req['fname'] ?? '')) . ' ' . ((string)($req['lname'] ?? '')));
         $userEmail = trim((string)($req['email'] ?? ''));
+        $isReturn = (($req['purpose'] ?? 'einf') === 'return');
+        $terminWort = $isReturn ? 'Rückgabetermin' : 'Einführungstermin';
+        $wannWort = $isReturn ? 'Rückgabe' : 'Einführung';
+        $icsFile = $isReturn ? 'rueckgabe.ics' : 'einfuehrung.ics';
         $when = zhl_ts_fmt((string)$offer['start_utc'], $tz, 'd.m.Y H:i') . '–' . zhl_ts_fmt((string)$offer['end_utc'], $tz, 'H:i') . ' Uhr';
 
         $ics = ZhlIcs::Build([
@@ -61,8 +65,8 @@ function zhl_ts_send_cancel($db, array $req, array $offer, string $tz): void
             'method' => 'CANCEL',
             'start_utc' => (string)$offer['start_utc'],
             'end_utc' => (string)$offer['end_utc'],
-            'summary' => 'ZHL Einführung: ' . $label,
-            'description' => 'Dieser Einführungstermin wurde abgesagt.',
+            'summary' => 'ZHL ' . $wannWort . ': ' . $label,
+            'description' => 'Dieser ' . $terminWort . ' wurde abgesagt.',
             'location' => ($offer['note'] ?? '') !== '' ? (string)$offer['note'] : 'ZHL Medien, Universität Bayreuth',
             'organizer_name' => $instructorName,
             'organizer_email' => $instructorEmail,
@@ -73,11 +77,11 @@ function zhl_ts_send_cancel($db, array $req, array $offer, string $tz): void
         ]);
 
         $lines = [
-            'Der Einführungstermin für „' . $label . '" wurde abgesagt.',
+            'Der ' . $terminWort . ' für „' . $label . '" wurde abgesagt.',
             'Termin (abgesagt): ' . $when,
-            'Einführung: ' . $instructorName,
+            $wannWort . ': ' . $instructorName,
             '',
-            'Die Absage für Ihren Kalender ist als Datei (einfuehrung.ics) angehängt.',
+            'Die Absage für Ihren Kalender ist als Datei (' . $icsFile . ') angehängt.',
             'Bei Bedarf stellen Sie bitte eine neue Terminanfrage in der Medienausleihe.',
             '', 'Viele Grüße', 'ZHL Medienausleihe',
         ];
@@ -92,8 +96,8 @@ function zhl_ts_send_cancel($db, array $req, array $offer, string $tz): void
             return;
         }
         $lang = !empty($req['language']) ? (string)$req['language'] : null;
-        $mail = new ZhlTerminRequestEmail($to, [], 'ZHL Medienausleihe — Einführungstermin abgesagt: ' . $label, implode("\n", $lines), $lang);
-        $mail->AddStringAttachment($ics, 'einfuehrung.ics');
+        $mail = new ZhlTerminRequestEmail($to, [], 'ZHL Medienausleihe — ' . $terminWort . ' abgesagt: ' . $label, implode("\n", $lines), $lang);
+        $mail->AddStringAttachment($ics, $icsFile);
         ServiceLocator::GetEmailService()->Send($mail);
     } catch (Throwable $e) {
         Log::Error('ZHL-TerminStorno: CANCEL-Mail fehlgeschlagen: %s', $e);
@@ -136,6 +140,8 @@ if ($req !== null && ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && (string
 $tz = ($req !== null && (string)($req['timezone'] ?? '') !== '') ? (string)$req['timezone'] : 'Europe/Berlin';
 $status = $req !== null ? (string)$req['status'] : '';
 $label = $req !== null ? (string)($req['label'] ?? 'Gerät') : '';
+$pgIsReturn = ($req !== null && (($req['purpose'] ?? 'einf') === 'return'));
+$pgTerminWort = $pgIsReturn ? 'Rückgabetermin' : 'Einführungstermin';
 $done = isset($_GET['done']);
 $chosen = null;
 if ($req !== null && (int)($req['chosen_offer_id'] ?? 0) > 0) {
@@ -147,7 +153,7 @@ if ($req !== null && (int)($req['chosen_offer_id'] ?? 0) > 0) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Einführungstermin absagen — ZHL Medienausleihe</title>
+    <title><?= zhl_ts_h($pgTerminWort) ?> absagen — ZHL Medienausleihe</title>
     <link rel="stylesheet" href="assets/vendor/bootstrap/5.3.3/css/bootstrap.css">
     <link rel="stylesheet" href="assets/vendor/bootstrap-icons/1.11.3/css/bootstrap-icons.min.css">
     <link rel="stylesheet" href="css/zhl-theme.css">
@@ -155,16 +161,16 @@ if ($req !== null && (int)($req['chosen_offer_id'] ?? 0) > 0) {
 </head>
 <body>
 <div class="container wrap py-4">
-  <h1 class="h4 mb-3"><i class="bi bi-calendar-x text-danger"></i> Einführungstermin absagen</h1>
+  <h1 class="h4 mb-3"><i class="bi bi-calendar-x text-danger"></i> <?= zhl_ts_h($pgTerminWort) ?> absagen</h1>
 
   <?php if ($req === null): ?>
     <div class="alert alert-danger"><i class="bi bi-x-circle"></i> Dieser Link ist ungültig oder abgelaufen.</div>
   <?php elseif ($done || $status === 'cancelled'): ?>
     <div class="alert alert-success"><i class="bi bi-check-circle"></i> Der Termin wurde abgesagt. Alle Beteiligten wurden benachrichtigt.</div>
   <?php elseif ($status === 'confirmed' && $chosen !== null): ?>
-    <p>Möchten Sie diesen Einführungstermin für <strong>„<?= zhl_ts_h($label) ?>"</strong> wirklich absagen?</p>
-    <p class="text-muted"><?= zhl_ts_h(zhl_ts_fmt((string)$chosen['start_utc'], $tz, 'd.m.Y H:i')) ?>–<?= zhl_ts_h(zhl_ts_fmt((string)$chosen['end_utc'], $tz, 'H:i')) ?> Uhr · Einführung: <?= zhl_ts_h((string)($chosen['instructor_name'] ?? '')) ?></p>
-    <p class="small text-muted">Die Absage gilt für alle Beteiligten (Sie und die einführende Person).</p>
+    <p>Möchten Sie diesen <?= zhl_ts_h($pgTerminWort) ?> für <strong>„<?= zhl_ts_h($label) ?>"</strong> wirklich absagen?</p>
+    <p class="text-muted"><?= zhl_ts_h(zhl_ts_fmt((string)$chosen['start_utc'], $tz, 'd.m.Y H:i')) ?>–<?= zhl_ts_h(zhl_ts_fmt((string)$chosen['end_utc'], $tz, 'H:i')) ?> Uhr · <?= $pgIsReturn ? 'Rückgabe bei' : 'Einführung' ?>: <?= zhl_ts_h((string)($chosen['instructor_name'] ?? '')) ?></p>
+    <p class="small text-muted">Die Absage gilt für alle Beteiligten (Sie und die <?= $pgIsReturn ? 'entgegennehmende' : 'einführende' ?> Person).</p>
     <form method="post">
       <input type="hidden" name="token" value="<?= zhl_ts_h($token) ?>">
       <input type="hidden" name="action" value="cancel">

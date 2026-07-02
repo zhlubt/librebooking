@@ -141,7 +141,7 @@ class ZhlTerminAnfrageAdminPage extends SecurePage
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Einführungs-Terminwünsche — ZHL Medienausleihe</title>
+    <title>Terminwünsche (Einführung &amp; Rückgabe) — ZHL Medienausleihe</title>
     <link rel="stylesheet" href="assets/vendor/bootstrap/5.3.3/css/bootstrap.css">
     <link rel="stylesheet" href="assets/vendor/bootstrap-icons/1.11.3/css/bootstrap-icons.min.css">
     <link rel="stylesheet" href="css/zhl-theme.css">
@@ -159,7 +159,7 @@ class ZhlTerminAnfrageAdminPage extends SecurePage
 
 <div class="savebar py-2 mb-3">
   <div class="container d-flex justify-content-between align-items-center" style="max-width:1000px">
-    <h1 class="h5 mb-0"><i class="bi bi-calendar2-plus text-success"></i> Einführungs-Terminwünsche
+    <h1 class="h5 mb-0"><i class="bi bi-calendar2-plus text-success"></i> Terminwünsche
       <span class="text-muted fs-6 fw-normal">· <?= count($open) ?> offen</span>
     </h1>
     <div class="d-flex gap-2">
@@ -180,10 +180,11 @@ class ZhlTerminAnfrageAdminPage extends SecurePage
 
   <div class="alert alert-light border small">
     <i class="bi bi-info-circle text-success"></i>
-    Der Nutzer wünscht eine <strong>Einführung</strong>. Biete 1–3 konkrete Termine an (auch mehrere
-    Kolleg:innen können Termine eintragen) und schick sie dem Nutzer zur Auswahl. Erst seine Auswahl
-    bucht den Termin und verschickt Kalendereinladungen. Ist das Gerät gar nicht verfügbar →
-    <strong>Ablehnen</strong>. <em>Keine</em> Mehrtages-Buchung mehr.
+    Der Nutzer wünscht einen Termin (Badge <strong>Einführung</strong> bzw. <strong>Rückgabe</strong>).
+    Biete 1–3 konkrete Termine an (auch mehrere Kolleg:innen können Termine eintragen) und schick sie
+    dem Nutzer zur Auswahl. Erst seine Auswahl bestätigt den Termin und verschickt Kalendereinladungen
+    an alle Beteiligten. Ist es nicht möglich → <strong>Ablehnen</strong>. <em>Keine</em>
+    Mehrtages-Buchung.
   </div>
 
   <?php if (empty($open)): ?>
@@ -193,7 +194,10 @@ class ZhlTerminAnfrageAdminPage extends SecurePage
   <?php foreach ($open as $r): $rid = (int)$r['id']; $isBundle = ($r['kind'] ?? 'single') === 'bundle';
         $offers = ZhlTerminRequest::ListOffers($db, $rid);
         $openOffers = array_values(array_filter($offers, fn($o) => ($o['status'] ?? '') === 'open'));
-        $isOffered = ($r['status'] ?? '') === 'offered'; ?>
+        $isOffered = ($r['status'] ?? '') === 'offered';
+        $isReturn = (($r['purpose'] ?? 'einf') === 'return');
+        $werLabel = $isReturn ? 'Rückgabe entgegennehmen' : 'Einführung macht';
+        $wannLabel = $isReturn ? 'Rückgabe' : 'Einführung'; ?>
     <div class="card req-card shadow-sm mb-3">
       <div class="card-body">
         <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
@@ -201,6 +205,7 @@ class ZhlTerminAnfrageAdminPage extends SecurePage
             <div class="fw-semibold">
               <i class="bi <?= $isBundle ? 'bi-box-seam' : 'bi-camera-video' ?> text-success"></i>
               <?= $h($r['label']) ?>
+              <?php if ($isReturn): ?><span class="badge text-bg-warning">Rückgabe</span><?php else: ?><span class="badge text-bg-light border">Einführung</span><?php endif; ?>
               <?php if ($isBundle): ?><span class="badge text-bg-secondary">Bundle</span><?php endif; ?>
               <?php if ($isOffered): ?><span class="badge badge-offered">Angebote raus</span><?php endif; ?>
             </div>
@@ -227,7 +232,7 @@ class ZhlTerminAnfrageAdminPage extends SecurePage
               <div class="offer-row d-flex justify-content-between align-items-center mb-1 <?= $ostat !== 'open' ? 'opacity-50' : '' ?>">
                 <div class="small">
                   <i class="bi bi-clock"></i> <strong><?= $h($fmtDateTime($o['start_utc'])) ?></strong>–<?= $h($fmtDateTime($o['end_utc']) === '—' ? '' : Date::Parse((string)$o['end_utc'], 'UTC')->ToTimezone($tz)->Format('H:i')) ?>
-                  · Einführung: <?= $h((string)($o['instructor_name'] ?? '')) ?>
+                  · <?= $h($wannLabel) ?>: <?= $h((string)($o['instructor_name'] ?? '')) ?>
                   <?php if (($o['note'] ?? '') !== ''): ?><span class="text-muted">· <?= $h((string)$o['note']) ?></span><?php endif; ?>
                   <?php if ($ostat !== 'open'): ?><span class="badge text-bg-light ms-1"><?= $h($ostat) ?></span><?php endif; ?>
                 </div>
@@ -265,7 +270,7 @@ class ZhlTerminAnfrageAdminPage extends SecurePage
                 <input type="time" class="form-control form-control-sm" name="offer_end" value="11:00" required>
               </div>
               <div class="col-auto">
-                <label class="form-label small mb-0">Einführung macht</label>
+                <label class="form-label small mb-0"><?= $h($werLabel) ?></label>
                 <select class="form-select form-select-sm" name="instructor_uid" required>
                   <?php foreach ($admins as $a): $auid = (int)$a['user_id']; $aname = trim(((string)($a['fname'] ?? '')) . ' ' . ((string)($a['lname'] ?? ''))); ?>
                     <option value="<?= $auid ?>" <?= $auid === (int)$session->UserId ? 'selected' : '' ?>><?= $h($aname !== '' ? $aname : (string)($a['email'] ?? ('#' . $auid))) ?></option>
@@ -384,13 +389,15 @@ class ZhlTerminAnfrageAdminPage extends SecurePage
                 return false;
             }
             $tz = !empty($u['timezone']) ? (string)$u['timezone'] : 'Europe/Berlin';
+            $isReturn = (($req['purpose'] ?? 'einf') === 'return');
+            $wannWort = $isReturn ? 'Rückgabe' : 'Einführung';
             $offers = ZhlTerminRequest::ListOffers($db, (int)$req['id'], 'open');
             $name = trim(((string)($u['fname'] ?? '')) . ' ' . ((string)($u['lname'] ?? '')));
             $label = (string)$req['label'];
             $link = $this->absoluteBase() . 'zhl-termin-auswahl.php?token=' . urlencode($token);
             $lines = [
                 ($name !== '' ? 'Hallo ' . $name . ',' : 'Hallo,'), '',
-                'für Ihre Einführung zu „' . $label . '" schlagen wir folgende Termine vor.',
+                'für Ihre ' . $wannWort . ' zu „' . $label . '" schlagen wir folgende Termine vor.',
                 'Bitte wählen Sie einen Termin aus:',
                 '  ' . $link,
                 '',
@@ -399,13 +406,18 @@ class ZhlTerminAnfrageAdminPage extends SecurePage
             foreach ($offers as $o) {
                 $start = $this->fmtLocal((string)$o['start_utc'], $tz, 'd.m.Y H:i');
                 $end = $this->fmtLocal((string)$o['end_utc'], $tz, 'H:i');
-                $line = '  • ' . $start . '–' . $end . ' Uhr — Einführung: ' . (string)($o['instructor_name'] ?? '');
+                $line = '  • ' . $start . '–' . $end . ' Uhr — ' . $wannWort . ': ' . (string)($o['instructor_name'] ?? '');
                 if (($o['note'] ?? '') !== '') {
                     $line .= ' (' . (string)$o['note'] . ')';
                 }
                 $lines[] = $line;
             }
-            $lines = array_merge($lines, [
+            $lines = array_merge($lines, $isReturn ? [
+                '',
+                'Nach Ihrer Auswahl erhalten Sie (und die entgegennehmende Person) eine Kalendereinladung.',
+                'Die Ausleihe selbst richtet das ZHL-Medien-Team ein.',
+                '', 'Viele Grüße', 'ZHL Medienausleihe',
+            ] : [
                 '',
                 'Nach Ihrer Auswahl erhalten Sie eine Kalendereinladung. Die Buchung des Geräts selbst',
                 'nehmen Sie anschließend separat vor (ab dem Ende der Einführung).',
@@ -413,7 +425,7 @@ class ZhlTerminAnfrageAdminPage extends SecurePage
             ]);
             $to = [new EmailAddress((string)$u['email'], $name !== '' ? $name : (string)$u['email'])];
             $lang = !empty($u['language']) ? (string)$u['language'] : null;
-            ServiceLocator::GetEmailService()->Send(new ZhlTerminRequestEmail($to, [], 'ZHL Medienausleihe — Terminvorschläge für Ihre Einführung: ' . $label, implode("\n", $lines), $lang));
+            ServiceLocator::GetEmailService()->Send(new ZhlTerminRequestEmail($to, [], 'ZHL Medienausleihe — Terminvorschläge für Ihre ' . $wannWort . ': ' . $label, implode("\n", $lines), $lang));
             return true;
         } catch (Throwable $e) {
             Log::Error('ZHL-TerminRequest: notifyUserOffers fehlgeschlagen: %s', $e);
@@ -431,16 +443,17 @@ class ZhlTerminAnfrageAdminPage extends SecurePage
             }
             $name = trim(((string)($u['fname'] ?? '')) . ' ' . ((string)($u['lname'] ?? '')));
             $label = (string)$req['label'];
+            $wunschWort = (($req['purpose'] ?? 'einf') === 'return') ? 'Rückgabe-Terminwunsch' : 'Einführungs-Terminwunsch';
             $lines = [
                 ($name !== '' ? 'Hallo ' . $name . ',' : 'Hallo,'), '',
-                'leider können wir Ihren Einführungs-Terminwunsch für „' . $label . '" derzeit nicht umsetzen.',
+                'leider können wir Ihren ' . $wunschWort . ' für „' . $label . '" derzeit nicht umsetzen.',
                 ($note !== '' ? "\nHinweis vom Team:\n" . $note : ''),
                 '', 'Bei Fragen melden Sie sich gern beim ZHL-Medien-Team.', '',
                 'Viele Grüße', 'ZHL Medienausleihe',
             ];
             $to = [new EmailAddress((string)$u['email'], $name !== '' ? $name : (string)$u['email'])];
             $lang = !empty($u['language']) ? (string)$u['language'] : null;
-            ServiceLocator::GetEmailService()->Send(new ZhlTerminRequestEmail($to, [], 'ZHL Medienausleihe — Einführungs-Terminwunsch nicht möglich: ' . $label, implode("\n", $lines), $lang));
+            ServiceLocator::GetEmailService()->Send(new ZhlTerminRequestEmail($to, [], 'ZHL Medienausleihe — ' . $wunschWort . ' nicht möglich: ' . $label, implode("\n", $lines), $lang));
         } catch (Throwable $e) {
             Log::Error('ZHL-TerminRequest: notifyUserDecline fehlgeschlagen: %s', $e);
         }

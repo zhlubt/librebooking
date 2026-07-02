@@ -22,10 +22,16 @@ class ZhlTerminAnfragePresenter
         $this->page = $page;
     }
 
+    /** Zweck der Anfrage: 'return' (Rückgabetermin) oder 'einf' (Default, Einführung). */
+    private function purpose(): string
+    {
+        return (($_REQUEST['purpose'] ?? '') === 'return') ? 'return' : 'einf';
+    }
+
     public function PageLoad(UserSession $user)
     {
         if (isset($_GET['sent'])) {
-            $this->page->Bind(['mode' => 'sent']);
+            $this->page->Bind(['mode' => 'sent', 'purpose' => $this->purpose()]);
             return;
         }
 
@@ -86,9 +92,11 @@ class ZhlTerminAnfragePresenter
         $startUtc = Date::Parse($startStr . ' 00:00:00', $tz)->ToTimezone('UTC')->Format('Y-m-d H:i:s');
         $endUtc = Date::Parse($endStr . ' 23:59:00', $tz)->ToTimezone('UTC')->Format('Y-m-d H:i:s');
 
+        $purpose = $this->purpose();
         $reqId = ZhlTerminRequest::Create($db, [
             'user_id' => (int)$user->UserId,
             'kind' => $ctx['kind'],
+            'purpose' => $purpose,
             'resource_id' => $ctx['kind'] === 'single' ? $ctx['id'] : null,
             'bundle_id' => $ctx['kind'] === 'bundle' ? $ctx['id'] : null,
             'label' => $ctx['label'],
@@ -103,12 +111,12 @@ class ZhlTerminAnfragePresenter
                 'action' => 'termin.request.create',
                 'entity_type' => $ctx['kind'] === 'bundle' ? 'bundle' : 'resource',
                 'entity_id' => (string)$ctx['id'],
-                'detail' => ['label' => $ctx['label'], 'from' => $startStr, 'to' => $endStr],
+                'detail' => ['label' => $ctx['label'], 'from' => $startStr, 'to' => $endStr, 'purpose' => $purpose],
             ]));
-            $this->notifyTeam($user, $ctx, $startStr, $endStr, $projectTitle, $message);
+            $this->notifyTeam($user, $ctx, $startStr, $endStr, $projectTitle, $message, $purpose);
         }
 
-        $this->page->GoTo('zhl-termin-anfrage.php?sent=1');
+        $this->page->GoTo('zhl-termin-anfrage.php?sent=1' . ($purpose === 'return' ? '&purpose=return' : ''));
     }
 
     /** Gerät/Bundle aus ?rid / ?bundle (GET oder POST) laden + auf aktiv prüfen. @return array|null */
@@ -142,6 +150,7 @@ class ZhlTerminAnfragePresenter
     {
         $this->page->Bind([
             'mode' => 'form',
+            'purpose' => $this->purpose(),
             'kind' => $ctx['kind'],
             'ctxId' => $ctx['id'],
             'label' => $ctx['label'],
@@ -155,7 +164,7 @@ class ZhlTerminAnfragePresenter
     }
 
     /** Mail ans Medien-Team (To = medien_email, test-sicher), CC an den Anfragenden. */
-    private function notifyTeam(UserSession $user, array $ctx, string $startStr, string $endStr, string $projectTitle, string $message): void
+    private function notifyTeam(UserSession $user, array $ctx, string $startStr, string $endStr, string $projectTitle, string $message, string $purpose = 'einf'): void
     {
         try {
             $to = ZhlTerminRequest::RecipientEmail();
@@ -163,12 +172,15 @@ class ZhlTerminAnfragePresenter
                 Log::Error('ZHL-TerminRequest: keine medien_email konfiguriert — Mail übersprungen.');
                 return;
             }
+            $isReturn = $purpose === 'return';
+            $wunschWort = $isReturn ? 'Rückgabe-Terminwunsch' : 'Einführungs-Terminwunsch';
             $name = trim($user->FirstName . ' ' . $user->LastName);
             $lines = [
-                'Es liegt ein neuer Einführungs-Terminwunsch für die Medienausleihe vor.',
+                'Es liegt ein neuer ' . $wunschWort . ' für die Medienausleihe vor.',
                 '',
-                'Bitte im Admin-Bereich bearbeiten: Termine anbieten (mit „wer macht die Einführung")',
-                'und dem Nutzer zur Auswahl schicken — oder ablehnen, wenn das Gerät nicht verfügbar ist:',
+                'Bitte im Admin-Bereich bearbeiten: Termine anbieten (mit „wer ' .
+                    ($isReturn ? 'nimmt die Rückgabe entgegen' : 'macht die Einführung') . '")',
+                'und dem Nutzer zur Auswahl schicken — oder ablehnen, wenn es nicht möglich ist:',
                 '  ' . $this->absoluteBase() . 'zhl-termin-anfrage-admin.php',
                 '',
                 ($ctx['kind'] === 'bundle' ? 'Bundle:          ' : 'Gerät:           ') . $ctx['label'],
@@ -179,7 +191,8 @@ class ZhlTerminAnfragePresenter
                 'Nachricht:',
                 ($message !== '' ? $message : '(keine)'),
                 '',
-                'Hinweis: Diese Anfrage hält das Gerät NICHT — bitte konkrete Einführungstermine anbieten.',
+                'Hinweis: Diese Anfrage hält das Gerät NICHT — bitte konkrete ' .
+                    ($isReturn ? 'Rückgabetermine' : 'Einführungstermine') . ' anbieten.',
                 '',
                 'ZHL Medienausleihe',
             ];
@@ -189,7 +202,7 @@ class ZhlTerminAnfragePresenter
             if (trim((string)$user->Email) !== '') {
                 $cc[] = new EmailAddress($user->Email, $name !== '' ? $name : $user->Email);
             }
-            $subject = 'ZHL Medienausleihe — Einführungs-Terminwunsch: ' . $ctx['label'];
+            $subject = 'ZHL Medienausleihe — ' . $wunschWort . ': ' . $ctx['label'];
             $lang = !empty($user->LanguageCode) ? $user->LanguageCode : null;
             ServiceLocator::GetEmailService()->Send(new ZhlTerminRequestEmail($toList, $cc, $subject, $body, $lang));
         } catch (Throwable $e) {

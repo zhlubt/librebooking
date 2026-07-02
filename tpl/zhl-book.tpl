@@ -56,7 +56,7 @@
 			</div>
 
 			{* Buchungs-Formular *}
-			<form class="zhl-book-card" method="post" action="{$Path}zhl-book.php">
+			<form class="zhl-book-card" method="post" action="{$Path}zhl-book.php" data-maxnutzung="{$MaxNutzungDays}" data-maxpuffer="{$MaxPufferDays}">
 				{csrf_token}
 				<input type="hidden" name="resourceId" value="{$ResourceId}">
 				<input type="hidden" name="scheduleId" value="{$ScheduleId}">
@@ -352,7 +352,15 @@
 					</div>
 				{/if}
 
-				<div class="zhl-book-actions">
+				{* Client-seitige Live-Warnung: erscheint, SOBALD die gewählte Dauer/der Puffer das Limit reißt — VOR dem Absenden. *}
+					<div id="zhl-limit-warn" class="zhl-ueb-item req" style="margin-top:14px;display:none;">
+						<strong><svg class="zhl-ic" style="width:1.05em;height:1.05em;vertical-align:-0.16em;flex:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> Diese Ausleihe liegt über dem Standard-Limit</strong>
+						<ul id="zhl-limit-reasons" class="zhl-small" style="margin:6px 0 10px 1.2em;padding:0;"></ul>
+						<span class="zhl-muted zhl-small">Du kannst die Auswahl anpassen — oder, wenn du das Gerät wirklich länger brauchst, hier eine begründete Sonderfreigabe anfragen (dein gewähltes Fenster ist schon eingetragen):</span>
+						<div style="margin-top:8px;"><a id="zhl-limit-cta" class="zhl-btn zhl-btn-sm" target="_blank" rel="noopener" href="{$Path}zhl-dauer-ausnahme.php?rid={$ResourceId}"><svg class="zhl-ic" style="width:1.05em;height:1.05em;vertical-align:-0.16em;flex:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="10"/></svg> Sonderfreigabe anfragen</a></div>
+					</div>
+
+					<div class="zhl-book-actions">
 					<button class="zhl-btn" type="submit" id="zhl-submit" {if $Einf.blocked || ($Pickup && $Pickup.blocked && $Fulfillment != 'hauspost') || ($Return && $Return.blocked && $Fulfillment != 'hauspost')}disabled{/if}>Verbindlich buchen ▸</button>
 					{if $Einf.blocked}<span class="zhl-muted zhl-small" style="margin-left:10px;">Buchung erst möglich, wenn ein Einführungstermin frei ist.</span>{/if}
 					{if $Pickup && $Pickup.blocked && $Fulfillment != 'hauspost'}<span class="zhl-muted zhl-small" style="margin-left:10px;">Buchung erst möglich, wenn ein Abholtermin frei ist.</span>{/if}
@@ -389,8 +397,10 @@
 	function setSubmitBlocked(blocked, reason) { if (!submit) { return; } submit.disabled = blocked; submit.title = blocked && reason ? reason : ''; }
 	// Submit-Sperre als Zustand: Einführung blockiert immer (Pflicht), Abholung nur wenn NICHT Hauspost.
 	var pickupBlocked = false, einfBlocked = false, returnBlocked = false, slotsLoading = false;
+	var durationExceeded = false, durationReason = '';
 	function updateSubmitState() {
 		if (slotsLoading) { setSubmitBlocked(true, 'Termine werden geladen …'); return; }
+			if (durationExceeded) { setSubmitBlocked(true, durationReason); return; }
 		if (einfBlocked) { setSubmitBlocked(true, 'Kein Einführungstermin verfügbar — bitte anderen Ausleihstart wählen.'); return; }
 		if (pickupBlocked && curFulfillment() !== 'hauspost' && !combinedActive()) { setSubmitBlocked(true, 'Kein Abholtermin verfügbar — bitte anderen Ausleihstart wählen.'); return; }
 		if (returnBlocked && curFulfillment() !== 'hauspost') { setSubmitBlocked(true, 'Kein Rückgabetermin verfügbar — bitte anderes Ausleihende wählen.'); return; }
@@ -401,6 +411,55 @@
 		pickupBlocked = !!(pickupWrap && pickupWrap.getAttribute('data-mandatory') === '1' && !pickupWrap.querySelector('input[name=pickup_slot]'));
 		returnBlocked = !!(returnWrap && returnWrap.getAttribute('data-mandatory') === '1' && !returnWrap.querySelector('input[name=return_slot]'));
 	}
+
+		// --- SPEC-AUSLEIHDAUER-LIMIT: Client-seitige Live-Prüfung (Dauer + Puffer) VOR dem Absenden ---
+		var bookForm = submit ? submit.closest('form') : document.querySelector('form.zhl-book-card');
+		var maxNutz = bookForm ? (parseInt(bookForm.getAttribute('data-maxnutzung'), 10) || 14) : 14;
+		var maxPufRaw = bookForm ? bookForm.getAttribute('data-maxpuffer') : null;
+		var maxPuf = (maxPufRaw === null || maxPufRaw === '' || isNaN(parseInt(maxPufRaw, 10))) ? 5 : parseInt(maxPufRaw, 10);
+		var limitWarn = document.getElementById('zhl-limit-warn');
+		var limitReasons = document.getElementById('zhl-limit-reasons');
+		var limitCta = document.getElementById('zhl-limit-cta');
+		function dayDiff(a, b) { var t1 = Date.parse(a + 'T00:00:00'), t2 = Date.parse(b + 'T00:00:00'); if (isNaN(t1) || isNaN(t2)) { return 0; } return Math.round((t2 - t1) / 86400000); }
+		function usageWindow() {
+			var ds = document.getElementById('dayStart'), de = document.getElementById('dayEnd'), sd = document.getElementById('slotDay');
+			if (ds && de && ds.value && de.value) { return { start: ds.value, end: de.value, nutz: dayDiff(ds.value, de.value) }; }
+			if (sd && sd.value) { return { start: sd.value, end: sd.value, nutz: 1 }; }
+			return null;
+		}
+		function selectedSlotDay(wrap, name) {
+			if (!wrap) { return null; }
+			var r = wrap.querySelector('input[name=' + name + ']:checked');
+			if (!r) { return null; }
+			var box = r.closest('.zhl-pickup-times');
+			return box ? box.getAttribute('data-day') : null;
+		}
+		function checkDurationLimit() {
+			durationExceeded = false; durationReason = '';
+			var reasons = [];
+			var u = usageWindow();
+			if (u) {
+				if (u.nutz > maxNutz) { reasons.push('Nutzungsdauer ' + u.nutz + ' Tage — Maximum ' + maxNutz + '.'); }
+				var pday = combinedActive() ? selectedSlotDay(einfWrap, 'einf_slot') : selectedSlotDay(pickupWrap, 'pickup_slot');
+				if (pday) { var pv = dayDiff(pday, u.start); if (pv > maxPuf) { reasons.push('Abholung ' + pv + ' Tage vor Nutzungsbeginn — Maximum ' + maxPuf + '.'); } }
+				var rday = selectedSlotDay(returnWrap, 'return_slot');
+				if (rday) { var pn = dayDiff(u.end, rday); if (pn > maxPuf) { reasons.push('Rückgabe ' + pn + ' Tage nach Nutzungsende — Maximum ' + maxPuf + '.'); } }
+			}
+			if (reasons.length && limitWarn) {
+				durationExceeded = true;
+				durationReason = 'Über dem Standard-Limit — Auswahl anpassen oder Sonderfreigabe anfragen.';
+				if (limitReasons) { limitReasons.innerHTML = reasons.map(function (r) { return '<li>' + esc(r) + '</li>'; }).join(''); }
+				if (limitCta && bookForm) {
+					var base = bookForm.getAttribute('action').replace(/zhl-book\.php.*$/, '');
+					var pt = projTitle ? encodeURIComponent(projTitle.value || '') : '';
+					limitCta.href = base + 'zhl-dauer-ausnahme.php?rid=' + encodeURIComponent(ridEl ? ridEl.value : '') + '&start=' + encodeURIComponent(u.start) + '&end=' + encodeURIComponent(u.end) + '&pt=' + pt;
+				}
+				limitWarn.style.display = '';
+			} else if (limitWarn) {
+				limitWarn.style.display = 'none';
+			}
+			updateSubmitState();
+		}
 
 	// --- Abhol-/Einführungstermine client-seitig rendern (Struktur = Server-Render) ---
 	function renderPickup(vm) {
@@ -532,7 +591,7 @@
 			dStart.value = lo; dEnd.value = hi;
 			if (dLabel) { dLabel.textContent = (lo === hi) ? ('Ausleihe: ' + lo) : ('Ausleihe: ' + lo + ' – ' + hi); }
 			if (dWknd) { dWknd.style.display = sel.some(function (c) { return c.classList.contains('wknd'); }) ? '' : 'none'; }
-			loadSlots(lo, '', hi); // Rückgabe-Floor braucht den End-Tag (SPEC-RUECKGABE)
+			loadSlots(lo, '', hi); checkDurationLimit(); // Rückgabe-Floor braucht den End-Tag (SPEC-RUECKGABE)
 		}
 		function setOneDay(td) { anchorDay = td.getAttribute('data-day'); applyRange(anchorDay, anchorDay); }
 		mgrid.addEventListener('click', function (ev) {
@@ -605,6 +664,7 @@
 		if (isHp && hpTitel && projTitle && hpTitel.value === '') { hpTitel.value = projTitle.value; }
 		if (combinedNote) { combinedNote.style.display = zusammen ? '' : 'none'; }
 		applyEinfRequired();
+		checkDurationLimit();
 		updateSubmitState();
 	}
 	recomputeBlockedFromDom(); // Anfangszustand aus dem Server-Render übernehmen
@@ -628,6 +688,7 @@
 	bindDayChips(pickupWrap);
 	bindDayChips(einfWrap);
 	bindDayChips(returnWrap);
+		[pickupWrap, einfWrap, returnWrap].forEach(function (w) { if (w) { w.addEventListener('change', checkDurationLimit); } });
 
 	// --- Wochen-Raster (Slotmodus): freie Zeitspanne anklicken → Termine zum START laden. ---
 	var grid = document.querySelector('.zhl-weekgrid');
@@ -641,7 +702,7 @@
 			clearSel(); td.classList.add('sel');
 			sD.value = td.getAttribute('data-day'); sB.value = td.getAttribute('data-b'); sE.value = td.getAttribute('data-e');
 			if (label) { label.textContent = sD.value + '  ' + sB.value + '–' + sE.value; }
-			loadSlots(sD.value, sB.value, sD.value);
+			loadSlots(sD.value, sB.value, sD.value); checkDurationLimit();
 		}
 		grid.addEventListener('click', function (ev) {
 			var td = ev.target.closest('td.s-free'); if (!td) { return; }
@@ -654,7 +715,7 @@
 			for (var j = lo; j <= hi; j++) { cells[j].classList.add('sel'); }
 			sD.value = cells[lo].getAttribute('data-day'); sB.value = cells[lo].getAttribute('data-b'); sE.value = cells[hi].getAttribute('data-e');
 			if (label) { label.textContent = sD.value + '  ' + sB.value + '–' + sE.value; }
-			loadSlots(sD.value, sB.value, sD.value);
+			loadSlots(sD.value, sB.value, sD.value); checkDurationLimit();
 			anchor = null;
 		});
 	}

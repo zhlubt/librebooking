@@ -40,6 +40,9 @@
 			<div class="zhl-book-errors">
 				<strong>Buchung nicht möglich:</strong>
 				<ul>{foreach from=$Errors item=e}<li>{$e|escape}</li>{/foreach}</ul>
+				<div style="margin-top:10px;">
+					<a class="zhl-btn zhl-btn-ghost zhl-btn-sm" href="{$Path}zhl-termin-anfrage.php?bundle={$BundleId}{if $ProjectTitle}&amp;pt={$ProjectTitle|escape:'url'}{/if}"><svg class="zhl-ic" style="width:1.05em;height:1.05em;vertical-align:-0.16em;flex:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> Passt der Zeitraum nicht? Wunschtermin anfragen</a>
+				</div>
 			</div>
 		{/if}
 
@@ -123,12 +126,15 @@
 				{if $AltGroups}
 					<div class="zhl-uplabel" style="margin-top:16px;">Alternativen wählen</div>
 					{foreach from=$AltGroups item=g}
-						<div class="zhl-einf-pick">
-							<div class="zhl-einf-head">{$g.group|escape} <span class="zhl-req">*</span></div>
+						<div class="zhl-einf-pick"{if $g.mode == 'multi'} data-altmulti="1"{/if}>
+							<div class="zhl-einf-head">{$g.group|capitalize|escape}{if $g.required} <span class="zhl-req">*</span>{/if}{if $g.mode == 'multi'} <span class="zhl-muted zhl-small">— mehrere möglich{if $g.required} (mind. eine){/if}</span>{/if}</div>
 							{foreach from=$g.options item=opt name=optl}
 								<label class="zhl-slot">
-									<input type="radio" name="alt_{$g.group|escape}" value="{$opt.type|escape}" required
-										{if isset($AltChoices[$g.group]) && $AltChoices[$g.group] == $opt.type}checked{elseif $smarty.foreach.optl.first && !isset($AltChoices[$g.group])}checked{/if}>
+									{if $g.mode == 'multi'}
+										<input type="checkbox" name="alt_{$g.group|escape}[]" value="{$opt.type|escape}"{if $opt.checked} checked{/if}>
+									{else}
+										<input type="radio" name="alt_{$g.group|escape}" value="{$opt.type|escape}" required{if $opt.checked} checked{/if}>
+									{/if}
 									<span>{$opt.type|escape}{if $opt.models} <span class="zhl-muted zhl-small">({foreach from=$opt.models item=m name=ml}{$m|escape}{if !$smarty.foreach.ml.last}, {/if}{/foreach})</span>{/if}</span>
 								</label>
 							{/foreach}
@@ -140,13 +146,16 @@
 				   (zhl-bundle-book.php?ajax=slots), damit die Termine gegen dein Datum gefiltert werden und
 				   kein Reload nötig ist (Titel/Auswahl bleiben erhalten). Datenattribute steuern das JS. *}
 				{if $EinfCertified}<div class="zhl-ueb-item ok" style="margin-top:16px;"><strong>✓ Du bist bereits eingeführt</strong></div>{/if}
-				{if $PickupActive || $EinfActive}
+				{if $PickupActive || $EinfActive || $ReturnActive}
 					<div id="zhl-slots"
 						data-bid="{$BundleId}"
 						data-pickup-active="{if $PickupActive}1{else}0{/if}"
 						data-pickup-mandatory="{if $PickupMandatory}1{else}0{/if}"
 						data-einf-active="{if $EinfActive}1{else}0{/if}"
+						data-return-active="{if $ReturnActive}1{else}0{/if}"
+						data-return-mandatory="{if $ReturnMandatory}1{else}0{/if}"
 						data-sel-pickup="{$SelPickupSlot|escape}"
+						data-sel-return="{$SelReturnSlot|escape}"
 						data-sel-einf="{$SelEinfSlot|escape}">
 						{if $CombineEligible}
 <div class="zhl-handovermode" style="margin-bottom:8px;">
@@ -157,9 +166,10 @@
 {else}
 <input type="hidden" name="handover_mode" value="getrennt">
 {/if}
-<p id="zhl-slot-hint" class="zhl-muted zhl-small" style="margin-top:16px;">⤴ Wähle oben den Aufnahme-Zeitraum — dann erscheinen hier die möglichen <strong>Abhol-</strong>{if $EinfActive} und <strong>Einführungs-</strong>{/if}termine.</p>
+<p id="zhl-slot-hint" class="zhl-muted zhl-small" style="margin-top:16px;">⤴ Wähle oben den Aufnahme-Zeitraum — dann erscheinen hier die möglichen <strong>Abhol-</strong>{if $EinfActive}, <strong>Einführungs-</strong>{/if}{if $ReturnActive} und <strong>Rückgabe-</strong>{/if}termine.</p>
 						<div id="zhl-pickup-wrap"></div>
 						<div id="zhl-einf-wrap"></div>
+						<div id="zhl-return-wrap"></div>
 					</div>
 				{/if}
 
@@ -226,6 +236,7 @@
 	var hint = document.getElementById('zhl-slot-hint');
 	var pickupWrap = document.getElementById('zhl-pickup-wrap');
 	var einfWrap = document.getElementById('zhl-einf-wrap');
+	var returnWrap = document.getElementById('zhl-return-wrap');
 	var hmRadios = document.querySelectorAll('.zhl-hm-radio');
 	var lastVm = null;
 	function curMode() { var v = 'zusammen'; hmRadios.forEach(function (r) { if (r.checked) { v = r.value; } }); return v; }
@@ -236,13 +247,18 @@
 		if (combined) { if (pickupWrap) { pickupWrap.innerHTML = ''; } }
 		else { pBlock = renderPickup(lastVm ? lastVm.pickup : null); }
 		var eBlock = renderEinf(lastVm ? lastVm.einf : null, combined);
+		var rBlock = renderReturn(lastVm ? lastVm.return : null);
 		var needEinf = slotBox && slotBox.getAttribute('data-einf-active') === '1';
 		var needPickup = !combined && slotBox && slotBox.getAttribute('data-pickup-mandatory') === '1';
+		var needReturn = slotBox && slotBox.getAttribute('data-return-mandatory') === '1';
 		if (eBlock && needEinf) { setSubmitBlocked(true, 'Kein Einführungstermin verfügbar — bitte anderen Zeitraum wählen.'); }
 		else if (pBlock && needPickup) { setSubmitBlocked(true, 'Kein Abholtermin verfügbar — bitte anderen Zeitraum wählen.'); }
+		else if (rBlock && needReturn) { setSubmitBlocked(true, 'Kein Rückgabetermin verfügbar — bitte anderen Zeitraum wählen.'); }
 		else { setSubmitBlocked(false); }
 	}
-	hmRadios.forEach(function (r) { r.addEventListener('change', applyMode); });
+	// Modus-Wechsel (zusammen/getrennt): erst neu rendern; im Tagesmodus zusätzlich Slots neu laden,
+	// da der Einführungs-Slot-Filter (Task B) serverseitig vom Modus abhängt.
+	hmRadios.forEach(function (r) { r.addEventListener('change', function () { applyMode(); var ds = document.getElementById('dayStart'); if (ds && ds.value) { loadSlots(ds.value); } }); });
 	function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]; }); }
 
 	// --- Termine (Abholung/Einführung) per AJAX zum gewählten Start laden — ohne Reload. ---
@@ -280,6 +296,34 @@
 		pickupWrap.innerHTML = h;
 		return false;
 	}
+	function renderReturn(vm) {
+		if (!returnWrap) { return false; }
+		if (!vm) { returnWrap.innerHTML = ''; return false; }
+		if (!vm.days || !vm.days.length) {
+			returnWrap.innerHTML = '<div class="zhl-ueb-item req" style="margin-top:16px;"><strong><svg class="zhl-ic" style="width:1.05em;height:1.05em;vertical-align:-0.16em;flex:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg> Kein Rückgabetermin verfügbar</strong> <span class="zhl-muted zhl-small">' +
+				(vm.earliestLabel ? 'Frühester Termin: ' + esc(vm.earliestLabel) + '.' : 'Aktuell kein Rückgabetermin frei.') + '</span></div>';
+			return vm.mandatory === true; // blockiert nur, wenn Rückgabe Pflicht ist
+		}
+		var sel = slotBox.getAttribute('data-sel-return') || '';
+		var selDay = '';
+		var req = vm.mandatory ? ' <span class="zhl-req">*</span>' : '';
+		var h = '<div class="zhl-uplabel" style="margin-top:16px;">Rückgabe</div><div class="zhl-einf-pick zhl-pickup">' +
+			'<div class="zhl-einf-head">Rückgabetermin wählen' + req + ' <span class="zhl-muted zhl-small">— am/nach dem Nutzungsende</span></div><div class="zhl-pickup-daybar">';
+		vm.days.forEach(function (d) { if ((d.slots || []).some(function (s) { return s.slot_id === sel; })) { selDay = d.date; } });
+		vm.days.forEach(function (d, i) { var act = (selDay ? d.date === selDay : i === 0); h += '<button type="button" class="zhl-pickup-day' + (act ? ' active' : '') + '" data-day="' + esc(d.date) + '">' + esc(d.label) + '</button>'; });
+		h += '</div>';
+		vm.days.forEach(function (d, i) {
+			var act = (selDay ? d.date === selDay : i === 0);
+			h += '<div class="zhl-pickup-times" data-day="' + esc(d.date) + '"' + (act ? '' : ' style="display:none;"') + '>';
+			(d.slots || []).forEach(function (s) {
+				h += '<label class="zhl-pickup-pill"><input type="radio" name="return_slot" value="' + esc(s.slot_id) + '"' + (vm.mandatory ? ' required' : '') + (s.slot_id === sel ? ' checked' : '') + '><span>' + esc(s.timeLabel) + '</span></label>';
+			});
+			h += '</div>';
+		});
+		h += '</div>';
+		returnWrap.innerHTML = h;
+		return false;
+	}
 	function renderEinf(vm, combined) {
 		if (!einfWrap) { return false; }
 		if (!vm || vm.certified) { einfWrap.innerHTML = ''; return false; }
@@ -292,6 +336,11 @@
 		var selDay = '';
 		vm.days.forEach(function (d) { if ((d.slots || []).some(function (s) { return s.slot_id === sel; })) { selDay = d.date; } });
 		var note = combined ? '<div class="zhl-ueb-item ok" style="margin:8px 0;"><strong>✓ Ein Termin genügt</strong> <span class="zhl-muted zhl-small">Dieser Termin ist zugleich der Abholtermin — du bekommst die Geräte direkt im Anschluss.</span></div>' : '';
+		// Task A: Mehrere einführungspflichtige Geräte-Typen → EIN gemeinsamer Termin deckt alle ab.
+		if (vm.coveredDevices && vm.coveredDevices.length > 1) {
+			var devList = vm.coveredDevices.map(function (n) { return esc(n); }).join(', ');
+			note += '<div class="zhl-ueb-item ok" style="margin:8px 0;"><strong>✓ Eine Einführung für mehrere Geräte</strong> <span class="zhl-muted zhl-small">Dieser eine Termin führt dich in alle einführungspflichtigen Geräte dieses Bundles ein: ' + devList + '.</span></div>';
+		}
 		var h = '<div class="zhl-uplabel" style="margin-top:16px;">Einführung' + (combined ? ' &amp; Abholung' : '') + '</div>' + note + '<div class="zhl-einf-pick zhl-pickup">' +
 			'<div class="zhl-einf-head">' + (combined ? 'Termin für Einführung + Abholung' : 'Einführungstermin wählen') + ' <span class="zhl-req">*</span></div><div class="zhl-pickup-daybar">';
 		vm.days.forEach(function (d, i) { var act = (selDay ? d.date === selDay : i === 0); h += '<button type="button" class="zhl-pickup-day' + (act ? ' active' : '') + '" data-day="' + esc(d.date) + '">' + esc(d.label) + '</button>'; });
@@ -315,17 +364,31 @@
 		boxes.forEach(function (b) { if (b.checked) { qs += '&keep_item%5B%5D=' + encodeURIComponent(b.value); } });
 		return qs;
 	}
+	// E1: gewählte Alternativ-Optionen (choice-Gruppen) mitgeben, damit der Server die Abhol-/Einführungs-
+	// Slots nur gegen die TATSÄCHLICH gewählte Option filtert (sonst gilt ein Slot als frei, sobald
+	// IRGENDEINE Option der Gruppe frei ist — auch die nicht gewählte). Auto-Gruppen haben keine Radios.
+	function altQuery() {
+		var qs = '';
+		document.querySelectorAll('input[type="radio"][name^="alt_"]:checked').forEach(function (r) {
+			qs += '&' + encodeURIComponent(r.name) + '=' + encodeURIComponent(r.value);
+		});
+		return qs;
+	}
 	function loadSlots(startYmd) {
 		if (!slotBox || !startYmd) { return; }
 		var bid = slotBox.getAttribute('data-bid');
-		var needsSlot = (slotBox.getAttribute('data-einf-active') === '1') || (slotBox.getAttribute('data-pickup-mandatory') === '1');
+		// Task B: Nutzungs-Ende mitgeben → der Server filtert Abhol-/Einführungs-Slots gegen die
+		// Geräte-Verfügbarkeit über [Abholtag … Nutzungsende].
+		var endYmd = (dEnd && dEnd.value) ? dEnd.value : startYmd;
+		var needsSlot = (slotBox.getAttribute('data-einf-active') === '1') || (slotBox.getAttribute('data-pickup-mandatory') === '1') || (slotBox.getAttribute('data-return-mandatory') === '1');
 		var token = ++fetchToken;
 		// Während des Ladens: alte (zum alten Datum gehörende) Termine entfernen + bei Pflicht-Terminen Submit sperren.
 		if (pickupWrap) { pickupWrap.innerHTML = ''; }
 		if (einfWrap) { einfWrap.innerHTML = ''; }
+		if (returnWrap) { returnWrap.innerHTML = ''; }
 		if (needsSlot) { setSubmitBlocked(true, 'Termine werden geladen …'); }
 		if (hint) { hint.innerHTML = '<svg class="zhl-ic" style="width:1.05em;height:1.05em;vertical-align:-0.16em;flex:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> Termine werden geladen …'; hint.style.display = ''; }
-		fetch(window.location.pathname + '?ajax=slots&bid=' + encodeURIComponent(bid) + '&start=' + encodeURIComponent(startYmd) + keepQuery(), { headers: { 'X-Requested-With': 'fetch' } })
+		fetch(window.location.pathname + '?ajax=slots&bid=' + encodeURIComponent(bid) + '&start=' + encodeURIComponent(startYmd) + '&end=' + encodeURIComponent(endYmd) + '&mode=' + encodeURIComponent(curMode()) + keepQuery() + altQuery(), { headers: { 'X-Requested-With': 'fetch' } })
 			.then(function (r) { if (!r.ok) { throw new Error('http'); } return r.json(); })
 			.then(function (j) {
 				if (token !== fetchToken) { return; } // veraltete Antwort verwerfen
@@ -345,6 +408,15 @@
 	// können sich dadurch ändern). Nutzt den aktuell gewählten Aufnahme-Start (Hidden dayStart).
 	document.querySelectorAll('.zhl-keep-list input[name="keep_item[]"]').forEach(function (b) {
 		b.addEventListener('change', function () {
+			var ds = document.getElementById('dayStart');
+			if (ds && ds.value) { loadSlots(ds.value); }
+		});
+	});
+
+	// E1: Wechselt der Nutzer eine Alternativ-Option (Stativ↔Gimbal o.ä.), die Slots neu gegen die
+	// nun gewählte Option filtern (ein zuvor passender Slot kann mit der anderen Option belegt sein).
+	document.querySelectorAll('input[type="radio"][name^="alt_"]').forEach(function (r) {
+		r.addEventListener('change', function () {
 			var ds = document.getElementById('dayStart');
 			if (ds && ds.value) { loadSlots(ds.value); }
 		});
@@ -399,6 +471,7 @@
 	}
 	bindDayChips(pickupWrap);
 	bindDayChips(einfWrap);
+	bindDayChips(returnWrap);
 
 	// Folge-Phase: Dauer-Auswahl ein-/ausblenden.
 	var afterChk = document.getElementById('afterChosen');

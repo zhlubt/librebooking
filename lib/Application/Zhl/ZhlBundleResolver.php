@@ -137,12 +137,21 @@ class ZhlBundleResolver
         // Option im Hauptloop scheitern — OHNE automatischen Rück-Fall auf die nächste Priorität. Für
         // unabhängige Gruppen (Mikrofone mit eigenem Geräte-Typ) tritt das nicht auf.
         $autoGroups = [];
+        // Multi-Wahl-Gruppen (alt_mode='multi'): der Nutzer darf MEHRERE Optionen zugleich wählen
+        // (z. B. Stativ UND Gimbal). $altChoices[group] ist dann ein Array von type_labels. Die
+        // Pflicht („mind. eine") gilt auf GRUPPEN-Ebene, nicht je Option: eine gewählte, aber nicht
+        // freie Option macht die Phase NICHT unerfüllbar, solange eine andere gewählte Option aufgeht.
+        $multiGroups = [];
         foreach ($items as $row) {
             $g = (isset($row['alt_group']) && $row['alt_group'] !== '') ? (string)$row['alt_group'] : null;
             if ($g !== null && (string)($row['alt_mode'] ?? 'choice') === 'auto') {
                 $autoGroups[$g] = true;
             }
+            if ($g !== null && (string)($row['alt_mode'] ?? 'choice') === 'multi') {
+                $multiGroups[$g] = true;
+            }
         }
+        $multiGroupSatisfied = []; // group => true, sobald eine gewählte Option genug freie Einheiten hat
         $autoOrder = []; // group => [ ['type'=>label,'qty'=>n], ... ] in Prioritäts-Reihenfolge (alle Mitglieder)
         foreach ($items as $row) {
             $g = (isset($row['alt_group']) && $row['alt_group'] !== '') ? (string)$row['alt_group'] : null;
@@ -202,8 +211,13 @@ class ZhlBundleResolver
             // eine fehlende/gefälschte Wahl darf eine erforderliche Gruppe nicht still verschwinden
             // lassen (sonst würde jede Nicht-Treffer-Option als „erfüllt" markiert).
             if ($altGroup !== null) {
-                $chosen = isset($altChoices[$altGroup]) ? (string)$altChoices[$altGroup] : null;
-                $validChoice = $chosen !== null && isset($altGroupOptions[$altGroup][$chosen]);
+                // Wahl kann String (choice/auto) ODER Array (multi) sein → auf eine Menge normalisieren.
+                $sel = $altChoices[$altGroup] ?? null;
+                $chosenSet = is_array($sel)
+                    ? array_flip(array_map('strval', $sel))
+                    : ($sel !== null && (string)$sel !== '' ? [(string)$sel => true] : []);
+                // Gültig = mind. eine gewählte Option ist eine echte Option dieser Gruppe.
+                $validChoice = !empty(array_intersect_key($chosenSet, $altGroupOptions[$altGroup] ?? []));
                 $required = !empty($altGroupRequired[$altGroup]);
 
                 if (!$validChoice) {
@@ -221,7 +235,7 @@ class ZhlBundleResolver
                     $phase->items[] = $ri;
                     continue;
                 }
-                if ($chosen !== $typeLabel) {
+                if (!isset($chosenSet[$typeLabel])) {
                     // gültige Wahl, aber nicht DIESE Option: überspringen (die gewählte Option-Zeile
                     // wird separat aufgelöst und entscheidet über die Erfüllung der Gruppe).
                     $ri->satisfied = true;
@@ -265,13 +279,31 @@ class ZhlBundleResolver
 
             $ri->resolvedResourceIds = $picked;
             $ri->satisfied = count($picked) >= $quantity;
-            if ($ri->required && !$ri->satisfied) {
+            if ($altGroup !== null && !empty($multiGroups[$altGroup])) {
+                // Multi-Gruppe: Pflicht auf Gruppen-Ebene. Eine gewählte, aber nicht freie Option
+                // darf die Phase nicht kippen — nur wenn KEINE gewählte Option frei ist (Post-Loop).
+                if ($ri->satisfied) {
+                    $multiGroupSatisfied[$altGroup] = true;
+                }
+            } elseif ($ri->required && !$ri->satisfied) {
                 $phase->satisfiable = false;
                 if ($phase->error === null) {
                     $phase->error = 'Nicht genügend freie Einheiten vom Typ „' . $typeLabel . '" im gewählten Zeitraum.';
                 }
             }
             $phase->items[] = $ri;
+        }
+
+        // Multi-Gruppen: mind. eine GEWÄHLTE Option muss frei sein (Pflicht auf Gruppen-Ebene). Der
+        // Fall „gar nichts gewählt" ist oben über $validChoice bereits behandelt; hier greift nur
+        // „gewählt, aber keine der gewählten Optionen im Zeitraum frei".
+        foreach ($multiGroups as $g => $_) {
+            if (!empty($altGroupRequired[$g]) && empty($altGroupFailed[$g]) && empty($multiGroupSatisfied[$g])) {
+                $phase->satisfiable = false;
+                if ($phase->error === null) {
+                    $phase->error = 'Keine deiner gewählten Optionen für „' . $g . '" ist im gewählten Zeitraum frei — bitte eine andere Option oder andere Tage wählen.';
+                }
+            }
         }
 
         $phase->scheduleId = $scheduleId;

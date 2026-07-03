@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<title>ZHL Selbst-Rückgabe — Ablageort-QR-Codes</title>
+<style>
+  @page { size: A4; margin: 18mm; }
+  body { font-family: system-ui, -apple-system, Arial, sans-serif; color:#1a1a1a; }
+  h1 { color:#009260; font-size:20px; margin:0 0 4px; }
+  .sub { color:#555; font-size:12px; margin:0 0 20px; }
+  .grid { display:flex; gap:24px; flex-wrap:wrap; }
+  .card { flex:1 1 45%; border:2px solid #009260; border-radius:12px; padding:18px;
+          text-align:center; page-break-inside:avoid; }
+  .card h2 { margin:0 0 10px; font-size:22px; color:#007a50; }
+  .card img { width:260px; height:260px; }
+  .card .hint { margin-top:10px; font-size:12px; color:#444; }
+  .steps { margin-top:26px; font-size:12px; color:#333; line-height:1.5; }
+  .steps b { color:#009260; }
+</style>
+</head>
+<body>
+  <h1>ZHL Medienausleihe — Selbst-Rückgabe</h1>
+  <p class="sub">QR am Ablageort scannen → einloggen oder per E-Mail anmelden → Medien wählen → Foto → fertig.</p>
+
+  <div class="grid">
+    <div class="card">
+      <h2>Cateringwagen</h2>
+      <img src="qr-cateringwagen.png" alt="QR Cateringwagen">
+      <div class="hint">Bitte die Medien sichtbar in die vorgesehene Box legen und hier fotografieren.</div>
+    </div>
+    <div class="card">
+      <h2>Videostudio</h2>
+      <img src="qr-videostudio.png" alt="QR Videostudio">
+      <div class="hint">Bitte die Medien an der vorgesehenen Ablage platzieren und hier fotografieren.</div>
+    </div>
+  </div>
+
+  <div class="steps">
+    <p><b>Test-Ablauf (zwei Orte):</b> Beide QR-Codes nacheinander scannen. Erwartet:
+    jeder Code öffnet die Rückgabe-Seite mit <i>genau seinem</i> Ort im Titel
+    (Cateringwagen bzw. Videostudio). Eine gemeldete Rückgabe erscheint für das Team
+    in der Übergabe-Checkliste und bleibt gesperrt, bis das Team sie bestätigt.</p>
+  </div>
+</body>
+</html>

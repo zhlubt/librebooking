@@ -21,4 +21,9 @@ return [
     // Label des Terminplaner-Termintyps für die Medien-Abholung (type_id 35).
     // Wird vom inline Abhol-Slot-Picker (C1) an lesson_slots.php/book_slot.php übergeben.
     'handover_type_label' => 'Übergabe Medien',
+
+    // Optional: mehrere Namensvarianten des Abhol-/Rückgabe-Termintyps abfragen und zusammenführen —
+    // einzelne Personen benennen ihren Termintyp auf meet.zhl-ubt.de uneinheitlich. Wenn gesetzt (Array),
+    // überschreibt diese Liste den Default aus ZhlBookPresenter::handoverTypeLabels() vollständig.
+    // 'handover_type_labels' => ['Übergabe Medien', 'Medienübergabe', 'Abholung/Abgabe'],
 ];

@@ -352,8 +352,8 @@ class ZhlBundleBookPresenter
             }
             if ($pickupSlot !== '') {
                 $loanStartUtc = $this->slotCutoffUtc($dayStartRaw, $tz);
-                $typeLabel = $this->tpConfig()['handover_type_label'] ?? 'Übergabe Medien';
-                $f = $this->fetchHandoverSlots($typeLabel, $pickupNeed['tp_member_id'], $loanStartUtc, $tz);
+                $typeLabels = $this->handoverTypeLabels();
+                $f = $this->fetchHandoverSlots($typeLabels, $pickupNeed['tp_member_id'], $loanStartUtc, $tz);
                 $resolved = null;
                 foreach ($f['slots'] as $s) {
                     if ((string)$s['slot_id'] === (string)$pickupSlot) {
@@ -390,8 +390,8 @@ class ZhlBundleBookPresenter
             }
             if ($returnSlot !== '') {
                 $floorUtc = $this->returnFloorUtc($dayStartRaw, '09:00', $dayEndRaw, $tz);
-                $typeLabel = $this->tpConfig()['handover_type_label'] ?? 'Übergabe Medien';
-                $rf = $this->fetchReturnSlots($typeLabel, $returnNeed['tp_member_id'], $floorUtc, $tz);
+                $typeLabels = $this->handoverTypeLabels();
+                $rf = $this->fetchReturnSlots($typeLabels, $returnNeed['tp_member_id'], $floorUtc, $tz);
                 $rResolved = null;
                 foreach ($rf['slots'] as $s) {
                     if ((string)$s['slot_id'] === (string)$returnSlot) {
@@ -1315,7 +1315,7 @@ class ZhlBundleBookPresenter
         }
         $ueb = $this->lookupUebergabe($db, $rid);
         $loanStartUtc = $this->slotCutoffUtc($aroundYmd, $tz);
-        $f = $this->fetchHandoverSlots($this->tpConfig()['handover_type_label'] ?? 'Übergabe Medien', $ueb['tp_member_id'], $loanStartUtc, $tz);
+        $f = $this->fetchHandoverSlots($this->handoverTypeLabels(), $ueb['tp_member_id'], $loanStartUtc, $tz);
         $mandatory = !$user->IsAdmin;
         return [
             'mandatory' => $mandatory,
@@ -1339,7 +1339,7 @@ class ZhlBundleBookPresenter
         }
         $ueb = $this->lookupUebergabe($db, $rid);
         $floorUtc = $this->returnFloorUtc($startYmd, '09:00', $endYmd, $tz);
-        $f = $this->fetchReturnSlots($this->tpConfig()['handover_type_label'] ?? 'Übergabe Medien', $ueb['tp_member_id'], $floorUtc, $tz);
+        $f = $this->fetchReturnSlots($this->handoverTypeLabels(), $ueb['tp_member_id'], $floorUtc, $tz);
         $mandatory = !$user->IsAdmin;
         return [
             'mandatory' => $mandatory,
@@ -1556,6 +1556,24 @@ class ZhlBundleBookPresenter
         return is_array($c) ? $c : [];
     }
 
+    /** Termintyp-Label(s) für Abholung/Rückgabe — Spiegel von ZhlBookPresenter::handoverTypeLabels. */
+    private function handoverTypeLabels(): array
+    {
+        $c = $this->tpConfig();
+        if (!empty($c['handover_type_labels']) && is_array($c['handover_type_labels'])) {
+            $labels = array_values(array_filter(array_map('strval', $c['handover_type_labels']), fn($l) => $l !== ''));
+            if ($labels) {
+                return $labels;
+            }
+        }
+        $defaults = ['Übergabe Medien', 'Medienübergabe', 'Abholung/Abgabe'];
+        $legacy = !empty($c['handover_type_label']) ? (string)$c['handover_type_label'] : null;
+        if ($legacy !== null && !in_array($legacy, $defaults, true)) {
+            $defaults[] = $legacy;
+        }
+        return $defaults;
+    }
+
     private function tpRequest(string $method, string $path, array $query = [], ?array $body = null): ?array
     {
         $c = $this->tpConfig();
@@ -1642,48 +1660,51 @@ class ZhlBundleBookPresenter
         return $out;
     }
 
-    private function fetchHandoverSlots(?string $typeLabel, ?int $memberId, ?string $loanStartUtc, $tz): array
+    private function fetchHandoverSlots(array $typeLabels, ?int $memberId, ?string $loanStartUtc, $tz): array
     {
         $out = ['slots' => [], 'earliestLabel' => null, 'typeId' => null, 'memberId' => null];
-        if ($typeLabel === null || $typeLabel === '') {
-            return $out;
-        }
-        $q = ['type_label' => $typeLabel];
-        if ($memberId) {
-            $q['member_id'] = $memberId;
-        }
-        $resp = $this->tpRequest('GET', '/api/lesson_slots.php', $q);
-        if (!$resp || empty($resp['members'])) {
+        $typeLabels = array_values(array_unique(array_filter(array_map('strval', $typeLabels), fn($l) => $l !== '')));
+        if (!$typeLabels) {
             return $out;
         }
         $earliest = null;
-        foreach ($resp['members'] as $mem) {
-            $out['typeId'] = $out['typeId'] ?? (isset($mem['type_id']) ? (int)$mem['type_id'] : null);
-            $out['memberId'] = $out['memberId'] ?? (isset($mem['member_id']) ? (int)$mem['member_id'] : null);
-            foreach ($mem['slots'] ?? [] as $s) {
-                $startUtc = $s['start_utc'] ?? null;
-                $endUtc = $s['end_utc'] ?? null;
-                if (!$startUtc) {
-                    continue;
+        foreach ($typeLabels as $typeLabel) {
+            $q = ['type_label' => $typeLabel];
+            if ($memberId) {
+                $q['member_id'] = $memberId;
+            }
+            $resp = $this->tpRequest('GET', '/api/lesson_slots.php', $q);
+            if (!$resp || empty($resp['members'])) {
+                continue;
+            }
+            foreach ($resp['members'] as $mem) {
+                $out['typeId'] = $out['typeId'] ?? (isset($mem['type_id']) ? (int)$mem['type_id'] : null);
+                $out['memberId'] = $out['memberId'] ?? (isset($mem['member_id']) ? (int)$mem['member_id'] : null);
+                foreach ($mem['slots'] ?? [] as $s) {
+                    $startUtc = $s['start_utc'] ?? null;
+                    $endUtc = $s['end_utc'] ?? null;
+                    if (!$startUtc) {
+                        continue;
+                    }
+                    if ($earliest === null || $startUtc < $earliest) {
+                        $earliest = $startUtc;
+                    }
+                    if ($loanStartUtc !== null && $endUtc !== null && $endUtc > $loanStartUtc) {
+                        continue;
+                    }
+                    if ($loanStartUtc !== null && $endUtc === null && $startUtc >= $loanStartUtc) {
+                        continue;
+                    }
+                    $out['slots'][] = [
+                        'slot_id' => (string)$s['slot_id'],
+                        'label' => (string)($s['label'] ?? $startUtc),
+                        'start_utc' => (string)$startUtc,
+                        'end_utc' => $endUtc !== null ? (string)$endUtc : null,
+                        'type_id' => isset($mem['type_id']) ? (int)$mem['type_id'] : null,
+                        'member_id' => isset($mem['member_id']) ? (int)$mem['member_id'] : null,
+                        'member_name' => isset($mem['member_name']) ? (string)$mem['member_name'] : null,
+                    ];
                 }
-                if ($earliest === null || $startUtc < $earliest) {
-                    $earliest = $startUtc;
-                }
-                if ($loanStartUtc !== null && $endUtc !== null && $endUtc > $loanStartUtc) {
-                    continue;
-                }
-                if ($loanStartUtc !== null && $endUtc === null && $startUtc >= $loanStartUtc) {
-                    continue;
-                }
-                $out['slots'][] = [
-                    'slot_id' => (string)$s['slot_id'],
-                    'label' => (string)($s['label'] ?? $startUtc),
-                    'start_utc' => (string)$startUtc,
-                    'end_utc' => $endUtc !== null ? (string)$endUtc : null,
-                    'type_id' => isset($mem['type_id']) ? (int)$mem['type_id'] : null,
-                    'member_id' => isset($mem['member_id']) ? (int)$mem['member_id'] : null,
-                    'member_name' => isset($mem['member_name']) ? (string)$mem['member_name'] : null,
-                ];
             }
         }
         if ($earliest !== null) {
@@ -1910,45 +1931,48 @@ class ZhlBundleBookPresenter
     }
 
     /** Rückgabe-Slots (Typ „Übergabe Medien", Slot-START ab Floor). Spiegel von ZhlBookPresenter. */
-    private function fetchReturnSlots(?string $typeLabel, ?int $memberId, ?string $floorUtc, $tz): array
+    private function fetchReturnSlots(array $typeLabels, ?int $memberId, ?string $floorUtc, $tz): array
     {
         $out = ['slots' => [], 'earliestLabel' => null, 'typeId' => null, 'memberId' => null];
-        if ($typeLabel === null || $typeLabel === '') {
-            return $out;
-        }
-        $q = ['type_label' => $typeLabel];
-        if ($memberId) {
-            $q['member_id'] = $memberId;
-        }
-        $resp = $this->tpRequest('GET', '/api/lesson_slots.php', $q);
-        if (!$resp || empty($resp['members'])) {
+        $typeLabels = array_values(array_unique(array_filter(array_map('strval', $typeLabels), fn($l) => $l !== '')));
+        if (!$typeLabels) {
             return $out;
         }
         $earliest = null;
-        foreach ($resp['members'] as $mem) {
-            $out['typeId'] = $out['typeId'] ?? (isset($mem['type_id']) ? (int)$mem['type_id'] : null);
-            $out['memberId'] = $out['memberId'] ?? (isset($mem['member_id']) ? (int)$mem['member_id'] : null);
-            foreach ($mem['slots'] ?? [] as $s) {
-                $startUtc = $s['start_utc'] ?? null;
-                $endUtc = $s['end_utc'] ?? null;
-                if (!$startUtc) {
-                    continue;
+        foreach ($typeLabels as $typeLabel) {
+            $q = ['type_label' => $typeLabel];
+            if ($memberId) {
+                $q['member_id'] = $memberId;
+            }
+            $resp = $this->tpRequest('GET', '/api/lesson_slots.php', $q);
+            if (!$resp || empty($resp['members'])) {
+                continue;
+            }
+            foreach ($resp['members'] as $mem) {
+                $out['typeId'] = $out['typeId'] ?? (isset($mem['type_id']) ? (int)$mem['type_id'] : null);
+                $out['memberId'] = $out['memberId'] ?? (isset($mem['member_id']) ? (int)$mem['member_id'] : null);
+                foreach ($mem['slots'] ?? [] as $s) {
+                    $startUtc = $s['start_utc'] ?? null;
+                    $endUtc = $s['end_utc'] ?? null;
+                    if (!$startUtc) {
+                        continue;
+                    }
+                    if ($floorUtc !== null && strcmp((string)$startUtc, $floorUtc) < 0) {
+                        continue;
+                    }
+                    if ($earliest === null || $startUtc < $earliest) {
+                        $earliest = $startUtc;
+                    }
+                    $out['slots'][] = [
+                        'slot_id' => (string)$s['slot_id'],
+                        'label' => (string)($s['label'] ?? $startUtc),
+                        'start_utc' => (string)$startUtc,
+                        'end_utc' => $endUtc !== null ? (string)$endUtc : null,
+                        'type_id' => isset($mem['type_id']) ? (int)$mem['type_id'] : null,
+                        'member_id' => isset($mem['member_id']) ? (int)$mem['member_id'] : null,
+                        'member_name' => isset($mem['member_name']) ? (string)$mem['member_name'] : null,
+                    ];
                 }
-                if ($floorUtc !== null && strcmp((string)$startUtc, $floorUtc) < 0) {
-                    continue;
-                }
-                if ($earliest === null || $startUtc < $earliest) {
-                    $earliest = $startUtc;
-                }
-                $out['slots'][] = [
-                    'slot_id' => (string)$s['slot_id'],
-                    'label' => (string)($s['label'] ?? $startUtc),
-                    'start_utc' => (string)$startUtc,
-                    'end_utc' => $endUtc !== null ? (string)$endUtc : null,
-                    'type_id' => isset($mem['type_id']) ? (int)$mem['type_id'] : null,
-                    'member_id' => isset($mem['member_id']) ? (int)$mem['member_id'] : null,
-                    'member_name' => isset($mem['member_name']) ? (string)$mem['member_name'] : null,
-                ];
             }
         }
         if ($earliest !== null) {

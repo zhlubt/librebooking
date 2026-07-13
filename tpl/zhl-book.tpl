@@ -204,7 +204,7 @@
 										{foreach from=$d.slots item=s}
 											<label class="zhl-pickup-pill">
 												<input type="radio" name="pickup_slot" value="{$s.slot_id|escape}" {if $Pickup.selected == $s.slot_id}checked{/if} {if $Pickup.mandatory}required{/if}>
-												<span>{$s.timeLabel|escape}</span>
+												<span>{$s.timeLabel|escape}{if $s.memberName} · {$s.memberName|escape}{/if}</span>
 											</label>
 										{/foreach}
 									</div>
@@ -268,7 +268,7 @@
 										{foreach from=$d.slots item=s}
 											<label class="zhl-pickup-pill">
 												<input type="radio" name="einf_slot" value="{$s.slot_id|escape}" {if $Einfuehrung == 'notwendig'}required{/if}>
-												<span>{$s.timeLabel|escape}</span>
+												<span>{$s.timeLabel|escape}{if $s.memberName} · {$s.memberName|escape}{/if}</span>
 											</label>
 										{/foreach}
 									</div>
@@ -310,7 +310,7 @@
 										{foreach from=$d.slots item=s}
 											<label class="zhl-pickup-pill">
 												<input type="radio" name="return_slot" value="{$s.slot_id|escape}" {if $Return.selected == $s.slot_id}checked{/if} {if $Return.mandatory}required{/if}>
-												<span>{$s.timeLabel|escape}</span>
+												<span>{$s.timeLabel|escape}{if $s.memberName} · {$s.memberName|escape}{/if}</span>
 											</label>
 										{/foreach}
 									</div>
@@ -481,7 +481,7 @@
 		h += '</div>';
 		vm.days.forEach(function (d, i) {
 			h += '<div class="zhl-pickup-times" data-day="' + esc(d.date) + '"' + (i === 0 ? '' : ' style="display:none;"') + '>';
-			(d.slots || []).forEach(function (s) { h += '<label class="zhl-pickup-pill"><input type="radio" name="pickup_slot" value="' + esc(s.slot_id) + '"' + (mandatory ? ' required' : '') + '><span>' + esc(s.timeLabel) + '</span></label>'; });
+			(d.slots || []).forEach(function (s) { h += '<label class="zhl-pickup-pill"><input type="radio" name="pickup_slot" value="' + esc(s.slot_id) + '"' + (mandatory ? ' required' : '') + '><span>' + esc(s.timeLabel) + (s.memberName ? ' · ' + esc(s.memberName) : '') + '</span></label>'; });
 			h += '</div>';
 		});
 		h += '</div>';
@@ -508,7 +508,7 @@
 		h += '</div>';
 		vm.days.forEach(function (d, i) {
 			h += '<div class="zhl-pickup-times" data-day="' + esc(d.date) + '"' + (i === 0 ? '' : ' style="display:none;"') + '>';
-			(d.slots || []).forEach(function (s) { h += '<label class="zhl-pickup-pill"><input type="radio" name="einf_slot" value="' + esc(s.slot_id) + '"' + (required ? ' required' : '') + '><span>' + esc(s.timeLabel) + '</span></label>'; });
+			(d.slots || []).forEach(function (s) { h += '<label class="zhl-pickup-pill"><input type="radio" name="einf_slot" value="' + esc(s.slot_id) + '"' + (required ? ' required' : '') + '><span>' + esc(s.timeLabel) + (s.memberName ? ' · ' + esc(s.memberName) : '') + '</span></label>'; });
 			h += '</div>';
 		});
 		h += '</div>';
@@ -538,7 +538,7 @@
 		h += '</div>';
 		vm.days.forEach(function (d, i) {
 			h += '<div class="zhl-pickup-times" data-day="' + esc(d.date) + '"' + (i === 0 ? '' : ' style="display:none;"') + '>';
-			(d.slots || []).forEach(function (s) { h += '<label class="zhl-pickup-pill"><input type="radio" name="return_slot" value="' + esc(s.slot_id) + '"' + (mandatory ? ' required' : '') + '><span>' + esc(s.timeLabel) + '</span></label>'; });
+			(d.slots || []).forEach(function (s) { h += '<label class="zhl-pickup-pill"><input type="radio" name="return_slot" value="' + esc(s.slot_id) + '"' + (mandatory ? ' required' : '') + '><span>' + esc(s.timeLabel) + (s.memberName ? ' · ' + esc(s.memberName) : '') + '</span></label>'; });
 			h += '</div>';
 		});
 		h += '</div>';

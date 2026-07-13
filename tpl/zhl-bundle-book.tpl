@@ -288,7 +288,7 @@
 			var act = (selDay ? d.date === selDay : i === 0);
 			h += '<div class="zhl-pickup-times" data-day="' + esc(d.date) + '"' + (act ? '' : ' style="display:none;"') + '>';
 			(d.slots || []).forEach(function (s) {
-				h += '<label class="zhl-pickup-pill"><input type="radio" name="pickup_slot" value="' + esc(s.slot_id) + '"' + (vm.mandatory ? ' required' : '') + (s.slot_id === sel ? ' checked' : '') + '><span>' + esc(s.timeLabel) + '</span></label>';
+				h += '<label class="zhl-pickup-pill"><input type="radio" name="pickup_slot" value="' + esc(s.slot_id) + '"' + (vm.mandatory ? ' required' : '') + (s.slot_id === sel ? ' checked' : '') + '><span>' + esc(s.timeLabel) + (s.memberName ? ' · ' + esc(s.memberName) : '') + '</span></label>';
 			});
 			h += '</div>';
 		});
@@ -316,7 +316,7 @@
 			var act = (selDay ? d.date === selDay : i === 0);
 			h += '<div class="zhl-pickup-times" data-day="' + esc(d.date) + '"' + (act ? '' : ' style="display:none;"') + '>';
 			(d.slots || []).forEach(function (s) {
-				h += '<label class="zhl-pickup-pill"><input type="radio" name="return_slot" value="' + esc(s.slot_id) + '"' + (vm.mandatory ? ' required' : '') + (s.slot_id === sel ? ' checked' : '') + '><span>' + esc(s.timeLabel) + '</span></label>';
+				h += '<label class="zhl-pickup-pill"><input type="radio" name="return_slot" value="' + esc(s.slot_id) + '"' + (vm.mandatory ? ' required' : '') + (s.slot_id === sel ? ' checked' : '') + '><span>' + esc(s.timeLabel) + (s.memberName ? ' · ' + esc(s.memberName) : '') + '</span></label>';
 			});
 			h += '</div>';
 		});
@@ -348,7 +348,7 @@
 		vm.days.forEach(function (d, i) {
 			var act = (selDay ? d.date === selDay : i === 0);
 			h += '<div class="zhl-pickup-times" data-day="' + esc(d.date) + '"' + (act ? '' : ' style="display:none;"') + '>';
-			(d.slots || []).forEach(function (s) { h += '<label class="zhl-pickup-pill"><input type="radio" name="einf_slot" value="' + esc(s.slot_id) + '" required' + (s.slot_id === sel ? ' checked' : '') + '><span>' + esc(s.timeLabel) + '</span></label>'; });
+			(d.slots || []).forEach(function (s) { h += '<label class="zhl-pickup-pill"><input type="radio" name="einf_slot" value="' + esc(s.slot_id) + '" required' + (s.slot_id === sel ? ' checked' : '') + '><span>' + esc(s.timeLabel) + (s.memberName ? ' · ' + esc(s.memberName) : '') + '</span></label>'; });
 			h += '</div>';
 		});
 		h += '</div>';

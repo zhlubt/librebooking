@@ -1612,8 +1612,10 @@ class ZhlBookPresenter
 
     /**
      * Abhol-Slots (5-Minuten-Raster) nach Kalendertag (lokale Zeitzone) gruppieren — für den
-     * kompakten Picker. Pro Tag: {date:'Y-m-d', label:'Mo 13.07.', slots:[{slot_id, timeLabel:'13:45'}]}.
-     * @param array[] $slots aus fetchHandoverSlots() (jeweils mit start_utc/slot_id)
+     * kompakten Picker. Pro Tag: {date:'Y-m-d', label:'Mo 13.07.', slots:[{slot_id, timeLabel:'13:45',
+     * memberName:'Anna Schmidt'}]}. memberName ist gesetzt, sobald mehrere Personen denselben
+     * Termintyp anbieten (SPEC-MULTI-ANBIETER), damit der Picker sie unterscheidbar anzeigt.
+     * @param array[] $slots aus fetchHandoverSlots() (jeweils mit start_utc/slot_id/member_name)
      * @return array[]
      */
     private function groupPickupByDay(array $slots, $tz): array
@@ -1635,6 +1637,7 @@ class ZhlBookPresenter
             $byDay[$ymd]['slots'][] = [
                 'slot_id' => (string)$s['slot_id'],
                 'timeLabel' => $start->Format('H:i'),
+                'memberName' => !empty($s['member_name']) ? (string)$s['member_name'] : null,
             ];
         }
         ksort($byDay);
@@ -1893,6 +1896,9 @@ class ZhlBookPresenter
                     'end_utc' => $endUtc !== null ? (string)$endUtc : null,
                     'type_id' => isset($mem['type_id']) ? (int)$mem['type_id'] : null,
                     'member_id' => isset($mem['member_id']) ? (int)$mem['member_id'] : null,
+                    // Mehrere Personen können denselben Termintyp anbieten (SPEC-MULTI-ANBIETER) —
+                    // Name mitführen, damit der Picker die Anbieter unterscheidbar anzeigen kann.
+                    'member_name' => isset($mem['member_name']) ? (string)$mem['member_name'] : null,
                 ];
             }
         }
@@ -1951,6 +1957,7 @@ class ZhlBookPresenter
                     'end_utc' => $endUtc !== null ? (string)$endUtc : null,
                     'type_id' => isset($mem['type_id']) ? (int)$mem['type_id'] : null,
                     'member_id' => isset($mem['member_id']) ? (int)$mem['member_id'] : null,
+                    'member_name' => isset($mem['member_name']) ? (string)$mem['member_name'] : null,
                 ];
             }
         }
@@ -2005,6 +2012,7 @@ class ZhlBookPresenter
                     'end_utc' => $endUtc !== null ? (string)$endUtc : null,
                     'type_id' => isset($mem['type_id']) ? (int)$mem['type_id'] : null,
                     'member_id' => isset($mem['member_id']) ? (int)$mem['member_id'] : null,
+                    'member_name' => isset($mem['member_name']) ? (string)$mem['member_name'] : null,
                 ];
             }
         }

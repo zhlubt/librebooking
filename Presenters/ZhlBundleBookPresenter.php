@@ -1538,7 +1538,7 @@ class ZhlBundleBookPresenter
             if (!isset($byDay[$ymd])) {
                 $byDay[$ymd] = ['date' => $ymd, 'label' => self::WD[(int)$start->Format('N')] . ' ' . $start->Format('d.m.'), 'slots' => []];
             }
-            $byDay[$ymd]['slots'][] = ['slot_id' => (string)$s['slot_id'], 'timeLabel' => $start->Format('H:i')];
+            $byDay[$ymd]['slots'][] = ['slot_id' => (string)$s['slot_id'], 'timeLabel' => $start->Format('H:i'), 'memberName' => !empty($s['member_name']) ? (string)$s['member_name'] : null];
         }
         ksort($byDay);
         return array_values($byDay);
@@ -1632,6 +1632,7 @@ class ZhlBundleBookPresenter
                     'end_utc' => $endUtc !== null ? (string)$endUtc : null,
                     'type_id' => isset($mem['type_id']) ? (int)$mem['type_id'] : null,
                     'member_id' => isset($mem['member_id']) ? (int)$mem['member_id'] : null,
+                    'member_name' => isset($mem['member_name']) ? (string)$mem['member_name'] : null,
                 ];
             }
         }
@@ -1681,6 +1682,7 @@ class ZhlBundleBookPresenter
                     'end_utc' => $endUtc !== null ? (string)$endUtc : null,
                     'type_id' => isset($mem['type_id']) ? (int)$mem['type_id'] : null,
                     'member_id' => isset($mem['member_id']) ? (int)$mem['member_id'] : null,
+                    'member_name' => isset($mem['member_name']) ? (string)$mem['member_name'] : null,
                 ];
             }
         }
@@ -1945,6 +1947,7 @@ class ZhlBundleBookPresenter
                     'end_utc' => $endUtc !== null ? (string)$endUtc : null,
                     'type_id' => isset($mem['type_id']) ? (int)$mem['type_id'] : null,
                     'member_id' => isset($mem['member_id']) ? (int)$mem['member_id'] : null,
+                    'member_name' => isset($mem['member_name']) ? (string)$mem['member_name'] : null,
                 ];
             }
         }

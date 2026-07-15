@@ -373,7 +373,7 @@ function zhl_handover_staff_names(array $typeLabels): array
     $map = [];
     foreach ($typeLabels as $label) {
         $resp = ZhlTerminplaner::Request('GET', '/api/lesson_slots.php', ['type_label' => $label]);
-        if (!$resp || !isset($resp['members'])) {
+        if (!$resp || !is_array($resp['members'] ?? null)) {
             continue;
         }
         foreach ($resp['members'] as $mem) {

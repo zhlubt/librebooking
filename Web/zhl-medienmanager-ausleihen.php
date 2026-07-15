@@ -60,8 +60,9 @@ class ZhlMedienmanagerAusleihenPage extends SecurePage
 
         $rows = zhl_handover_pickups_due($startUtc, $endUtc);
 
-        // Zuständige Person best-effort auflösen (terminplaner, einmal pro Seitenaufruf).
-        $staffNames = zhl_handover_staff_names(zhl_handover_type_labels());
+        // Zuständige Person best-effort auflösen (terminplaner, einmal pro Seitenaufruf) —
+        // nur wenn überhaupt Zeilen anstehen, sonst unnötige HTTP-Roundtrips bei leerer Agenda.
+        $staffNames = $rows ? zhl_handover_staff_names(zhl_handover_type_labels()) : [];
 
         // Nach lokalem Kalendertag gruppieren.
         $groups = [];

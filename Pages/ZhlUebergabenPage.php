@@ -15,7 +15,7 @@ class ZhlUebergabenPage extends SecurePage implements IZhlUebergabenPage
 
     public function __construct()
     {
-        parent::__construct('Persönliche Übergaben');
+        parent::__construct('ZhlUebergabenTitle');
         $this->presenter = new ZhlUebergabenPresenter($this);
     }
 

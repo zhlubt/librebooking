@@ -17,7 +17,7 @@ class ZhlRueckgabenPage extends SecurePage implements IZhlRueckgabenPage
 
     public function __construct()
     {
-        parent::__construct('Rückgaben');
+        parent::__construct('ZhlRueckgabenTitle');
         $this->presenter = new ZhlRueckgabenPresenter($this);
     }
 

@@ -15,7 +15,7 @@ class ZhlAusleihenPage extends SecurePage implements IZhlAusleihenPage
 
     public function __construct()
     {
-        parent::__construct('Ausleihen');
+        parent::__construct('ZhlAusleihenTitle');
         $this->presenter = new ZhlAusleihenPresenter($this);
     }
 

@@ -63,6 +63,11 @@ $zhlCommon = [
         'ZhlNoDevices'            => 'Keine Geräte für diese Auswahl. Versuch eine andere Kategorie, einen anderen Zeitraum oder Suchbegriff.',
         'ZhlPrototypeNote'        => 'Prototyp: Verfügbarkeit als <strong>Prognose</strong>; die verbindliche Prüfung erfolgt beim Buchen.',
 
+        // --- Ausleihen/Rückgaben/Übergaben (zhl-ausleihen/-rueckgaben/-uebergaben.tpl) ---
+        'ZhlAusleihenTitle'       => 'Ausleihen',
+        'ZhlRueckgabenTitle'      => 'Rückgaben',
+        'ZhlUebergabenTitle'      => 'Persönliche Übergaben',
+
         // --- Konto (zhl-account.tpl) ---
         'ZhlAccountTitle'         => 'Mein Konto',
         'ZhlAccountSub'           => 'Ihre Kontaktdaten auf einen Blick. Änderungen nehmen Sie über die Schaltflächen vor.',
@@ -139,6 +144,11 @@ $zhlCommon = [
         'ZhlFullyBookedRange'     => 'Fully booked in this period',
         'ZhlNoDevices'            => 'No devices for this selection. Try another category, period or search term.',
         'ZhlPrototypeNote'        => 'Prototype: availability shown as a <strong>forecast</strong>; the binding check happens when you book.',
+
+        // --- Ausleihen/Rückgaben/Übergaben (zhl-ausleihen/-rueckgaben/-uebergaben.tpl) ---
+        'ZhlAusleihenTitle'       => 'Pickups',
+        'ZhlRueckgabenTitle'      => 'Returns',
+        'ZhlUebergabenTitle'      => 'Personal handovers',
 
         // --- Account (zhl-account.tpl) ---
         'ZhlAccountTitle'         => 'My Account',

@@ -32,7 +32,12 @@ class ZhlUebergabenPage extends SecurePage implements IZhlUebergabenPage
         $type = (string)$this->GetQuerystring('type');
         $ref = trim((string)$this->GetQuerystring('ref'));
         $staff = trim((string)$this->GetQuerystring('staff'));
-        $upcoming = $this->GetQuerystring('upcoming') !== '0'; // Default AN, explizit "0" schaltet aus
+        // Checkboxen werden bei GET-Formularen NICHT übertragen, wenn sie unangekreuzt sind —
+        // ein fehlendes "upcoming" ist daher nicht von "Nutzer hat es abgewählt" unterscheidbar.
+        // Der Hidden-Marker "f" (im Formular immer gesetzt) trennt: kein Marker = Erstaufruf
+        // (Default AN); Marker gesetzt = echtes Submit, dann zählt nur die Checkbox selbst.
+        $submitted = $this->GetQuerystring('f') === '1';
+        $upcoming = $submitted ? ($this->GetQuerystring('upcoming') === '1') : true;
 
         $filters = [
             'status' => in_array($status, ['requested', 'confirmed', 'done', 'cancelled'], true) ? $status : '',

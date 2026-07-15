@@ -73,7 +73,7 @@ class ZhlLoanOverview
 
         $rows = [];
         foreach ($filtered as $r) {
-            $rows[] = self::toRow($r, $edge, $resourcesBySeries, $handoverByRef, $tz);
+            $rows[] = self::toRow($r, $edge, $resourcesBySeries, $handoverByRef, $tz, $startLocal, $endLocal);
         }
         usort($rows, fn($a, $b) => strcmp($a['sortKey'], $b['sortKey']));
         return $rows;
@@ -163,19 +163,33 @@ class ZhlLoanOverview
         return $out;
     }
 
-    /** Rang für den "am wenigsten fortgeschrittenen" Status über mehrere handover-Zeilen. */
+    /**
+     * Rang für den "am wenigsten fortgeschrittenen, noch aktionsbedürftigen" Status über
+     * mehrere handover-Zeilen einer Bundle-Buchung. 'cancelled' ist bewusst der HÖCHSTE Rang
+     * (letzte Wahl) — eine stornierte Zeile darf eine noch aktive (requested/confirmed) NIE
+     * verdecken; nur wenn ALLE Zeilen storniert sind, gewinnt zwangsläufig eine cancelled-Zeile
+     * und deriveStatus() bildet das korrekt auf „Termin fehlt" ab.
+     */
     private static function statusRank(?string $status): int
     {
         return match ($status) {
             'confirmed' => 2,
             'done' => 3,
-            default => 1, // requested, cancelled, unbekannt, fehlend
+            'cancelled' => 4,
+            default => 1, // requested, unbekannt, fehlend
         };
     }
 
     /** @param ReservationItemView $r */
-    private static function toRow($r, string $edge, array $resourcesBySeries, array $handoverByRef, string $tz): array
-    {
+    private static function toRow(
+        $r,
+        string $edge,
+        array $resourcesBySeries,
+        array $handoverByRef,
+        string $tz,
+        Date $windowStart,
+        Date $windowEnd
+    ): array {
         $startLocal = $r->StartDate->ToTimezone($tz);
         $endLocal = $r->EndDate->ToTimezone($tz);
         $ref = (string)$r->ReferenceNumber;
@@ -244,12 +258,19 @@ class ZhlLoanOverview
         }
 
         // Effektiver Zeitpunkt: der VEREINBARTE Übergabe-Termin ist relevanter als der reine
-        // Reservierungsrand, wenn er existiert (z. B. Abholung 2 Tage vor Nutzungsbeginn).
+        // Reservierungsrand, wenn er existiert (z. B. Abholung 2 Tage vor Nutzungsbeginn) —
+        // ABER nur, wenn er selbst noch im abgefragten Fenster liegt. Die Zeile wurde bereits
+        // anhand des nativen Reservierungsrands ins Fenster aufgenommen (Load()); ein davon
+        // abweichender Handover-Termin außerhalb des Fensters darf sie weder aus ihrer
+        // Tagesgruppe herausreißen noch fälschlich in eine andere hineinziehen.
         $effective = $edge === self::EDGE_END ? $endLocal : $startLocal;
         $scheduledField = $edge === self::EDGE_END ? 'scheduled_end_utc' : 'scheduled_start_utc';
         if ($handover && !empty($handover[$scheduledField])) {
             try {
-                $effective = Date::Parse((string)$handover[$scheduledField], 'UTC')->ToTimezone($tz);
+                $scheduled = Date::Parse((string)$handover[$scheduledField], 'UTC')->ToTimezone($tz);
+                if ($scheduled->GreaterThanOrEqual($windowStart) && $scheduled->LessThan($windowEnd)) {
+                    $effective = $scheduled;
+                }
             } catch (Throwable $e) {
                 // Fallback bleibt der Reservierungsrand.
             }

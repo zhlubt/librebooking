@@ -18,6 +18,7 @@
     </div>
 
     <form method="get" action="{$Path}zhl-handover-admin.php" class="card" style="margin-bottom:18px">
+      <input type="hidden" name="f" value="1">
       <div class="card-body" style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end">
         <div>
           <label style="font-size:12.5px;font-weight:600;color:var(--text2);display:block;margin-bottom:4px">Status</label>

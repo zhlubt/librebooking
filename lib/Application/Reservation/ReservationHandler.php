@@ -100,7 +100,16 @@ class ReservationHandler implements IReservationHandler
                 throw($ex);
             }
 
-            $this->notificationService->Notify($reservationSeries);
+            // ZHL-Härtung (E): Die Reservierung ist nach Persist() bereits committet. Wirft die
+            // (best-effort) Benachrichtigung danach eine Exception (z. B. SMTP-Ausfall), darf sie NICHT
+            // bis zum aufrufenden Presenter durchschlagen — sonst meldet dieser „Buchung fehlgeschlagen",
+            // der Nutzer schickt das Formular erneut ab und es entsteht eine ZWEITE Reservierung. Daher
+            // den Fehler hier protokollieren und schlucken; gespeichert ist gespeichert.
+            try {
+                $this->notificationService->Notify($reservationSeries);
+            } catch (Exception $nex) {
+                Log::Error('Reservation saved but notification failed (ref=%s): %s', $reservationSeries->CurrentInstance()->ReferenceNumber(), $nex);
+            }
 
             $view->SetSaveSuccessfulMessage($result);
         } else {

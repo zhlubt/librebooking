@@ -1,0 +1,280 @@
+<?php
+/**
+ * ZHL — iCalendar-Feed (.ics) zum Abonnieren in Outlook.
+ *
+ * Liefert als ein VCALENDAR:
+ *   • geplante Übergaben, Rückgaben und Einführungen (zhl_booking_handover)
+ *   • Videostudio-Buchungen (echte Reservierungen des Studios selbst)
+ * Andere Geräte-Ausleihen kommen bewusst NICHT in den Kalender (zu viele Termine).
+ *
+ * Auth über ?key=<secret> gegen config/zhl-calendar.php['key'] (Outlook abonniert die
+ * URL ohne Login → der Schlüssel ist das Bearer-Token). Bewusst leichtgewichtig: kein
+ * Framework-/Session-Bootstrap, nur die ZHL-Lib (raw PDO) + Config. Read-only.
+ *
+ * In den DESCRIPTION-Feldern steht alles Nötige (Vorgang, Gerät, Ausleihende:r, E-Mail,
+ * Status, Buchungslink), damit das ZHL-Team direkt aus dem Kalender handeln kann.
+ */
+
+declare(strict_types=1);
+
+require_once(__DIR__ . '/zhl-handover-lib.php');
+
+// ----------------------------------------------------------------------------
+// 1) Auth: Schlüssel aus config/zhl-calendar.php gegen ?key= prüfen.
+// ----------------------------------------------------------------------------
+$confFile = dirname(__DIR__) . '/config/zhl-calendar.php';
+$conf = is_readable($confFile) ? require $confFile : [];
+$conf = is_array($conf) ? $conf : [];
+$secret = (string)($conf['key'] ?? '');
+$given = isset($_GET['key']) ? (string)$_GET['key'] : '';
+
+if ($secret === '' || $secret === 'REPLACE_WITH_LONG_RANDOM_SECRET' || strlen($secret) < 16 || !hash_equals($secret, $given)) {
+    http_response_code(403);
+    header('Content-Type: text/plain; charset=utf-8');
+    echo 'Forbidden — gültiger ?key= erforderlich.';
+    exit;
+}
+
+// ----------------------------------------------------------------------------
+// 2) Basis-URL (für Buchungslinks) + Kalender-Metadaten.
+// ----------------------------------------------------------------------------
+$pastDays = max(0, (int)($conf['past_days'] ?? 30));
+$futureDays = max(1, (int)($conf['future_days'] ?? 365));
+$calName = (string)($conf['calendar_name'] ?? 'ZHL Medien — Übergaben & Studio');
+
+// script.url direkt aus config.php lesen (kein Framework nötig).
+$cfg = require dirname(__DIR__) . '/config/config.php';
+$scriptUrl = rtrim((string)($cfg['settings']['script.url'] ?? ''), '/');
+$host = parse_url($scriptUrl, PHP_URL_HOST) ?: 'media.zhl-ubt.de';
+$detailBase = $scriptUrl !== '' ? $scriptUrl . '/zhl-booking-detail.php?id=' : '';
+
+// ----------------------------------------------------------------------------
+// 3) Zeitfenster (UTC) bestimmen.
+// ----------------------------------------------------------------------------
+$utc = new DateTimeZone('UTC');
+$now = new DateTime('now', $utc);
+$startUtc = (clone $now)->modify('-' . $pastDays . ' days')->format('Y-m-d H:i:s');
+$endUtc = (clone $now)->modify('+' . $futureDays . ' days')->format('Y-m-d H:i:s');
+
+// DB-Fehler kontrolliert behandeln: ein abonnierter Feed darf keine 500-Details leaken.
+try {
+    $handovers = zhl_handover_planned($startUtc, $endUtc);   // alle Typen
+    $studio = zhl_studio_reservations($startUtc, $endUtc);
+} catch (Throwable $e) {
+    error_log('zhl-calendar: ' . $e->getMessage());
+    http_response_code(503);
+    header('Content-Type: text/plain; charset=utf-8');
+    echo 'Kalender momentan nicht verfügbar.';
+    exit;
+}
+
+// ----------------------------------------------------------------------------
+// 4) iCal-Helfer.
+// ----------------------------------------------------------------------------
+$icsEscape = static function (string $s): string {
+    $s = str_replace('\\', '\\\\', $s);
+    $s = str_replace(';', '\\;', $s);
+    $s = str_replace(',', '\\,', $s);
+    $s = str_replace(["\r\n", "\n", "\r"], '\\n', $s);
+    return $s;
+};
+
+// UTC-„Y-m-d H:i:s" → iCal UTC-Stempel „YYYYMMDDTHHMMSSZ".
+$icsStamp = static function (?string $utcStr) use ($utc): ?string {
+    if (!$utcStr) {
+        return null;
+    }
+    try {
+        return (new DateTime($utcStr, $utc))->format('Ymd\THis\Z');
+    } catch (Throwable $e) {
+        return null;
+    }
+};
+
+// Zeilenfaltung auf 73 OKTETTEN (RFC 5545 zählt Oktette, nicht Zeichen), Fortsetzung
+// mit führendem Space. Gefaltet wird nur an UTF-8-Zeichengrenzen (strlen je Zeichen),
+// damit kein Mehrbytezeichen zerschnitten wird.
+$icsFold = static function (string $line): string {
+    if (strlen($line) <= 73) {
+        return $line;
+    }
+    $chunks = [];
+    $buf = '';
+    $bufBytes = 0;
+    foreach (mb_str_split($line, 1, 'UTF-8') as $ch) {
+        $chBytes = strlen($ch);
+        if ($bufBytes + $chBytes > 73) {
+            $chunks[] = $buf;
+            $buf = ' '; // Fortsetzungszeile beginnt mit einem Space
+            $bufBytes = 1;
+        }
+        $buf .= $ch;
+        $bufBytes += $chBytes;
+    }
+    if ($buf !== '') {
+        $chunks[] = $buf;
+    }
+    return implode("\r\n", $chunks);
+};
+
+$dtstamp = gmdate('Ymd\THis\Z');
+
+$lines = [];
+$lines[] = 'BEGIN:VCALENDAR';
+$lines[] = 'VERSION:2.0';
+$lines[] = 'PRODID:-//ZHL//Medienausleihe Termine//DE';
+$lines[] = 'CALSCALE:GREGORIAN';
+$lines[] = 'METHOD:PUBLISH';
+$lines[] = $icsFold('X-WR-CALNAME:' . $icsEscape($calName));
+$lines[] = 'X-WR-TIMEZONE:Europe/Berlin';
+
+$typeLabel = ['pickup' => 'Abholung', 'return' => 'Rückgabe', 'einf' => 'Einführung'];
+$statusMap = ['requested' => 'TENTATIVE', 'confirmed' => 'CONFIRMED', 'done' => 'CONFIRMED'];
+$statusLabel = ['requested' => 'angefragt', 'confirmed' => 'terminiert', 'done' => 'erledigt'];
+
+$addEvent = function (array $event) use (&$lines, $icsEscape, $icsFold) {
+    $lines[] = 'BEGIN:VEVENT';
+    $lines[] = 'UID:' . $event['uid'];
+    $lines[] = 'DTSTAMP:' . $event['dtstamp'];
+    $lines[] = 'DTSTART:' . $event['start'];
+    $lines[] = 'DTEND:' . $event['end'];
+    $lines[] = $icsFold('SUMMARY:' . $icsEscape($event['summary']));
+    if (!empty($event['location'])) {
+        $lines[] = $icsFold('LOCATION:' . $icsEscape($event['location']));
+    }
+    if (!empty($event['description'])) {
+        $lines[] = $icsFold('DESCRIPTION:' . $icsEscape($event['description']));
+    }
+    if (!empty($event['url'])) {
+        $lines[] = $icsFold('URL:' . $icsEscape($event['url']));
+    }
+    if (!empty($event['status'])) {
+        $lines[] = 'STATUS:' . $event['status'];
+    }
+    $lines[] = 'END:VEVENT';
+};
+
+// --- Übergaben / Rückgaben / Einführungen ---
+foreach ($handovers as $r) {
+    $start = $icsStamp($r['scheduled_start_utc'] ?? null);
+    if ($start === null) {
+        continue; // ohne Startzeit kein Kalendereintrag
+    }
+    $end = $icsStamp($r['scheduled_end_utc'] ?? null);
+    if ($end === null) {
+        // 30-Min-Default, falls kein Ende terminiert wurde.
+        try {
+            $end = (new DateTime((string)$r['scheduled_start_utc'], $utc))->modify('+30 minutes')->format('Ymd\THis\Z');
+        } catch (Throwable $e) {
+            $end = $start;
+        }
+    }
+
+    $t = (string)$r['type'];
+    $tl = $typeLabel[$t] ?? $t;
+    $resourceName = (string)($r['resource_name'] ?? 'Gerät');
+    $name = trim((string)($r['borrower_name'] ?? ''));
+    $email = trim((string)($r['borrower_email'] ?? ''));
+    if ($name === '') {
+        $name = $email !== '' ? $email : 'unbekannt';
+    }
+    $ref = (string)($r['reference_number'] ?? '');
+    $st = (string)$r['status'];
+    $ort = trim((string)($r['rueckgabeort'] ?? ''));
+
+    $descParts = [
+        'Vorgang: ' . $tl,
+        'Gerät: ' . $resourceName,
+        'Ausleihende:r: ' . $name,
+    ];
+    if ($email !== '') {
+        $descParts[] = 'E-Mail: ' . $email;
+    }
+    $descParts[] = 'Status: ' . ($statusLabel[$st] ?? $st);
+    if ($t === 'return' && $ort !== '') {
+        $descParts[] = 'Rückgabeort: ' . $ort;
+    }
+    if ($ref !== '') {
+        $descParts[] = 'Buchung: ' . $ref;
+        if ($detailBase !== '') {
+            $descParts[] = $detailBase . rawurlencode($ref);
+        }
+    }
+
+    $addEvent([
+        'uid' => 'zhl-handover-' . (int)$r['id'] . '@' . $host,
+        'dtstamp' => $dtstamp,
+        'start' => $start,
+        'end' => $end,
+        'summary' => $tl . ': ' . $resourceName . ' — ' . $name,
+        'location' => ($t === 'return') ? $ort : '',
+        'description' => implode("\n", $descParts),
+        'url' => ($ref !== '' && $detailBase !== '') ? $detailBase . rawurlencode($ref) : '',
+        'status' => $statusMap[$st] ?? 'CONFIRMED',
+    ]);
+}
+
+// --- Videostudio-Buchungen ---
+foreach ($studio as $s) {
+    $start = $icsStamp($s['start_date'] ?? null);
+    $end = $icsStamp($s['end_date'] ?? null);
+    if ($start === null || $end === null) {
+        continue;
+    }
+    $title = trim((string)($s['title'] ?? ''));
+    $owner = trim((string)($s['owner_name'] ?? ''));
+    $email = trim((string)($s['owner_email'] ?? ''));
+    if ($owner === '') {
+        $owner = $email !== '' ? $email : 'unbekannt';
+    }
+    $ref = (string)($s['reference_number'] ?? '');
+    $pending = ((int)($s['status_id'] ?? 1) === 3); // 3 = Pending (Genehmigung offen)
+
+    $summary = 'Videostudio: ' . ($title !== '' ? $title : $owner);
+    if ($pending) {
+        $summary .= ' (Genehmigung offen)';
+    }
+
+    $descParts = [
+        'Videostudio-Buchung',
+        'Bucher:in: ' . $owner,
+    ];
+    if ($email !== '') {
+        $descParts[] = 'E-Mail: ' . $email;
+    }
+    if ($title !== '') {
+        $descParts[] = 'Titel: ' . $title;
+    }
+    $rawDesc = trim(strip_tags((string)($s['description'] ?? '')));
+    if ($rawDesc !== '') {
+        $descParts[] = 'Hinweis: ' . mb_substr($rawDesc, 0, 500);
+    }
+    if ($ref !== '') {
+        $descParts[] = 'Buchung: ' . $ref;
+        if ($detailBase !== '') {
+            $descParts[] = $detailBase . rawurlencode($ref);
+        }
+    }
+
+    $addEvent([
+        'uid' => 'zhl-studio-' . (int)$s['reservation_instance_id'] . '@' . $host,
+        'dtstamp' => $dtstamp,
+        'start' => $start,
+        'end' => $end,
+        'summary' => $summary,
+        'location' => (string)($s['resource_name'] ?? 'ZHL Videostudio'),
+        'description' => implode("\n", $descParts),
+        'url' => ($ref !== '' && $detailBase !== '') ? $detailBase . rawurlencode($ref) : '',
+        'status' => $pending ? 'TENTATIVE' : 'CONFIRMED',
+    ]);
+}
+
+$lines[] = 'END:VCALENDAR';
+
+// ----------------------------------------------------------------------------
+// 5) Ausgabe (CRLF, gefaltete Zeilen sind bereits eingebettet).
+// ----------------------------------------------------------------------------
+header('Content-Type: text/calendar; charset=utf-8');
+header('Content-Disposition: inline; filename="zhl-medien-termine.ics"');
+header('Cache-Control: no-cache, max-age=300');
+echo implode("\r\n", $lines) . "\r\n";

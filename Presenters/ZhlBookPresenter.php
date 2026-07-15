@@ -115,6 +115,14 @@ class ZhlBookPresenter
         $pickup = null;
         if ($this->pickupApplies($ueb)) {
             $f = $this->fetchHandoverSlots($this->handoverTypeLabels(), $ueb['tp_member_id'], $loanStartUtc, $tz);
+            // Task B: Abhol-Slots gegen die Geräte-Verfügbarkeit über [Abholtag … Nutzungsende] filtern.
+            // Die Reservierung beginnt am Abholtag → wählt der Nutzer einen frühen Abhol-Slot, an dessen
+            // Tag das Gerät (bzw. der ganze Typ-Pool) bis Nutzungsende NICHT durchgehend frei ist, würde
+            // der native Save ihn ablehnen. Im Tagesmodus filtern (Slot-Modus: Stunden-Logik, kein Vorlauf-
+            // Abholtag-Fenster). Pool-bewusst über poolResourceIds (wie der Commit-Pfad pickFreeUnit).
+            if ($ueb['booking_mode'] !== 'slot') {
+                $f['slots'] = $this->filterPickupSlotsByResourceFree($user, $resource, $f['slots'], $end, $tz);
+            }
             $mandatory = !$user->IsAdmin;
             $pickup = ['mandatory' => $mandatory, 'days' => $this->groupPickupByDay($f['slots'], $tz), 'earliestLabel' => $f['earliestLabel']];
         }
@@ -579,6 +587,12 @@ class ZhlBookPresenter
             $errors = $facade->GetErrors();
             if (empty($errors)) {
                 $errors = ['Die Buchung konnte nicht angelegt werden.'];
+            }
+            // E (Pool-TOCTOU-Härtung): Zwischen pickFreeUnit() (Lese-Prüfung) und dem nativen Persist kann
+            // eine andere Buchung dieselbe Einheit gegriffen haben → die native Validierung lehnt ab. Bei
+            // einem Pool >1 dem Nutzer einen klaren Wiederhol-Hinweis geben (statt nur der nativen Meldung).
+            if (count($this->poolResourceIds($user, $resource)) > 1) {
+                $errors[] = 'Hinweis: Eventuell wurde das Gerät gerade von jemand anderem gebucht. Bitte den Zeitraum erneut wählen oder die Seite neu laden — dann wird automatisch eine andere freie Einheit geprüft.';
             }
             $this->bindForm($user, $resource, $beginDate, $beginTime, $endDate, $endTime, $choice, $errors, $attrValues, $projectTitle, $pickupSlot, $fulfillment, $hpValues);
             return;
@@ -1201,6 +1215,72 @@ class ZhlBookPresenter
                 continue;
             }
             if ($this->pickFreeUnit($poolIds, $begin, $end) !== null) {
+                $out[] = $s;
+            }
+        }
+        return array_values($out);
+    }
+
+    /**
+     * Task B — Abhol-Slots gegen die Geräte-Verfügbarkeit über [Abholtag … Nutzungsende] filtern.
+     * Behält nur Slots, an deren Abholtag mindestens EINE Pool-Einheit des Geräte-Typs durchgehend bis
+     * zum Nutzungsende frei ist (Reservierung beginnt am Abholtag). Spiegelt den Commit-Pfad
+     * (poolResourceIds + pickFreeUnit) → ein angebotener Slot ist beim Speichern auch erfüllbar.
+     *
+     * Fenster je Slot = [Abholtag-Schedule-Beginn … Nutzungsende-Schedule-Ende]. Nur Tagesmodus.
+     * @param array[] $slots      Roh-Abhol-Slots (mit start_utc)
+     * @param string  $loanEndYmd Nutzungs-End-Tag (Y-m-d)
+     * @return array[]
+     */
+    private function filterPickupSlotsByResourceFree(UserSession $user, $resource, array $slots, string $loanEndYmd, $tz): array
+    {
+        if (empty($slots)) {
+            return $slots;
+        }
+        $poolIds = $this->poolResourceIds($user, $resource);
+        if (empty($poolIds)) {
+            return $slots;
+        }
+        // Nutzungsende-Tagesgrenze (einmal): Reservierung endet am Nutzungs-End-Tag zur Schedule-Endzeit.
+        $endBounds = $this->scheduleDayBounds($user, $resource, $loanEndYmd);
+        $loanEndDate = $endBounds['endNextDay']
+            ? Date::Parse($loanEndYmd . ' 00:00:00', $tz)->AddDays(1)->Format('Y-m-d')
+            : $loanEndYmd;
+        $loanEndUtc = Date::Parse($loanEndDate . ' ' . $endBounds['end'], $tz);
+
+        // Codex-Fix (Perf): Belegung aller Pool-Einheiten EINMAL über das Gesamtfenster laden
+        // [frühester Abholtag … Nutzungsende] statt je Slot eine eigene DB-Abfrage (pickFreeUnit).
+        $earliestDay = null;
+        foreach ($slots as $s) {
+            if (empty($s['start_utc'])) {
+                continue;
+            }
+            $d = Date::Parse((string)$s['start_utc'], 'UTC')->ToTimezone($tz)->Format('Y-m-d');
+            if ($earliestDay === null || strcmp($d, $earliestDay) < 0) {
+                $earliestDay = $d;
+            }
+        }
+        if ($earliestDay === null) {
+            return $slots;
+        }
+        $loadBegin = Date::Parse($earliestDay . ' 00:00:00', $tz);
+        $items = (new ResourceAvailability(new ReservationViewRepository()))->GetItemsBetween($loadBegin, $loanEndUtc, $poolIds);
+        $byResource = $this->splitItemsByResource($items);
+
+        $out = [];
+        foreach ($slots as $s) {
+            if (empty($s['start_utc'])) {
+                $out[] = $s; // ohne Tag nicht beurteilbar → konservativ behalten.
+                continue;
+            }
+            $pickupDay = Date::Parse((string)$s['start_utc'], 'UTC')->ToTimezone($tz)->Format('Y-m-d');
+            $sb = $this->scheduleDayBounds($user, $resource, $pickupDay);
+            $winBegin = Date::Parse($pickupDay . ' ' . $sb['begin'], $tz);
+            // Liegt der Abholtag NACH dem Nutzungsende (sollte nicht passieren), Fenster = Abholtag.
+            $winEnd = $winBegin->GreaterThan($loanEndUtc)
+                ? Date::Parse($pickupDay . ' ' . $sb['end'], $tz)
+                : $loanEndUtc;
+            if ($this->poolWindowFree($byResource, $poolIds, $winBegin, $winEnd)) {
                 $out[] = $s;
             }
         }

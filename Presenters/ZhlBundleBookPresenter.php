@@ -40,6 +40,8 @@ class ZhlBundleBookPresenter
     private $postedReturnSlot = '';
     /** B-remove: vom Nutzer abgewählte (entfernte) Bundle-Positions-IDs — für Re-Render nach POST-Fehler. */
     private $removedIds = [];
+    /** Task C: gecachte buchbare/sichtbare Ressourcen-IDs (allowedResourceIds), pro Request. */
+    private $allowedCache = null;
 
     public function __construct($page)
     {
@@ -108,17 +110,29 @@ class ZhlBundleBookPresenter
             echo json_encode(['error' => 'date']);
             return;
         }
-        // End-Tag optional (Rückgabe-Floor, SPEC-RUECKGABE). Fehlt/ungültig → auf Start zurückfallen.
+        // Task B: Nutzungs-Ende (gewählter End-Tag) mitführen → Abhol-/Einführungs-Slots, deren Abholtag
+        // die Geräte nicht durchgehend bis zum Nutzungsende frei lässt, gar nicht erst anbieten. Fehlt
+        // das Ende (Altclients), fällt der Filter auf [start..start] zurück (mindestens der Starttag).
+        // Dient zugleich als Rückgabe-Floor (SPEC-RUECKGABE).
         $end = isset($_GET['end']) ? trim((string)$_GET['end']) : '';
         if (!$this->isYmd($end) || strcmp($end, $start) < 0) {
             $end = $start;
         }
+        // Codex-Fix (Task B): „zusammen/getrennt" mitführen. NUR im „zusammen"-Modus ist der Einführungs-
+        // Slot zugleich der Übergabetag (Reservierung beginnt dann an diesem Tag) → nur dann den Einführungs-
+        // Slot gegen das Geräte-Fenster bis Nutzungsende filtern. Im „getrennt"-Modus ist die Einführung ein
+        // reiner Personentermin ohne Gerätebindung → KEIN Geräte-Fenster-Filter (er war sonst zu streng).
+        $mode = ($_GET['mode'] ?? '') === 'getrennt' ? 'getrennt' : 'zusammen';
         // B-remove: Abhol-/Einführungstermine GEGEN die aktuell behaltenen Positionen berechnen — wählt
         // der Nutzer das einzige einführungs-/abholpflichtige Gerät ab, liefert das VM null (kein Pflicht-Slot).
         $mainItems = $this->applyKeepFilter($this->itemsForPhase($bundle, 'main'));
+        // E1: Die in der UI gewählten Alternativ-Optionen (choice-Gruppen) mitführen, damit der Slot-Filter
+        // nur gegen die TATSÄCHLICH gewählte Option prüft — konsistent mit dem Resolver (löst genau eine
+        // Option auf). Ohne diese Wahl gälte ein Slot als frei, sobald IRGENDEINE Option der Gruppe frei ist.
+        $altChoices = $this->collectAltChoices($bundle);
         echo json_encode([
-            'pickup' => $this->buildPickupVm($db, $user, $mainItems, $start, $tz),
-            'einf' => $this->buildEinfVm($db, $user, $mainItems, $start, $tz),
+            'pickup' => $this->buildPickupVm($db, $user, $mainItems, $start, $end, $tz, $altChoices),
+            'einf' => $this->buildEinfVm($db, $user, $mainItems, $start, $end, $tz, $mode, $altChoices),
             'return' => $this->buildReturnVm($db, $user, $mainItems, $start, $end, $tz),
         ], JSON_UNESCAPED_UNICODE);
     }
@@ -598,8 +612,28 @@ class ZhlBundleBookPresenter
                 // Termin zuerst lokal speichern, dann Zertifikats-Bestätigung anstoßen.
                 try {
                     $einfBookingId = isset($book['booking_id']) ? (string)$book['booking_id'] : null;
-                    $this->persistEinfuehrung($db, $mainRef, (int)$einfPlan['resourceId'], (int)$einfPlan['member_id'], $einfBookingId, $einfPlan['start_utc'], $einfPlan['end_utc']);
-                    $this->createCertConfirmation($db, (int)$user->UserId, $einfPlan['resourceId']);
+                    // Task A: NICHT nur das erste Gerät bestätigen — der EINE gebuchte Einführungs-Termin
+                    // deckt ALLE einführungspflichtigen Geräte-Typen des Bundles ab. Pro distinktem
+                    // Zertifikatstyp eine eigene einf-Zeile (Detailseite je Gerät) + cert_confirmation.
+                    // $einfPlan['resourceId'] (auf die final reservierte Einheit nachgezogen, Schritt 6b)
+                    // bleibt das Repräsentativ-Gerät für die „Zusammen"-Übergabe weiter unten.
+                    // Ziele frisch gegen die FINAL reservierten Einheiten auflösen (nach Pool-Fallback 6b).
+                    // Codex-Fix: KEIN Rückfall auf $einfPlan['resourceId'], falls leer — sonst entstünden
+                    // einf-/Cert-Artefakte für eine Einheit, die nach dem Ausweichen evtl. gar nicht mehr
+                    // reserviert oder bereits zertifiziert ist. Leer ⇒ nichts hinterlegen (Termin steht).
+                    $einfTargets = $this->allResourcesNeedingEinf($db, $user, $mainResourceIds);
+                    // Codex-Fix: pro Ziel eigenes try/catch — ein Fehler bei EINEM Gerät darf die
+                    // Bestätigung der übrigen Geräte-Typen nicht verhindern (Task-A-Zweck).
+                    foreach ($einfTargets as $et) {
+                        $etRid = (int)$et['resourceId'];
+                        try {
+                            $this->persistEinfuehrung($db, $mainRef, $etRid, (int)$einfPlan['member_id'], $einfBookingId, $einfPlan['start_utc'], $einfPlan['end_utc']);
+                            $this->createCertConfirmation($db, (int)$user->UserId, $etRid);
+                        } catch (Throwable $te) {
+                            Log::Error('ZHL-Bundle Einführung-Ziel fehlgeschlagen (ref=%s, res=%s): %s', $mainRef, $etRid, $te);
+                            $postWarnings[] = 'Die Aufnahme ist gebucht, aber die Einführungs-Bestätigung für ein Gerät (#' . $etRid . ') konnte nicht hinterlegt werden — bitte beim ZHL-Team melden.';
+                        }
+                    }
                     // „Zusammen": der gebuchte Einführungstermin ist zugleich der Übergabetermin →
                     // Übergabe-Zeilen (pickup + return) aus dem Einführungs-Slot ableiten, geschlüsselt
                     // auf das Übergabe-Repräsentativ-Gerät (wie der normale Pickup). KEIN separater Abhol-Slot.
@@ -782,10 +816,15 @@ class ZhlBundleBookPresenter
         $db = ServiceLocator::GetDatabase();
         $tz = $user->Timezone;
 
-        // Leitgerät = erstes erforderliches Main-Item (specific_resource_id oder Typ) → Kalender-Proxy.
+        // Leitgerät = erstes erforderliches Main-Item (specific_resource_id oder Typ) → Schedule/Layout-Anker.
+        // $mainItems bleibt UNGEFILTERT für die Anzeige (B-remove zeigt alle Positionen mit Häkchen);
+        // der Kalender bewertet aber nur die aktuell BEHALTENEN Positionen (keep-gefilterte Kopie).
         $mainItems = $this->itemsForPhase($bundle, 'main');
         $leitId = $this->leitResourceId($db, $user, $mainItems);
-        $cal = $leitId > 0 ? $this->monthGrid($user, $leitId, $aroundYmd) : null;
+        // Task C: Pool-bewusster Kalender über ALLE behaltenen Pflichtpositionen (nicht nur das Leitgerät).
+        // applyKeepFilter setzt $this->removedIds; das wird unten beim Anzeige-keep-Flag genutzt.
+        $calItems = $this->applyKeepFilter($mainItems);
+        $cal = $leitId > 0 ? $this->monthGridForBundle($user, $db, $calItems, $leitId, $aroundYmd) : null;
 
         // Pflicht-Reservierungs-Attribute (z. B. Haftpflichtversicherung) — wie Einzelbuchung.
         $attributes = [];
@@ -998,7 +1037,8 @@ class ZhlBundleBookPresenter
         }
         $out = [];
         foreach ($groups as $g => $mode) {
-            $raw = $_POST['alt_' . $g] ?? null;
+            // $_REQUEST: POST beim verbindlichen Buchen, GET beim AJAX-Slot-Filter (E1) — gleiche Wahl.
+            $raw = $_REQUEST['alt_' . $g] ?? null;
             if ($mode === 'multi') {
                 $arr = is_array($raw)
                     ? array_values(array_filter(array_map(fn($x) => trim((string)$x), $raw), fn($x) => $x !== ''))
@@ -1284,6 +1324,63 @@ class ZhlBundleBookPresenter
         return null;
     }
 
+    /**
+     * Task A — ALLE aufgelösten Geräte, die eine Einführung brauchen (notwendig + User nicht
+     * zertifiziert), reduziert auf je EIN Repräsentativ-Gerät pro abgedecktem Zertifikatstyp.
+     *
+     * Modellentscheidung (Codex-/SPEC-konform, SPEC-BUNDLE-BOOKING §Codex-Entscheidungen Z.113
+     * „Einführung/Zertifikat für ALLE Items prüfen, nicht nur das Primärgerät"):
+     *   - Es gibt GENAU EINEN gemeinsamen Einführungs-TERMIN für das ganze Bundle (alle
+     *     einführungspflichtigen Geräte teilen sich den Terminplaner-Typ „Einführung in Medien",
+     *     member 2 — der Einweiser führt in EINER Session in alle Geräte ein). Mehrere
+     *     Terminplaner-Slots wären eine Zumutung für den Studierenden und fachlich unnötig.
+     *   - ABER: pro DISTINKTEM Zertifikatstyp braucht es eine eigene zhl_cert_confirmation und eine
+     *     eigene einf-Zeile in zhl_booking_handover. Bisheriger Bug: nur das ERSTE Gerät bekam beides,
+     *     ein zweiter einführungspflichtiger Geräte-Typ (z. B. Pocket 6K + Gimbal → zwei cert_types)
+     *     blieb unbestätigt.
+     *   - Geräte OHNE konfigurierten Zertifikatstyp (kein zhl_cert_type_resource-Eintrag) bekommen
+     *     dennoch je Gerät eine einf-Zeile (Schlüssel = resource_id), damit die Detailseite den
+     *     Termin je Gerät zeigt; createCertConfirmation ist dort ein No-op (kein Typ gefunden).
+     *
+     * @return array[] Liste von ['resourceId'=>int] + ueb-Feldern, dedupliziert auf je ein Gerät
+     *                 pro Zertifikatstyp (Geräte ohne Typ einzeln).
+     */
+    private function allResourcesNeedingEinf($db, UserSession $user, array $resourceIds): array
+    {
+        $out = [];
+        $seenCertTypes = [];   // cert_type_id => true (pro Typ nur EIN Repräsentativ-Gerät)
+        foreach ($resourceIds as $rid) {
+            $rid = (int)$rid;
+            $ueb = $this->lookupUebergabe($db, $rid);
+            if ($ueb['einfuehrung'] !== 'notwendig' || $this->userIsCertified($db, $user->UserId, $rid)) {
+                continue;
+            }
+            $ctid = $this->certTypeIdForResource($db, $rid);
+            if ($ctid > 0) {
+                if (isset($seenCertTypes[$ctid])) {
+                    continue; // dieser Zertifikatstyp ist bereits durch ein anderes Gerät abgedeckt
+                }
+                $seenCertTypes[$ctid] = true;
+            }
+            $out[] = ['resourceId' => $rid] + $ueb;
+        }
+        return $out;
+    }
+
+    /**
+     * Task A — Zertifikatstyp-ID, die dieses Gerät abdeckt (oder 0). Spiegelt die Auswahl in
+     * createCertConfirmation, damit die Deduplizierung exakt zum dort angelegten Datensatz passt.
+     */
+    private function certTypeIdForResource($db, int $rid): int
+    {
+        $cmd = new AdHocCommand('SELECT t.id FROM zhl_cert_type_resource ctr JOIN zhl_cert_type t ON t.id = ctr.cert_type_id WHERE ctr.resource_id = @r AND t.active = 1 ORDER BY t.id LIMIT 1');
+        $cmd->AddParameter(new Parameter('@r', $rid));
+        $reader = $db->Query($cmd);
+        $row = $reader->GetRow();
+        $reader->Free();
+        return $row ? (int)$row['id'] : 0;
+    }
+
     /** Erstes aufgelöstes Gerät, das abgeholt werden muss (abholen/abholen_persoenlich). */
     private function firstResourceNeedingPickup($db, array $resourceIds): ?array
     {
@@ -1309,7 +1406,7 @@ class ZhlBundleBookPresenter
     }
 
     /** Pickup-VM für die Anzeige (Proxy über die Typ-Geräte des Bundles). */
-    private function buildPickupVm($db, UserSession $user, array $mainItems, string $aroundYmd, $tz): ?array
+    private function buildPickupVm($db, UserSession $user, array $mainItems, string $aroundYmd, string $loanEndYmd, $tz, array $altChoices = []): ?array
     {
         $rid = $this->firstTypeResourceNeeding($db, $mainItems, 'pickup');
         if ($rid <= 0) {
@@ -1318,14 +1415,19 @@ class ZhlBundleBookPresenter
         $ueb = $this->lookupUebergabe($db, $rid);
         $loanStartUtc = $this->slotCutoffUtc($aroundYmd, $tz);
         $f = $this->fetchHandoverSlots($this->handoverTypeLabels(), $ueb['tp_member_id'], $loanStartUtc, $tz);
+        // Task B: Abhol-Slots, deren Abholtag die Bundle-Geräte nicht durchgehend bis Nutzungsende frei
+        // lässt, gar nicht erst anbieten (Reservierung beginnt am Abholtag → der native Save würde sie sonst
+        // ablehnen). Filtert gegen die aufgelösten Pflicht-Ressourcen über [Abholtag … Nutzungsende].
+        // E1: $altChoices schränkt choice-Gruppen auf die gewählte Option ein (konsistent mit dem Resolver).
+        $slots = $this->filterSlotsByBundleAvailability($db, $user, $mainItems, $f['slots'], $loanEndYmd, $tz, $altChoices);
         $mandatory = !$user->IsAdmin;
         return [
             'mandatory' => $mandatory,
-            'days' => $this->groupPickupByDay($f['slots'], $tz),
+            'days' => $this->groupPickupByDay($slots, $tz),
             'typeId' => $f['typeId'],
             'memberId' => $f['memberId'],
             'earliestLabel' => $f['earliestLabel'],
-            'blocked' => ($mandatory && empty($f['slots'])),
+            'blocked' => ($mandatory && empty($slots)),
         ];
     }
 
@@ -1353,7 +1455,7 @@ class ZhlBundleBookPresenter
         ];
     }
 
-    private function buildEinfVm($db, UserSession $user, array $mainItems, string $aroundYmd, $tz): ?array
+    private function buildEinfVm($db, UserSession $user, array $mainItems, string $aroundYmd, string $loanEndYmd, $tz, string $mode = 'zusammen', array $altChoices = []): ?array
     {
         $rid = $this->firstTypeResourceNeeding($db, $mainItems, 'einf');
         if ($rid <= 0) {
@@ -1366,14 +1468,25 @@ class ZhlBundleBookPresenter
         $ueb = $this->lookupUebergabe($db, $rid);
         $loanStartUtc = $this->slotCutoffUtc($aroundYmd, $tz);
         $f = $this->fetchEinfuehrungSlots($ueb['einfuehrung_typ'], $ueb['tp_member_id'], $loanStartUtc, $tz);
+        // Codex-Fix (Task B): Einführungs-Slots NUR im „zusammen"-Modus gegen das Geräte-Fenster filtern.
+        // Dann ist der Einführungs-Slot zugleich der Übergabetag → die Reservierung beginnt an diesem Tag,
+        // also muss das Gerät ab da bis Nutzungsende frei sein. Im „getrennt"-Modus ist die Einführung ein
+        // Personentermin ohne Gerätebindung (Reservierung erst ab separatem Abholtag) → NICHT filtern.
+        $combinedEligible = ($mode === 'zusammen') && $this->firstTypeResourceNeeding($db, $mainItems, 'pickup') > 0;
+        $slots = $combinedEligible
+            ? $this->filterSlotsByBundleAvailability($db, $user, $mainItems, $f['slots'], $loanEndYmd, $tz, $altChoices)
+            : $f['slots'];
         return [
             'certified' => false,
-            'slots' => $f['slots'],
-            'days' => $this->groupPickupByDay($f['slots'], $tz),
+            'slots' => $slots,
+            'days' => $this->groupPickupByDay($slots, $tz),
             'typeId' => $f['typeId'],
             'memberId' => $f['memberId'],
             'earliestLabel' => $f['earliestLabel'],
-            'blocked' => empty($f['slots']),
+            'blocked' => empty($slots),
+            // Task A: Wie viele einführungspflichtige Geräte-Typen deckt dieser EINE Termin ab?
+            // (>1 → Hinweis im Picker, dass ein gemeinsamer Termin alle Geräte abdeckt.)
+            'coveredDevices' => $this->einfCoveredDeviceLabels($db, $user, $mainItems),
         ];
     }
 
@@ -1406,12 +1519,73 @@ class ZhlBundleBookPresenter
         return 0;
     }
 
-    // --- Monats-Kalender (Tagesmodus, Proxy über das Leitgerät) ---
+    /**
+     * Task A — Anzeige-Labels der einführungspflichtigen Geräte-Typen des Bundles (für den Hinweis,
+     * dass der EINE gemeinsame Einführungs-Termin mehrere Geräte abdeckt). Ein Typ gilt als
+     * einführungspflichtig, sobald irgendeine Einheit des Typs einfuehrung='notwendig' trägt — und
+     * nur, wenn der User für diese Einheit NICHT bereits zertifiziert ist (sonst kein Pflichtgrund).
+     * @return string[] distinkte Typ-Labels in Item-Reihenfolge
+     */
+    private function einfCoveredDeviceLabels($db, UserSession $user, array $mainItems): array
+    {
+        $labels = [];
+        foreach ($mainItems as $it) {
+            if ((int)$it['quantity'] <= 0) {
+                continue;
+            }
+            $candidates = [];
+            if ($it['specific_resource_id'] !== null) {
+                $candidates[] = (int)$it['specific_resource_id'];
+            } else {
+                $candidates = $this->resourceIdsOfType($db, (string)$it['type_label']);
+            }
+            foreach ($candidates as $rid) {
+                $ueb = $this->lookupUebergabe($db, (int)$rid);
+                if ($ueb['einfuehrung'] === 'notwendig' && !$this->userIsCertified($db, $user->UserId, (int)$rid)) {
+                    $label = (string)$it['type_label'];
+                    if ($label !== '' && !in_array($label, $labels, true)) {
+                        $labels[] = $label;
+                    }
+                    break; // ein Treffer je Item genügt
+                }
+            }
+        }
+        return $labels;
+    }
 
-    private function monthGrid(UserSession $user, int $rid, string $aroundYmd): array
+    // --- Monats-Kalender (Tagesmodus) ---
+    // Task C: Der frühere Leitgerät-only monthGrid() wurde durch monthGridForBundle() ersetzt
+    // (pool-bewusst über ALLE Pflichtpositionen). Siehe unten.
+
+    private function dayHasReservablePeriod($layout, $day): bool
+    {
+        foreach ($layout->GetLayout($day, false) as $p) {
+            if (method_exists($p, 'IsReservable') && $p->IsReservable() && $p->BeginDate() !== null && $p->EndDate() !== null) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Task C — Pool-bewusster Monats-Kalender fürs Bundle: ein Tag ist nur dann „frei", wenn JEDE
+     * Pflichtposition des Bundles an diesem Tag erfüllbar ist (genug freie Einheiten je Geräte-Typ).
+     * Pool-/alt_group-Positionen gelten als erfüllbar, sobald EINE Option genug freie Einheiten hat.
+     *
+     * Bisher zeigte der Kalender nur die Belegung des Leitgeräts → ein Tag konnte „frei" wirken,
+     * obwohl ein anderes Pflichtgerät belegt war (Nutzer-Bug). Reuse der Resolver-Wahrheitsquellen:
+     * gleiche Typ-Auflösung (resourceIdsOfType / specific_resource_id) wie der Buchungs-Resolver.
+     *
+     * Schedule/Layout/Zeitachse bleiben am Leitgerät verankert (alle Verleih-Geräte liegen auf
+     * Schedule 5 — gleiche Periodengrenzen; Leitgerät-Layout ist repräsentativ wie zuvor).
+     *
+     * @param array[] $mainItems  bereits keep-gefilterte Main-Items
+     * @param int     $leitId     Leitgerät (für Schedule/Layout-Referenz)
+     */
+    private function monthGridForBundle(UserSession $user, $db, array $mainItems, int $leitId, string $aroundYmd): array
     {
         $tz = $user->Timezone;
-        $scheduleId = $this->resourceScheduleId(ServiceLocator::GetDatabase(), $rid);
+        $scheduleId = $this->resourceScheduleId($db, $leitId);
         $earliestYmd = Date::Now()->ToTimezone($tz)->Format('Y-m-d');
         $refYmd = ($aroundYmd > $earliestYmd) ? $aroundYmd : $earliestYmd;
         $ref = Date::Parse($refYmd . ' 00:00:00', $tz)->ToTimezone($tz);
@@ -1420,9 +1594,14 @@ class ZhlBundleBookPresenter
         $firstOfMonth = Date::Parse(sprintf('%04d-%02d-01 00:00:00', $year, $month), $tz);
         $dow = (int)$firstOfMonth->Format('N');
         $gridStart = $firstOfMonth->AddDays(-($dow - 1));
-
-        $items = (new ResourceAvailability(new ReservationViewRepository()))->GetItemsBetween($gridStart, $gridStart->AddDays(42), [$rid]);
+        $gridEnd = $gridStart->AddDays(42);
         $layout = (new ScheduleRepository())->GetLayout($scheduleId, new ScheduleLayoutFactory($tz));
+
+        // Pflicht-Anforderungen + Kandidaten-IDs (gemeinsame Wahrheitsquelle mit Task B / Slot-Filter).
+        [$requirements, $allIds] = $this->bundleRequirements($db, $user, $mainItems);
+
+        // Belegung aller Kandidaten-Einheiten EINMAL über das Gitter-Fenster laden, nach Ressource indexieren.
+        $byResource = $this->loadBusyMap($gridStart, $gridEnd, $allIds);
 
         $weeks = [];
         for ($w = 0; $w < 6; $w++) {
@@ -1438,14 +1617,8 @@ class ZhlBundleBookPresenter
                 } elseif (!$this->dayHasReservablePeriod($layout, $day)) {
                     $state = 'closed';
                 } else {
-                    $busy = false;
-                    foreach ($items as $it) {
-                        if ($it->GetStartDate()->LessThan($day->AddDays(1)) && $it->GetEndDate()->GreaterThan($day)) {
-                            $busy = true;
-                            break;
-                        }
-                    }
-                    $state = $busy ? 'busy' : 'free';
+                    $dayEnd = $day->AddDays(1);
+                    $state = $this->allRequirementsFreeInWindow($requirements, $byResource, $day, $dayEnd) ? 'free' : 'busy';
                 }
                 $row[] = ['date' => $ymd, 'dom' => (int)$local->Format('j'), 'inMonth' => $inMonth, 'state' => $state, 'weekend' => $weekend];
             }
@@ -1461,14 +1634,248 @@ class ZhlBundleBookPresenter
         ];
     }
 
-    private function dayHasReservablePeriod($layout, $day): bool
+    /**
+     * Task C/B — Sind im Fenster [$winBegin,$winEnd) ALLE Anforderungen erfüllbar?
+     *
+     * Jede Anforderung hat ein oder mehrere alternative Options-Sets (alt_group → je Option ein Set).
+     * Sie gilt als erfüllt, sobald MINDESTENS EIN Options-Set für sich genug freie, disjunkte Einheiten
+     * hat (KEINE Mischung über Optionen hinweg — spiegelt den Resolver, der genau eine Option auflöst).
+     * Die Zuteilung ist über Anforderungen hinweg GLOBAL DISJUNKT (eine vergebene Einheit zählt für keine
+     * andere). Gierig in Anforderungs-Reihenfolge wie der Resolver (kein Backtracking; bewusst, Codex ok).
+     *
+     * @param array[]                        $requirements [ [ ['ids'=>int[],'qty'=>int], ...optionsets ], ... ]
+     * @param array<int,IReservedItemView[]> $byResource   resource_id → belegende Items
+     */
+    private function allRequirementsFreeInWindow(array $requirements, array $byResource, $winBegin, $winEnd): bool
     {
-        foreach ($layout->GetLayout($day, false) as $p) {
-            if (method_exists($p, 'IsReservable') && $p->IsReservable() && $p->BeginDate() !== null && $p->EndDate() !== null) {
-                return true;
+        $used = []; // global disjunkt: bereits vergebene Einheiten
+        foreach ($requirements as $optionSets) {
+            $satisfied = false;
+            foreach ($optionSets as $set) {
+                $qty = (int)$set['qty'];
+                $picked = [];
+                foreach ($set['ids'] as $rid) {
+                    $rid = (int)$rid;
+                    if (isset($used[$rid])) {
+                        continue;
+                    }
+                    if ($this->unitFreeInWindow($byResource[$rid] ?? [], $winBegin, $winEnd)) {
+                        $picked[] = $rid;
+                        if (count($picked) >= $qty) {
+                            break;
+                        }
+                    }
+                }
+                if (count($picked) >= $qty) {
+                    // Diese Option erfüllt die Anforderung → ihre Einheiten global als vergeben markieren.
+                    foreach ($picked as $rid) {
+                        $used[$rid] = true;
+                    }
+                    $satisfied = true;
+                    break;
+                }
+            }
+            if (!$satisfied) {
+                return false;
             }
         }
-        return false;
+        return true;
+    }
+
+    /**
+     * Task C — Vom User buchbare, nicht-versteckte Ressourcen-IDs (gleiche Basis wie der Resolver:
+     * GetAllResources(false,$user) + CanBook + nicht HIDDEN). Pro Request einmal aufgelöst.
+     * @return array<int,bool> resource_id => true
+     */
+    private function allowedResourceIds(UserSession $user): array
+    {
+        if ($this->allowedCache !== null) {
+            return $this->allowedCache;
+        }
+        $resourceService = new ResourceService(
+            new ResourceRepository(),
+            new SchedulePermissionService(PluginManager::Instance()->LoadPermission()),
+            new AttributeService(new AttributeRepository()),
+            new UserRepository(),
+            new AccessoryRepository()
+        );
+        $out = [];
+        foreach ($resourceService->GetAllResources(false, $user) as $r) {
+            if ((int)$r->GetStatusId() === ResourceStatus::HIDDEN) {
+                continue;
+            }
+            if (!$r->CanBook) {
+                continue;
+            }
+            $out[(int)$r->GetId()] = true;
+        }
+        $this->allowedCache = $out;
+        return $out;
+    }
+
+    /**
+     * Task C/B — Pflicht-Anforderungen des Bundles als Options-Sets (gemeinsame Wahrheitsquelle für
+     * Kalender UND Slot-Filter). Jede Anforderung = Liste alternativer Options-Sets {ids, qty}:
+     * normale Position = ein Set; alt_group = je Mitglied-Option ein Set. Kandidaten sind auf die
+     * Resolver-Basis gefiltert (buchbar + nicht HIDDEN).
+     *
+     * E1: $altChoices (group => gewählter type_label) schränkt eine choice-Gruppe auf GENAU die gewählte
+     * Option ein — exakt wie der Resolver, der nur die gewählte Option auflöst. Ohne (gültige) Wahl bzw.
+     * für auto-Gruppen bleiben ALLE Optionen als Alternativ-Sets erhalten (Gruppe frei, sobald eine frei).
+     *
+     * @param array[]            $mainItems  keep-gefilterte Main-Items
+     * @param array<string,string> $altChoices group => gewählter type_label (leer = keine Einschränkung)
+     * @return array{0: array[], 1: int[]}  [requirements, allCandidateIds]
+     */
+    private function bundleRequirements($db, UserSession $user, array $mainItems, array $altChoices = []): array
+    {
+        $allowed = $this->allowedResourceIds($user);
+        // E1: auto-Gruppen NICHT auf eine Wahl einschränken — dort pickt der Resolver automatisch die erste
+        // freie Option nach Priorität; eine User-Wahl gibt es nicht (Radios sind ausgeblendet).
+        // Zugleich die gültigen Options-Labels je Gruppe sammeln, damit eine GEFÄLSCHTE/unbekannte Wahl
+        // ($altChoices[g] ist keine echte Option) wie „keine Wahl" behandelt wird (alle Optionen bleiben) —
+        // statt alle Optionen wegzufiltern. Spiegelt den Resolver, der eine ungültige Wahl nicht akzeptiert.
+        $autoGroups = [];
+        $groupOptions = []; // group => [type_label => true]
+        foreach ($mainItems as $it) {
+            $g = (isset($it['alt_group']) && $it['alt_group'] !== '') ? (string)$it['alt_group'] : null;
+            if ($g === null) {
+                continue;
+            }
+            if ((string)($it['alt_mode'] ?? 'choice') === 'auto') {
+                $autoGroups[$g] = true;
+            }
+            $tl = (string)($it['type_label'] ?? '');
+            if ($tl !== '') {
+                $groupOptions[$g][$tl] = true;
+            }
+        }
+        $requirements = [];
+        $altReq = [];   // group => index in $requirements
+        $allIds = [];
+        foreach ($mainItems as $it) {
+            $qty = (int)$it['quantity'];
+            if ($qty <= 0 || (int)$it['required'] !== 1) {
+                continue; // Packliste + optionale Positionen blocken weder Kalender noch Slots.
+            }
+            $group = (isset($it['alt_group']) && $it['alt_group'] !== '') ? (string)$it['alt_group'] : null;
+            // E1: Bei einer GÜLTIGEN Wahl in einer choice-Gruppe nur die gewählte Option berücksichtigen.
+            // „Gültig" = die Wahl ist eine echte Option der Gruppe; eine unbekannte Wahl wird ignoriert
+            // (alle Optionen bleiben), damit eine gefälschte Eingabe nicht die ganze Gruppe wegfiltert.
+            if ($group !== null && empty($autoGroups[$group])
+                && isset($altChoices[$group]) && $altChoices[$group] !== ''
+                && isset($groupOptions[$group][(string)$altChoices[$group]])
+                && (string)$altChoices[$group] !== (string)$it['type_label']) {
+                continue; // gültige Wahl, aber nicht DIESE Option → ignorieren.
+            }
+            $ids = $it['specific_resource_id'] !== null
+                ? [(int)$it['specific_resource_id']]
+                : $this->resourceIdsOfType($db, (string)$it['type_label']);
+            $ids = array_values(array_filter(array_map('intval', $ids), fn($r) => isset($allowed[$r])));
+            $optionSet = ['ids' => $ids, 'qty' => $qty];
+            if ($group !== null) {
+                if (!isset($altReq[$group])) {
+                    $altReq[$group] = count($requirements);
+                    $requirements[] = [$optionSet];
+                } else {
+                    $requirements[$altReq[$group]][] = $optionSet;
+                }
+            } else {
+                $requirements[] = [$optionSet];
+            }
+            foreach ($ids as $rid) {
+                $allIds[(int)$rid] = true;
+            }
+        }
+        return [$requirements, array_map('intval', array_keys($allIds))];
+    }
+
+    /**
+     * Task B — Abhol-/Einführungs-Slots gegen die Bundle-Verfügbarkeit filtern. Ein Slot bleibt nur,
+     * wenn die Bundle-Pflichtgeräte im Fenster [Slot-Tag 00:00 … Nutzungsende-Tag 24:00) durchgehend
+     * frei sind (gegen die EIGENE Reservierung des Slots wird nicht geprüft — die existiert noch nicht).
+     *
+     * Reservierung beginnt am Abholtag → das Gerät muss schon ab dem Abholtag bis Nutzungsende frei sein.
+     * Bisher konnte der Nutzer einen frühen Abhol-Slot wählen, den der native Save dann als Konflikt
+     * ablehnte. Nutzt dieselbe Anforderungs-/Disjunkt-Logik wie der Kalender (bundleRequirements +
+     * allRequirementsFreeInWindow). Best-effort: ohne Anforderungen/Slots bleibt die Liste unverändert.
+     *
+     * @param array[] $slots      Roh-Slots (mit start_utc)
+     * @param string  $loanEndYmd Nutzungs-End-Tag (Y-m-d)
+     * @return array[] gefilterte Slots
+     */
+    private function filterSlotsByBundleAvailability($db, UserSession $user, array $mainItems, array $slots, string $loanEndYmd, $tz, array $altChoices = []): array
+    {
+        if (empty($slots)) {
+            return $slots;
+        }
+        [$requirements, $allIds] = $this->bundleRequirements($db, $user, $mainItems, $altChoices);
+        if (empty($requirements) || empty($allIds)) {
+            return $slots; // keine buchbaren Pflichtgeräte → nichts zu prüfen.
+        }
+        // Fenster-Ober­grenze = Ende des Nutzungs-End-Tags (lokal), in TZ. Untergrenze = frühester Slot-Tag.
+        $loanEnd = Date::Parse($loanEndYmd . ' 00:00:00', $tz)->AddDays(1); // exklusiv = Beginn Folgetag
+        // Belegung EINMAL über das gesamte mögliche Fenster laden (frühester Slot-Tag … Nutzungsende).
+        $earliestSlotDay = null;
+        foreach ($slots as $s) {
+            if (empty($s['start_utc'])) {
+                continue;
+            }
+            $d = Date::Parse($s['start_utc'], 'UTC')->ToTimezone($tz)->Format('Y-m-d');
+            if ($earliestSlotDay === null || strcmp($d, $earliestSlotDay) < 0) {
+                $earliestSlotDay = $d;
+            }
+        }
+        if ($earliestSlotDay === null) {
+            return $slots;
+        }
+        $loadBegin = Date::Parse($earliestSlotDay . ' 00:00:00', $tz);
+        $byResource = $this->loadBusyMap($loadBegin, $loanEnd, $allIds);
+
+        $out = [];
+        foreach ($slots as $s) {
+            if (empty($s['start_utc'])) {
+                $out[] = $s; // ohne Tag nicht beurteilbar → konservativ behalten.
+                continue;
+            }
+            $slotDay = Date::Parse($s['start_utc'], 'UTC')->ToTimezone($tz)->Format('Y-m-d');
+            $winBegin = Date::Parse($slotDay . ' 00:00:00', $tz);
+            // Liegt der Slot-Tag NACH dem Nutzungsende (theoretisch), Fenster = Slot-Tag selbst.
+            $winEnd = $winBegin->GreaterThan($loanEnd) ? $winBegin->AddDays(1) : $loanEnd;
+            if ($this->allRequirementsFreeInWindow($requirements, $byResource, $winBegin, $winEnd)) {
+                $out[] = $s;
+            }
+        }
+        return $out;
+    }
+
+    /**
+     * Belegung der gegebenen Ressourcen im Fenster [$begin,$end) EINMAL laden, nach Ressource indexiert.
+     * @param int[] $resourceIds
+     * @return array<int,IReservedItemView[]>
+     */
+    private function loadBusyMap($begin, $end, array $resourceIds): array
+    {
+        $byResource = [];
+        if (empty($resourceIds)) {
+            return $byResource;
+        }
+        $items = (new ResourceAvailability(new ReservationViewRepository()))->GetItemsBetween($begin, $end, $resourceIds);
+        foreach ($items as $it) {
+            $byResource[(int)$it->GetResourceId()][] = $it;
+        }
+        return $byResource;
+    }
+
+    /** Ist eine Einheit (gegebene belegende Items) im Fenster [$winBegin,$winEnd) durchgehend frei? */
+    private function unitFreeInWindow(array $items, $winBegin, $winEnd): bool
+    {
+        foreach ($items as $it) {
+            if ($it->GetStartDate()->LessThan($winEnd) && $it->GetEndDate()->GreaterThan($winBegin)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private function scheduleDayBounds(UserSession $user, int $scheduleId, string $dayYmd): array

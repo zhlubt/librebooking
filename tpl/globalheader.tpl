@@ -198,6 +198,9 @@
                                         <li id="navZhlHandover"><a class="dropdown-item"
                                                 href="{$Path}zhl-handover-admin.php">{translate key="ZhlNavHandovers"}</a>
                                         </li>
+                                        <li id="navZhlTermine"><a class="dropdown-item"
+                                                href="{$Path}zhl-termine-admin.php">{translate key="ZhlNavTermine"}</a>
+                                        </li>
                                     </ul>
                                 </li>
                             {/if}

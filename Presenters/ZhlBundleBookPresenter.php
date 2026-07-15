@@ -753,7 +753,8 @@ class ZhlBundleBookPresenter
             $pu = $this->lookupUebergabe($db, $pickupRid);
             $pickupMandatory = $this->pickupApplies($pu) && !$user->IsAdmin;
         }
-        $einfCertified = $einfRid > 0 && $this->userIsCertified($db, $user->UserId, $einfRid);
+        // Admin-Gruppe (Nutzer-Vorgabe 2026-07-15): keine Einführung nötig, unabhängig vom Zertifikatsstatus.
+        $einfCertified = $einfRid > 0 && ($user->IsAdmin || $this->userIsCertified($db, $user->UserId, $einfRid));
         $einfActive = $einfRid > 0 && !$einfCertified;
 
         // Per-Load-Nonce (Doppel-Submit-Schutz).
@@ -1093,7 +1094,8 @@ class ZhlBundleBookPresenter
     {
         foreach ($resourceIds as $rid) {
             $ueb = $this->lookupUebergabe($db, (int)$rid);
-            if ($ueb['einfuehrung'] === 'notwendig' && !$this->userIsCertified($db, $user->UserId, (int)$rid)) {
+            // Admin-Gruppe (Nutzer-Vorgabe 2026-07-15): keine Einführung nötig, unabhängig vom Zertifikatsstatus.
+            if ($ueb['einfuehrung'] === 'notwendig' && !$user->IsAdmin && !$this->userIsCertified($db, $user->UserId, (int)$rid)) {
                 return ['resourceId' => (int)$rid] + $ueb;
             }
         }
@@ -1128,7 +1130,8 @@ class ZhlBundleBookPresenter
         foreach ($resourceIds as $rid) {
             $rid = (int)$rid;
             $ueb = $this->lookupUebergabe($db, $rid);
-            if ($ueb['einfuehrung'] !== 'notwendig' || $this->userIsCertified($db, $user->UserId, $rid)) {
+            // Admin-Gruppe (Nutzer-Vorgabe 2026-07-15): keine Einführung nötig, unabhängig vom Zertifikatsstatus.
+            if ($ueb['einfuehrung'] !== 'notwendig' || $user->IsAdmin || $this->userIsCertified($db, $user->UserId, $rid)) {
                 continue;
             }
             $ctid = $this->certTypeIdForResource($db, $rid);
@@ -1201,7 +1204,8 @@ class ZhlBundleBookPresenter
         if ($rid <= 0) {
             return null;
         }
-        if ($this->userIsCertified($db, $user->UserId, $rid)) {
+        // Admin-Gruppe (Nutzer-Vorgabe 2026-07-15): keine Einführung nötig, unabhängig vom Zertifikatsstatus.
+        if ($user->IsAdmin || $this->userIsCertified($db, $user->UserId, $rid)) {
             return ['certified' => true, 'slots' => [], 'blocked' => false];
         }
         $ueb = $this->lookupUebergabe($db, $rid);
@@ -1277,7 +1281,8 @@ class ZhlBundleBookPresenter
             }
             foreach ($candidates as $rid) {
                 $ueb = $this->lookupUebergabe($db, (int)$rid);
-                if ($ueb['einfuehrung'] === 'notwendig' && !$this->userIsCertified($db, $user->UserId, (int)$rid)) {
+                // Admin-Gruppe (Nutzer-Vorgabe 2026-07-15): keine Einführung nötig, unabhängig vom Zertifikatsstatus.
+                if ($ueb['einfuehrung'] === 'notwendig' && !$user->IsAdmin && !$this->userIsCertified($db, $user->UserId, (int)$rid)) {
                     $label = (string)$it['type_label'];
                     if ($label !== '' && !in_array($label, $labels, true)) {
                         $labels[] = $label;

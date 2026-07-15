@@ -133,7 +133,7 @@ class ZhlBundleBookPresenter
         echo json_encode([
             'pickup' => $this->buildPickupVm($db, $user, $mainItems, $start, $end, $tz, $altChoices),
             'einf' => $this->buildEinfVm($db, $user, $mainItems, $start, $end, $tz, $mode, $altChoices),
-            'return' => $this->buildReturnVm($db, $user, $mainItems, $start, $end, $tz),
+            'return' => $this->buildReturnVm($db, $user, $mainItems, $start, $end, $tz, $altChoices),
         ], JSON_UNESCAPED_UNICODE);
     }
 
@@ -874,9 +874,9 @@ class ZhlBundleBookPresenter
         // Übergabe/Einführung werden NICHT mehr server-seitig gegen ein Default-Datum gerendert (das zeigte
         // fälschlich „kein Termin"). Stattdessen lädt das JS die Termine per AJAX zum GEWÄHLTEN Aufnahme-Start
         // (zhl-bundle-book.php?ajax=slots). Hier nur leichte Aktiv-Flags (kein Terminplaner-Call beim Laden).
-        $pickupRid = $this->firstTypeResourceNeeding($db, $mainItems, 'pickup');
-        $einfRid = $this->firstTypeResourceNeeding($db, $mainItems, 'einf');
-        $returnRid = $this->firstTypeResourceNeeding($db, $mainItems, 'return');
+        $pickupRid = $this->firstTypeResourceNeeding($db, $mainItems, 'pickup', $altChoices);
+        $einfRid = $this->firstTypeResourceNeeding($db, $mainItems, 'einf', $altChoices);
+        $returnRid = $this->firstTypeResourceNeeding($db, $mainItems, 'return', $altChoices);
         $pickupActive = $pickupRid > 0;
         $pickupMandatory = false;
         if ($pickupActive) {
@@ -1408,7 +1408,7 @@ class ZhlBundleBookPresenter
     /** Pickup-VM für die Anzeige (Proxy über die Typ-Geräte des Bundles). */
     private function buildPickupVm($db, UserSession $user, array $mainItems, string $aroundYmd, string $loanEndYmd, $tz, array $altChoices = []): ?array
     {
-        $rid = $this->firstTypeResourceNeeding($db, $mainItems, 'pickup');
+        $rid = $this->firstTypeResourceNeeding($db, $mainItems, 'pickup', $altChoices);
         if ($rid <= 0) {
             return null;
         }
@@ -1435,9 +1435,9 @@ class ZhlBundleBookPresenter
      * Rückgabe-VM (SPEC-RUECKGABE) für die Anzeige (Proxy über die Typ-Geräte des Bundles). Slots ab
      * Floor = max(Endtag-Anfang, Start-Anker). $endYmd = gewählter Aufnahme-Endtag (für Multi-Day-Floor).
      */
-    private function buildReturnVm($db, UserSession $user, array $mainItems, string $startYmd, string $endYmd, $tz): ?array
+    private function buildReturnVm($db, UserSession $user, array $mainItems, string $startYmd, string $endYmd, $tz, array $altChoices = []): ?array
     {
-        $rid = $this->firstTypeResourceNeeding($db, $mainItems, 'return');
+        $rid = $this->firstTypeResourceNeeding($db, $mainItems, 'return', $altChoices);
         if ($rid <= 0) {
             return null;
         }
@@ -1457,7 +1457,7 @@ class ZhlBundleBookPresenter
 
     private function buildEinfVm($db, UserSession $user, array $mainItems, string $aroundYmd, string $loanEndYmd, $tz, string $mode = 'zusammen', array $altChoices = []): ?array
     {
-        $rid = $this->firstTypeResourceNeeding($db, $mainItems, 'einf');
+        $rid = $this->firstTypeResourceNeeding($db, $mainItems, 'einf', $altChoices);
         if ($rid <= 0) {
             return null;
         }
@@ -1472,7 +1472,7 @@ class ZhlBundleBookPresenter
         // Dann ist der Einführungs-Slot zugleich der Übergabetag → die Reservierung beginnt an diesem Tag,
         // also muss das Gerät ab da bis Nutzungsende frei sein. Im „getrennt"-Modus ist die Einführung ein
         // Personentermin ohne Gerätebindung (Reservierung erst ab separatem Abholtag) → NICHT filtern.
-        $combinedEligible = ($mode === 'zusammen') && $this->firstTypeResourceNeeding($db, $mainItems, 'pickup') > 0;
+        $combinedEligible = ($mode === 'zusammen') && $this->firstTypeResourceNeeding($db, $mainItems, 'pickup', $altChoices) > 0;
         $slots = $combinedEligible
             ? $this->filterSlotsByBundleAvailability($db, $user, $mainItems, $f['slots'], $loanEndYmd, $tz, $altChoices)
             : $f['slots'];
@@ -1490,11 +1490,20 @@ class ZhlBundleBookPresenter
         ];
     }
 
-    /** Erstes Typ-Gerät eines Main-Items, das Abholung ('pickup') bzw. Einführung ('einf') braucht. */
-    private function firstTypeResourceNeeding($db, array $mainItems, string $kind): int
+    /**
+     * Erstes Typ-Gerät eines Main-Items, das Abholung ('pickup')/Einführung ('einf')/Rückgabe ('return')
+     * braucht. $altChoices berücksichtigen (E1) — sonst könnte eine NICHT gewählte Alt-Gruppen-Option
+     * (z. B. Stativ statt des gewählten Gimbal) fälschlich Abhol-/Einführungspflicht oder den falschen
+     * Terminplaner-Member bestimmen.
+     */
+    private function firstTypeResourceNeeding($db, array $mainItems, string $kind, array $altChoices = []): int
     {
+        [$autoGroups, $groupOptions] = $this->altGroupMeta($mainItems);
         foreach ($mainItems as $it) {
             if ((int)$it['quantity'] <= 0) {
+                continue;
+            }
+            if ($this->altGroupItemExcluded($it, $autoGroups, $groupOptions, $altChoices)) {
                 continue;
             }
             $candidates = [];
@@ -1714,27 +1723,13 @@ class ZhlBundleBookPresenter
     }
 
     /**
-     * Task C/B — Pflicht-Anforderungen des Bundles als Options-Sets (gemeinsame Wahrheitsquelle für
-     * Kalender UND Slot-Filter). Jede Anforderung = Liste alternativer Options-Sets {ids, qty}:
-     * normale Position = ein Set; alt_group = je Mitglied-Option ein Set. Kandidaten sind auf die
-     * Resolver-Basis gefiltert (buchbar + nicht HIDDEN).
-     *
-     * E1: $altChoices (group => gewählter type_label) schränkt eine choice-Gruppe auf GENAU die gewählte
-     * Option ein — exakt wie der Resolver, der nur die gewählte Option auflöst. Ohne (gültige) Wahl bzw.
-     * für auto-Gruppen bleiben ALLE Optionen als Alternativ-Sets erhalten (Gruppe frei, sobald eine frei).
-     *
-     * @param array[]            $mainItems  keep-gefilterte Main-Items
-     * @param array<string,string> $altChoices group => gewählter type_label (leer = keine Einschränkung)
-     * @return array{0: array[], 1: int[]}  [requirements, allCandidateIds]
+     * Gruppen-Metadaten aus $mainItems: welche Alt-Gruppen sind 'auto' (keine User-Wahl) + welche
+     * type_labels sind je Gruppe gültige Optionen. Gemeinsame Basis für bundleRequirements() und
+     * firstTypeResourceNeeding(), damit beide dieselbe Alt-Gruppen-Filterlogik verwenden.
+     * @return array{0: array<string,bool>, 1: array<string,array<string,bool>>} [autoGroups, groupOptions]
      */
-    private function bundleRequirements($db, UserSession $user, array $mainItems, array $altChoices = []): array
+    private function altGroupMeta(array $mainItems): array
     {
-        $allowed = $this->allowedResourceIds($user);
-        // E1: auto-Gruppen NICHT auf eine Wahl einschränken — dort pickt der Resolver automatisch die erste
-        // freie Option nach Priorität; eine User-Wahl gibt es nicht (Radios sind ausgeblendet).
-        // Zugleich die gültigen Options-Labels je Gruppe sammeln, damit eine GEFÄLSCHTE/unbekannte Wahl
-        // ($altChoices[g] ist keine echte Option) wie „keine Wahl" behandelt wird (alle Optionen bleiben) —
-        // statt alle Optionen wegzufiltern. Spiegelt den Resolver, der eine ungültige Wahl nicht akzeptiert.
         $autoGroups = [];
         $groupOptions = []; // group => [type_label => true]
         foreach ($mainItems as $it) {
@@ -1750,6 +1745,52 @@ class ZhlBundleBookPresenter
                 $groupOptions[$g][$tl] = true;
             }
         }
+        return [$autoGroups, $groupOptions];
+    }
+
+    /**
+     * E1: Gehört $it zu einer choice/multi-Alt-Gruppe mit GÜLTIGER Wahl in $altChoices, aber ist NICHT
+     * die gewählte Option? Dann soll $it ignoriert werden. „Gültig" = mind. eine gewählte Option ist eine
+     * echte Option der Gruppe; eine unbekannte/fehlende Wahl gilt als „keine Wahl" (alle Optionen bleiben),
+     * damit eine gefälschte Eingabe nicht die ganze Gruppe wegfiltert. Wahl kann String (choice/auto) ODER
+     * Array (multi) sein → auf eine Menge normalisieren, wie ZhlBundleResolver::ResolvePhase — sonst würde
+     * eine Multi-Wahl (Array) per (string)-Cast zu "Array" verstümmelt und die Gruppe faktisch ungefiltert
+     * bleiben. auto-Gruppen NICHT einschränken — dort pickt der Resolver automatisch die erste freie Option.
+     */
+    private function altGroupItemExcluded(array $it, array $autoGroups, array $groupOptions, array $altChoices): bool
+    {
+        $group = (isset($it['alt_group']) && $it['alt_group'] !== '') ? (string)$it['alt_group'] : null;
+        if ($group === null || !empty($autoGroups[$group])) {
+            return false;
+        }
+        $sel = $altChoices[$group] ?? null;
+        $chosenSet = is_array($sel)
+            ? array_flip(array_map('strval', $sel))
+            : ($sel !== null && (string)$sel !== '' ? [(string)$sel => true] : []);
+        $validChoice = !empty(array_intersect_key($chosenSet, $groupOptions[$group] ?? []));
+        return $validChoice && !isset($chosenSet[(string)$it['type_label']]);
+    }
+
+    /**
+     * Task C/B — Pflicht-Anforderungen des Bundles als Options-Sets (gemeinsame Wahrheitsquelle für
+     * Kalender UND Slot-Filter). Jede Anforderung = Liste alternativer Options-Sets {ids, qty}:
+     * normale Position = ein Set; alt_group = je Mitglied-Option ein Set. Kandidaten sind auf die
+     * Resolver-Basis gefiltert (buchbar + nicht HIDDEN).
+     *
+     * E1: $altChoices (group => gewählter type_label(s)) schränkt eine choice-Gruppe auf GENAU die
+     * gewählte(n) Option(en) ein — exakt wie der Resolver, der nur die gewählte(n) Option(en) auflöst.
+     * Ohne (gültige) Wahl bzw. für auto-Gruppen bleiben ALLE Optionen als Alternativ-Sets erhalten
+     * (Gruppe frei, sobald eine frei).
+     *
+     * @param array[]                      $mainItems  keep-gefilterte Main-Items
+     * @param array<string,string|string[]> $altChoices group => gewählter type_label (choice/auto)
+     *                                                   oder type_labels (multi); leer = keine Einschränkung
+     * @return array{0: array[], 1: int[]}  [requirements, allCandidateIds]
+     */
+    private function bundleRequirements($db, UserSession $user, array $mainItems, array $altChoices = []): array
+    {
+        $allowed = $this->allowedResourceIds($user);
+        [$autoGroups, $groupOptions] = $this->altGroupMeta($mainItems);
         $requirements = [];
         $altReq = [];   // group => index in $requirements
         $allIds = [];
@@ -1758,16 +1799,10 @@ class ZhlBundleBookPresenter
             if ($qty <= 0 || (int)$it['required'] !== 1) {
                 continue; // Packliste + optionale Positionen blocken weder Kalender noch Slots.
             }
-            $group = (isset($it['alt_group']) && $it['alt_group'] !== '') ? (string)$it['alt_group'] : null;
-            // E1: Bei einer GÜLTIGEN Wahl in einer choice-Gruppe nur die gewählte Option berücksichtigen.
-            // „Gültig" = die Wahl ist eine echte Option der Gruppe; eine unbekannte Wahl wird ignoriert
-            // (alle Optionen bleiben), damit eine gefälschte Eingabe nicht die ganze Gruppe wegfiltert.
-            if ($group !== null && empty($autoGroups[$group])
-                && isset($altChoices[$group]) && $altChoices[$group] !== ''
-                && isset($groupOptions[$group][(string)$altChoices[$group]])
-                && (string)$altChoices[$group] !== (string)$it['type_label']) {
+            if ($this->altGroupItemExcluded($it, $autoGroups, $groupOptions, $altChoices)) {
                 continue; // gültige Wahl, aber nicht DIESE Option → ignorieren.
             }
+            $group = (isset($it['alt_group']) && $it['alt_group'] !== '') ? (string)$it['alt_group'] : null;
             $ids = $it['specific_resource_id'] !== null
                 ? [(int)$it['specific_resource_id']]
                 : $this->resourceIdsOfType($db, (string)$it['type_label']);

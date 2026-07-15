@@ -372,6 +372,11 @@
 		document.querySelectorAll('input[type="radio"][name^="alt_"]:checked').forEach(function (r) {
 			qs += '&' + encodeURIComponent(r.name) + '=' + encodeURIComponent(r.value);
 		});
+		// Multi-Wahl-Gruppen (alt_mode='multi') sind Checkboxen (name="alt_<group>[]") — ohne diese
+		// würde der Server bei Mehrfachauswahl nie eine Wahl sehen und die Gruppe ungefiltert lassen.
+		document.querySelectorAll('input[type="checkbox"][name^="alt_"]:checked').forEach(function (c) {
+			qs += '&' + encodeURIComponent(c.name) + '=' + encodeURIComponent(c.value);
+		});
 		return qs;
 	}
 	function loadSlots(startYmd) {
@@ -415,7 +420,8 @@
 
 	// E1: Wechselt der Nutzer eine Alternativ-Option (Stativ↔Gimbal o.ä.), die Slots neu gegen die
 	// nun gewählte Option filtern (ein zuvor passender Slot kann mit der anderen Option belegt sein).
-	document.querySelectorAll('input[type="radio"][name^="alt_"]').forEach(function (r) {
+	// Radios (choice) UND Checkboxen (multi) — siehe altQuery().
+	document.querySelectorAll('input[name^="alt_"]').forEach(function (r) {
 		r.addEventListener('change', function () {
 			var ds = document.getElementById('dayStart');
 			if (ds && ds.value) { loadSlots(ds.value); }

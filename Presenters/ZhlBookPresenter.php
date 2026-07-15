@@ -112,8 +112,10 @@ class ZhlBookPresenter
                 $einf = ['certified' => false, 'required' => ($ueb['einfuehrung'] === 'notwendig'), 'slots' => $f['slots'], 'days' => $this->groupPickupByDay($f['slots'], $tz), 'earliestLabel' => $f['earliestLabel']];
             }
         }
+        // Admin-Gruppe (Nutzer-Vorgabe 2026-07-15): keine Übergabe (Abholung/Rückgabe) nötig — bucht
+        // einfach und entnimmt/bringt selbst zurück, ohne Termin. Picker daher gar nicht erst anbieten.
         $pickup = null;
-        if ($this->pickupApplies($ueb)) {
+        if (!$user->IsAdmin && $this->pickupApplies($ueb)) {
             $f = $this->fetchHandoverSlots($this->handoverTypeLabels(), $ueb['tp_member_id'], $loanStartUtc, $tz);
             // Task B: Abhol-Slots gegen die Geräte-Verfügbarkeit über [Abholtag … Nutzungsende] filtern.
             // Die Reservierung beginnt am Abholtag → wählt der Nutzer einen frühen Abhol-Slot, an dessen
@@ -128,7 +130,7 @@ class ZhlBookPresenter
         }
         // Rückgabe-Slots (SPEC-RUECKGABE): selber Typ wie Abholung, Floor = max(Endtag-Anfang, Start-Anker).
         $return = null;
-        if ($this->returnApplies($ueb)) {
+        if (!$user->IsAdmin && $this->returnApplies($ueb)) {
             $floorUtc = $this->returnFloorUtc($start, $time, $end, $tz);
             $f = $this->fetchReturnSlots($this->handoverTypeLabels(), $ueb['tp_member_id'], $floorUtc, $tz);
             $mandatory = !$user->IsAdmin;
@@ -842,9 +844,10 @@ class ZhlBookPresenter
             }
         }
 
-        // Abhol-Slot-Picker (C1) — nur wenn das Gerät überhaupt abgeholt werden muss.
+        // Abhol-Slot-Picker (C1) — nur wenn das Gerät überhaupt abgeholt werden muss. Admin-Gruppe
+        // (Nutzer-Vorgabe 2026-07-15): keine Übergabe nötig — Picker gar nicht erst anbieten.
         $pickup = null;
-        if ($this->pickupApplies($ueb)) {
+        if (!$user->IsAdmin && $this->pickupApplies($ueb)) {
             $loanStartUtc = Date::Parse($beginDate . ' ' . $beginTime, $tz)->ToTimezone('UTC')->Format('Y-m-d H:i:s');
             $f = $this->fetchHandoverSlots($this->handoverTypeLabels(), $ueb['tp_member_id'], $loanStartUtc, $tz);
             $mandatory = !$user->IsAdmin;
@@ -864,7 +867,7 @@ class ZhlBookPresenter
         // Rückgabe-Slot-Picker (SPEC-RUECKGABE) — nur bei persönlicher Rückgabe. Floor = max(Endtag-Anfang,
         // Start-Anker); selber Terminplaner-Typ wie die Abholung. 'blocked' = Pflicht ohne freien Slot (AK-9-Andockpunkt).
         $return = null;
-        if ($this->returnApplies($ueb)) {
+        if (!$user->IsAdmin && $this->returnApplies($ueb)) {
             $floorUtc = $this->returnFloorUtc($beginDate, $beginTime, $endDate, $tz);
             $f = $this->fetchReturnSlots($this->handoverTypeLabels(), $ueb['tp_member_id'], $floorUtc, $tz);
             $mandatory = !$user->IsAdmin;

@@ -874,9 +874,9 @@ class ZhlBundleBookPresenter
         // Übergabe/Einführung werden NICHT mehr server-seitig gegen ein Default-Datum gerendert (das zeigte
         // fälschlich „kein Termin"). Stattdessen lädt das JS die Termine per AJAX zum GEWÄHLTEN Aufnahme-Start
         // (zhl-bundle-book.php?ajax=slots). Hier nur leichte Aktiv-Flags (kein Terminplaner-Call beim Laden).
-        $pickupRid = $this->firstTypeResourceNeeding($db, $mainItems, 'pickup', $altChoices);
-        $einfRid = $this->firstTypeResourceNeeding($db, $mainItems, 'einf', $altChoices);
-        $returnRid = $this->firstTypeResourceNeeding($db, $mainItems, 'return', $altChoices);
+        $pickupRid = $this->firstTypeResourceNeeding($db, $user, $mainItems, 'pickup', $altChoices);
+        $einfRid = $this->firstTypeResourceNeeding($db, $user, $mainItems, 'einf', $altChoices);
+        $returnRid = $this->firstTypeResourceNeeding($db, $user, $mainItems, 'return', $altChoices);
         $pickupActive = $pickupRid > 0;
         $pickupMandatory = false;
         if ($pickupActive) {
@@ -1408,7 +1408,7 @@ class ZhlBundleBookPresenter
     /** Pickup-VM für die Anzeige (Proxy über die Typ-Geräte des Bundles). */
     private function buildPickupVm($db, UserSession $user, array $mainItems, string $aroundYmd, string $loanEndYmd, $tz, array $altChoices = []): ?array
     {
-        $rid = $this->firstTypeResourceNeeding($db, $mainItems, 'pickup', $altChoices);
+        $rid = $this->firstTypeResourceNeeding($db, $user, $mainItems, 'pickup', $altChoices);
         if ($rid <= 0) {
             return null;
         }
@@ -1437,7 +1437,7 @@ class ZhlBundleBookPresenter
      */
     private function buildReturnVm($db, UserSession $user, array $mainItems, string $startYmd, string $endYmd, $tz, array $altChoices = []): ?array
     {
-        $rid = $this->firstTypeResourceNeeding($db, $mainItems, 'return', $altChoices);
+        $rid = $this->firstTypeResourceNeeding($db, $user, $mainItems, 'return', $altChoices);
         if ($rid <= 0) {
             return null;
         }
@@ -1457,7 +1457,7 @@ class ZhlBundleBookPresenter
 
     private function buildEinfVm($db, UserSession $user, array $mainItems, string $aroundYmd, string $loanEndYmd, $tz, string $mode = 'zusammen', array $altChoices = []): ?array
     {
-        $rid = $this->firstTypeResourceNeeding($db, $mainItems, 'einf', $altChoices);
+        $rid = $this->firstTypeResourceNeeding($db, $user, $mainItems, 'einf', $altChoices);
         if ($rid <= 0) {
             return null;
         }
@@ -1472,7 +1472,7 @@ class ZhlBundleBookPresenter
         // Dann ist der Einführungs-Slot zugleich der Übergabetag → die Reservierung beginnt an diesem Tag,
         // also muss das Gerät ab da bis Nutzungsende frei sein. Im „getrennt"-Modus ist die Einführung ein
         // Personentermin ohne Gerätebindung (Reservierung erst ab separatem Abholtag) → NICHT filtern.
-        $combinedEligible = ($mode === 'zusammen') && $this->firstTypeResourceNeeding($db, $mainItems, 'pickup', $altChoices) > 0;
+        $combinedEligible = ($mode === 'zusammen') && $this->firstTypeResourceNeeding($db, $user, $mainItems, 'pickup', $altChoices) > 0;
         $slots = $combinedEligible
             ? $this->filterSlotsByBundleAvailability($db, $user, $mainItems, $f['slots'], $loanEndYmd, $tz, $altChoices)
             : $f['slots'];
@@ -1494,9 +1494,12 @@ class ZhlBundleBookPresenter
      * Erstes Typ-Gerät eines Main-Items, das Abholung ('pickup')/Einführung ('einf')/Rückgabe ('return')
      * braucht. $altChoices berücksichtigen (E1) — sonst könnte eine NICHT gewählte Alt-Gruppen-Option
      * (z. B. Stativ statt des gewählten Gimbal) fälschlich Abhol-/Einführungspflicht oder den falschen
-     * Terminplaner-Member bestimmen.
+     * Terminplaner-Member bestimmen. Admin-Gruppe (Nutzer-Vorgabe 2026-07-15): braucht keine Übergabe
+     * (Abholung/Rückgabe) — bucht einfach und entnimmt/bringt selbst zurück, ohne Termin. 'einf' bewusst
+     * NICHT hier gaten: buildEinfVm() braucht den $rid auch für Admins, um die Zertifikats-Kurzfassung
+     * ("keine Einführung nötig") + coveredDevices korrekt aufzulösen.
      */
-    private function firstTypeResourceNeeding($db, array $mainItems, string $kind, array $altChoices = []): int
+    private function firstTypeResourceNeeding($db, UserSession $user, array $mainItems, string $kind, array $altChoices = []): int
     {
         [$autoGroups, $groupOptions] = $this->altGroupMeta($mainItems);
         foreach ($mainItems as $it) {
@@ -1514,13 +1517,13 @@ class ZhlBundleBookPresenter
             }
             foreach ($candidates as $rid) {
                 $ueb = $this->lookupUebergabe($db, (int)$rid);
-                if ($kind === 'pickup' && $this->pickupApplies($ueb)) {
+                if ($kind === 'pickup' && !$user->IsAdmin && $this->pickupApplies($ueb)) {
                     return (int)$rid;
                 }
                 if ($kind === 'einf' && $ueb['einfuehrung'] === 'notwendig') {
                     return (int)$rid;
                 }
-                if ($kind === 'return' && $this->returnApplies($ueb)) {
+                if ($kind === 'return' && !$user->IsAdmin && $this->returnApplies($ueb)) {
                     return (int)$rid;
                 }
             }

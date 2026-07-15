@@ -252,7 +252,7 @@
 					{if $Einf.mode != 'keine'}
 						<div id="zhl-einf-wrap" data-required="{if $Einfuehrung == 'notwendig'}1{else}0{/if}" data-active="{if !$Einf.certified}1{else}0{/if}">
 						{if $Einf.certified}
-							<div class="zhl-ueb-item ok"><strong>✓ Du bist bereits eingeführt</strong> <span class="zhl-muted zhl-small">Für dieses Gerät liegt ein Einführungs-Nachweis vor — kein Termin nötig.</span></div>
+							<div class="zhl-ueb-item ok"><strong>✓ Keine Einführung nötig</strong> <span class="zhl-muted zhl-small">Einführungs-Nachweis vorhanden oder für dich (z. B. als Administrator) nicht erforderlich — kein Termin nötig.</span></div>
 						{elseif $Einf.days}
 							<div class="zhl-einf-pick zhl-pickup">
 								<div class="zhl-einf-head">Einführungstermin wählen{if $Einfuehrung == 'notwendig'} <span class="zhl-req">*</span>{/if}</div>
@@ -418,7 +418,7 @@
 		var active = einfWrap.getAttribute('data-active') === '1';
 		var required = einfWrap.getAttribute('data-required') === '1';
 		if (vm && vm.certified) {
-			einfWrap.innerHTML = '<div class="zhl-ueb-item ok"><strong>✓ Du bist bereits eingeführt</strong> <span class="zhl-muted zhl-small">Für dieses Gerät liegt ein Einführungs-Nachweis vor — kein Termin nötig.</span></div>';
+			einfWrap.innerHTML = '<div class="zhl-ueb-item ok"><strong>✓ Keine Einführung nötig</strong> <span class="zhl-muted zhl-small">Einführungs-Nachweis vorhanden oder für dich (z. B. als Administrator) nicht erforderlich — kein Termin nötig.</span></div>';
 			return false;
 		}
 		if (!active || !vm) { return false; }

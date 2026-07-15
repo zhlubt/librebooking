@@ -193,19 +193,39 @@ function zhl_handover_resource_accessories(int $resourceId): array
     return $stmt->fetchAll();
 }
 
-/** Übergabe-Datensätze für die Admin-Übersicht (optional gefiltert nach Status). */
-function zhl_handover_list(?string $status = null): array
-{
+/**
+ * Übergabe-Datensätze für die Admin-Übersicht „Persönliche Übergaben", gefiltert.
+ * $upcomingOnly blendet erledigte/vergangene Termine aus (scheduled_start_utc < jetzt
+ * UND status IN (done)) — 'requested'/'confirmed' ohne Termin oder in der Zukunft bleiben.
+ */
+function zhl_handover_list(
+    ?string $status = null,
+    ?string $type = null,
+    ?string $ref = null,
+    bool $upcomingOnly = false
+): array {
     $sql = "SELECT h.*, r.name AS resource_name,
                    EXISTS(SELECT 1 FROM zhl_handover_check c
                           WHERE c.type = h.type
                             AND (c.reference_number = h.reference_number OR c.handover_token = h.handover_token)) AS has_check
             FROM zhl_booking_handover h
-            LEFT JOIN resources r ON r.resource_id = h.resource_id";
+            LEFT JOIN resources r ON r.resource_id = h.resource_id
+            WHERE 1=1";
     $params = [];
-    if ($status !== null && in_array($status, ['requested', 'confirmed', 'done'], true)) {
-        $sql .= ' WHERE h.status = ?';
+    if ($status !== null && in_array($status, ['requested', 'confirmed', 'done', 'cancelled'], true)) {
+        $sql .= ' AND h.status = ?';
         $params[] = $status;
+    }
+    if ($type !== null && in_array($type, ['pickup', 'return', 'einf'], true)) {
+        $sql .= ' AND h.type = ?';
+        $params[] = $type;
+    }
+    if ($ref !== null && $ref !== '') {
+        $sql .= ' AND h.reference_number = ?';
+        $params[] = $ref;
+    }
+    if ($upcomingOnly) {
+        $sql .= " AND h.status <> 'done'";
     }
     $sql .= ' ORDER BY h.updated_at DESC, h.id DESC LIMIT 200';
     $stmt = zhl_handover_db()->prepare($sql);
@@ -267,79 +287,6 @@ function zhl_handover_borrower_name(?string $reference, ?string $token): string
     }
 
     return '';
-}
-
-/** Default-Rückgabeort eines Geräts (zhl_uebergabe.rueckgabeort) oder '' (Block D). */
-function zhl_handover_rueckgabeort(?int $resourceId): string
-{
-    if (!$resourceId) {
-        return '';
-    }
-    $stmt = zhl_handover_db()->prepare('SELECT rueckgabeort FROM zhl_uebergabe WHERE resource_id = ?');
-    $stmt->execute([$resourceId]);
-    $v = $stmt->fetchColumn();
-    return $v === false || $v === null ? '' : (string)$v;
-}
-
-/**
- * Fällige RÜCKGABEN eines Tages (Block D1, Medienmanager-Tagesseite).
- *
- * Alle zhl_booking_handover-Zeilen mit type='return', deren scheduled_end_utc in
- * das (in UTC umgerechnete) Tagesfenster [$startUtc, $endUtc) fällt. Joint das Gerät
- * (resources) und den Default-Rückgabeort (zhl_uebergabe). Storno ('cancelled') wird
- * ausgeblendet. $startUtc/$endUtc sind 'Y-m-d H:i:s'-UTC-Grenzen (halboffenes Intervall).
- *
- * @return array<int,array<string,mixed>>
- */
-function zhl_handover_returns_due(string $startUtc, string $endUtc): array
-{
-    $stmt = zhl_handover_db()->prepare(
-        "SELECT h.id, h.handover_token, h.reference_number, h.resource_id, h.status,
-                h.scheduled_start_utc, h.scheduled_end_utc,
-                r.name AS resource_name,
-                u.rueckgabeort
-         FROM zhl_booking_handover h
-         LEFT JOIN resources r ON r.resource_id = h.resource_id
-         LEFT JOIN zhl_uebergabe u ON u.resource_id = h.resource_id
-         WHERE h.type = 'return'
-           AND h.status <> 'cancelled'
-           AND h.scheduled_end_utc >= ?
-           AND h.scheduled_end_utc < ?
-         ORDER BY u.rueckgabeort IS NULL, u.rueckgabeort, h.scheduled_end_utc, h.id"
-    );
-    $stmt->execute([$startUtc, $endUtc]);
-    return $stmt->fetchAll();
-}
-
-/**
- * Anstehende ABHOLUNGEN in einem Zeitfenster (Ausleihen-Übersicht).
- *
- * Alle zhl_booking_handover-Zeilen mit type='pickup', deren scheduled_start_utc in
- * [$startUtc, $endUtc) fällt und die noch nicht abgeschlossen/storniert sind
- * (status requested|confirmed — 'done' heißt bereits abgeholt, 'cancelled' ist tot).
- * Joint das Gerät (resources) und den Default-Abholort (zhl_uebergabe).
- *
- * @return array<int,array<string,mixed>>
- */
-function zhl_handover_pickups_due(string $startUtc, string $endUtc): array
-{
-    $stmt = zhl_handover_db()->prepare(
-        "SELECT h.id, h.handover_token, h.reference_number, h.resource_id, h.status,
-                h.staff_member_id, h.staff_role,
-                h.scheduled_start_utc, h.scheduled_end_utc,
-                r.name AS resource_name,
-                u.abholort
-         FROM zhl_booking_handover h
-         LEFT JOIN resources r ON r.resource_id = h.resource_id
-         LEFT JOIN zhl_uebergabe u ON u.resource_id = h.resource_id
-         WHERE h.type = 'pickup'
-           AND h.status IN ('requested', 'confirmed')
-           AND h.scheduled_start_utc >= ?
-           AND h.scheduled_start_utc < ?
-         ORDER BY h.scheduled_start_utc, h.id"
-    );
-    $stmt->execute([$startUtc, $endUtc]);
-    return $stmt->fetchAll();
 }
 
 /** Konfigurierte Übergabe-Typ-Labels (terminplaner-Kategorienamen) — wie im Buchungsflow (ZhlBookPresenter::handoverTypeLabels). */

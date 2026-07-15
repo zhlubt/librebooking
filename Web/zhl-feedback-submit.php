@@ -24,12 +24,13 @@ require_once(ROOT_DIR . 'lib/Email/namespace.php');
 require_once(ROOT_DIR . 'Presenters/ZhlTerminRequestEmail.php');
 
 // === Empfänger der Meldungen (bei Bedarf hier anpassen) ===
-const ZHL_FEEDBACK_RECIPIENT = 'paul.doelle@uni-bayreuth.de';
-const ZHL_FEEDBACK_RECIPIENT_NAME = 'Paul Doelle';
+const ZHL_FEEDBACK_RECIPIENT = 'zhlmedien@uni-bayreuth.de';
+const ZHL_FEEDBACK_RECIPIENT_NAME = 'ZHL Medienausleihe';
 const ZHL_FEEDBACK_MIN_LEN = 10;
 const ZHL_FEEDBACK_MAX_LEN = 5000;
 const ZHL_FEEDBACK_MIN_INTERVAL = 15;  // Sekunden zwischen zwei Meldungen je Session
 const ZHL_FEEDBACK_MAX_PER_SESSION = 30;
+const ZHL_FEEDBACK_MAX_SHOT_BYTES = 8 * 1024 * 1024;  // dekodiertes Limit, s. zhl-feedback.js MAX_SHOT_BYTES
 
 header('Content-Type: application/json; charset=utf-8');
 header('X-Content-Type-Options: nosniff');
@@ -66,9 +67,26 @@ $href = trim((string)($_POST['href'] ?? ''));
 $pageTitle = trim((string)($_POST['page_title'] ?? ''));
 $contactEmail = trim((string)($_POST['contact_email'] ?? ''));
 $lang = trim((string)($_POST['lang'] ?? 'de'));
+$screenshotDataUrl = trim((string)($_POST['screenshot'] ?? ''));
 
 if (mb_strlen($message) < ZHL_FEEDBACK_MIN_LEN) {
     zhl_fb_json(false, 422, 'too_short');
+}
+
+// Screenshot (optional) aus Data-URL dekodieren — vom Client ohne das Melde-Fenster selbst
+// aufgenommen (zhl-feedback.js hideOwnUi()).
+$screenshotBytes = null;
+$screenshotFileName = null;
+if ($screenshotDataUrl !== '' && str_starts_with($screenshotDataUrl, 'data:image/')) {
+    $commaPos = strpos($screenshotDataUrl, ',');
+    if ($commaPos !== false) {
+        $header = substr($screenshotDataUrl, 0, $commaPos);
+        $raw = base64_decode(substr($screenshotDataUrl, $commaPos + 1), true);
+        if ($raw !== false && strlen($raw) > 0 && strlen($raw) <= ZHL_FEEDBACK_MAX_SHOT_BYTES) {
+            $screenshotBytes = $raw;
+            $screenshotFileName = str_contains($header, 'png') ? 'screenshot.png' : 'screenshot.jpg';
+        }
+    }
 }
 if (mb_strlen($message) > ZHL_FEEDBACK_MAX_LEN) {
     $message = mb_substr($message, 0, ZHL_FEEDBACK_MAX_LEN) . ' […]';
@@ -120,6 +138,7 @@ $bodyLines = [
     'Seite: ' . ($pageTitle !== '' ? $pageTitle . ' — ' : '') . ($href !== '' ? $href : '(unbekannt)'),
     'Zeitpunkt: ' . $when,
     'Browser: ' . ($ua !== '' ? $ua : '(unbekannt)'),
+    'Screenshot: ' . ($screenshotBytes !== null ? 'angehängt' : 'nein'),
 ];
 $body = implode("\n", $bodyLines);
 
@@ -129,7 +148,11 @@ $to = [new EmailAddress(ZHL_FEEDBACK_RECIPIENT, ZHL_FEEDBACK_RECIPIENT_NAME)];
 try {
     // Empfänger ist das (deutschsprachige) Team → Mail-Rahmen immer 'de', unabhängig von der
     // UI-Sprache des Melders. Dessen Sprache steht ggf. im Body-Text selbst.
-    ServiceLocator::GetEmailService()->Send(new ZhlTerminRequestEmail($to, [], $subjectName, $body, 'de'));
+    $emailMessage = new ZhlTerminRequestEmail($to, [], $subjectName, $body, 'de');
+    if ($screenshotBytes !== null) {
+        $emailMessage->AddStringAttachment($screenshotBytes, $screenshotFileName);
+    }
+    ServiceLocator::GetEmailService()->Send($emailMessage);
 } catch (Throwable $e) {
     Log::Error('ZHL Feedback: Mailversand fehlgeschlagen: %s', $e->getMessage());
     zhl_fb_json(false, 500, 'send_failed');

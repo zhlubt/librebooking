@@ -21,6 +21,7 @@
 
     var script = document.currentScript;
     var ENDPOINT = (script && script.getAttribute('data-endpoint')) || 'zhl-feedback-submit.php';
+    var MAX_SHOT_BYTES = 7 * 1024 * 1024; // muss unter Server-Limit (8 MB, s. ZHL_FEEDBACK_MAX_SHOT_BYTES) bleiben
 
     // Sprache: <html lang> oder vom ZHL-Umschalter gesetztes localStorage (zhlLang).
     function isEnglish() {
@@ -46,11 +47,15 @@
             msgPh: 'Beschreiben Sie kurz, was Sie gemacht haben und was schiefging …',
             emailLabel: 'Ihre E-Mail für Rückfragen (optional)',
             emailPh: 'name@uni-bayreuth.de',
+            shot: 'Screenshot des aktuellen Fensters anhängen',
+            shotHint: 'Sie werden gefragt, welches Fenster/welchen Tab Sie teilen möchten.',
             send: 'Absenden',
             sending: 'Wird gesendet …',
+            shooting: 'Screenshot wird vorbereitet …',
             ok: 'Vielen Dank! Ihre Meldung ist bei uns angekommen.',
             errShort: 'Bitte beschreiben Sie das Problem etwas genauer (mindestens ein Satz).',
-            errSend: 'Senden fehlgeschlagen. Bitte später erneut versuchen oder eine Mail an paul.doelle@uni-bayreuth.de.'
+            shotFail: 'Screenshot konnte nicht erstellt werden — wird ohne gesendet.',
+            errSend: 'Senden fehlgeschlagen. Bitte später erneut versuchen oder eine Mail an zhlmedien@uni-bayreuth.de.'
         },
         en: {
             badgeTitle: 'Site under development',
@@ -64,11 +69,15 @@
             msgPh: 'Briefly describe what you did and what went wrong …',
             emailLabel: 'Your e-mail for follow-up questions (optional)',
             emailPh: 'name@uni-bayreuth.de',
+            shot: 'Attach a screenshot of the current window',
+            shotHint: 'You will be asked which window/tab to share.',
             send: 'Send',
             sending: 'Sending …',
+            shooting: 'Preparing screenshot …',
             ok: 'Thank you! Your report has reached us.',
             errShort: 'Please describe the problem in a little more detail (at least one sentence).',
-            errSend: 'Sending failed. Please try again later or email paul.doelle@uni-bayreuth.de.'
+            shotFail: 'Screenshot could not be captured — sending without it.',
+            errSend: 'Sending failed. Please try again later or email zhlmedien@uni-bayreuth.de.'
         }
     };
 
@@ -108,6 +117,9 @@
         '.zhl-fb-modal textarea{min-height:120px;resize:vertical;margin-bottom:14px;}' +
         '.zhl-fb-modal input[type=email]{margin-bottom:14px;}' +
         '.zhl-fb-modal textarea:focus,.zhl-fb-modal input[type=email]:focus{outline:none;border-color:#009260;box-shadow:0 0 0 3px rgba(0,146,96,.15);}' +
+        '.zhl-fb-check{display:flex;align-items:flex-start;gap:8px;margin:0 0 4px;font-size:13.5px;color:#1f2a25;cursor:pointer;}' +
+        '.zhl-fb-check input{margin-top:3px;flex:none;}' +
+        '.zhl-fb-shothint{margin:0 0 14px;font-size:12px;color:#6b7a72;}' +
         '.zhl-fb-hp{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden;}' +
         '.zhl-fb-send{width:100%;border:none;cursor:pointer;background:linear-gradient(135deg,#009260 0%,#00744c 100%);' +
         'color:#fff;font:inherit;font-weight:650;font-size:15px;padding:12px;border-radius:10px;box-shadow:0 6px 16px rgba(0,146,96,.28);}' +
@@ -163,6 +175,8 @@
                         '<textarea id="zhl-fb-msg" required placeholder="' + esc(t('msgPh')) + '"></textarea>' +
                         '<label class="zhl-fb-label" for="zhl-fb-email">' + esc(t('emailLabel')) + '</label>' +
                         '<input type="email" id="zhl-fb-email" placeholder="' + esc(t('emailPh')) + '" autocomplete="email">' +
+                        '<label class="zhl-fb-check"><input type="checkbox" id="zhl-fb-shot"><span>' + esc(t('shot')) + '</span></label>' +
+                        '<p class="zhl-fb-shothint">' + esc(t('shotHint')) + '</p>' +
                         '<div class="zhl-fb-hp"><label>Bitte leer lassen<input type="text" id="zhl-fb-hp" tabindex="-1" autocomplete="off"></label></div>' +
                         '<button type="submit" class="zhl-fb-send">' + esc(t('send')) + '</button>' +
                         '<p class="zhl-fb-status" role="status"></p>' +
@@ -183,6 +197,63 @@
         }
         function close() { overlay.classList.remove('open'); }
 
+        /* Blendet Badge + Melde-Fenster aus (visibility:hidden -> kein Reflow) und wartet zwei
+           Frames + kurze Pause, damit der Screen-Capture-Stream den aktualisierten,
+           dialog-freien Zustand liefert. So landet das Melde-Fenster selbst nicht im Screenshot. */
+        function hideOwnUi() {
+            badge.style.visibility = 'hidden';
+            overlay.style.visibility = 'hidden';
+            return new Promise(function (resolve) {
+                requestAnimationFrame(function () {
+                    requestAnimationFrame(function () {
+                        setTimeout(resolve, 260);
+                    });
+                });
+            });
+        }
+
+        function restoreOwnUi() {
+            badge.style.visibility = '';
+            overlay.style.visibility = '';
+        }
+
+        /* Screenshot via native Screen-Capture-API (kein externes Lib). */
+        function captureScreenshot() {
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+                return Promise.reject(new Error('unsupported'));
+            }
+            var opts = { video: { cursor: 'never' }, audio: false, preferCurrentTab: true };
+            return navigator.mediaDevices.getDisplayMedia(opts).then(function (stream) {
+                var video = document.createElement('video');
+                video.srcObject = stream;
+
+                function stop() { try { stream.getTracks().forEach(function (tr) { tr.stop(); }); } catch (e) { /* noop */ } }
+
+                return video.play()
+                    .then(hideOwnUi)
+                    .then(function () {
+                        var w = video.videoWidth || window.innerWidth;
+                        var h = video.videoHeight || window.innerHeight;
+                        var canvas = document.createElement('canvas');
+                        canvas.width = w;
+                        canvas.height = h;
+                        canvas.getContext('2d').drawImage(video, 0, 0, w, h);
+                        stop();
+                        restoreOwnUi();
+                        var data = canvas.toDataURL('image/jpeg', 0.82);
+                        if (data.length > MAX_SHOT_BYTES) {
+                            data = canvas.toDataURL('image/jpeg', 0.55);
+                        }
+                        return data;
+                    })
+                    .catch(function (err) {
+                        stop();
+                        restoreOwnUi();
+                        throw err;
+                    });
+            });
+        }
+
         badge.addEventListener('click', open);
         overlay.querySelector('.zhl-fb-x').addEventListener('click', close);
         overlay.addEventListener('click', function (e) { if (e.target === overlay) { close(); } });
@@ -202,22 +273,44 @@
             }
 
             var btn = overlay.querySelector('.zhl-fb-send');
+            var shotEl = overlay.querySelector('#zhl-fb-shot');
             btn.disabled = true;
             btn.textContent = t('sending');
 
-            var body = new URLSearchParams();
-            body.set('message', text);
-            body.set('href', location.href);
-            body.set('page_title', document.title || '');
-            body.set('contact_email', overlay.querySelector('#zhl-fb-email').value.trim());
-            body.set('lang', isEnglish() ? 'en' : 'de');
-            body.set('hp', overlay.querySelector('#zhl-fb-hp').value);
+            var screenshotData = '';
+            var chain;
+            if (shotEl.checked) {
+                status.className = 'zhl-fb-status';
+                status.textContent = t('shooting');
+                chain = captureScreenshot().then(function (data) {
+                    screenshotData = data;
+                }).catch(function () {
+                    status.className = 'zhl-fb-status';
+                    status.textContent = t('shotFail');
+                });
+            } else {
+                chain = Promise.resolve();
+            }
 
-            fetch(ENDPOINT, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
-                credentials: 'same-origin',
-                body: body.toString()
+            chain.then(function () {
+                status.className = 'zhl-fb-status';
+                status.textContent = t('sending');
+
+                var body = new URLSearchParams();
+                body.set('message', text);
+                body.set('href', location.href);
+                body.set('page_title', document.title || '');
+                body.set('contact_email', overlay.querySelector('#zhl-fb-email').value.trim());
+                body.set('lang', isEnglish() ? 'en' : 'de');
+                body.set('hp', overlay.querySelector('#zhl-fb-hp').value);
+                body.set('screenshot', screenshotData);
+
+                return fetch(ENDPOINT, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
+                    credentials: 'same-origin',
+                    body: body.toString()
+                });
             }).then(function (r) {
                 return r.json().catch(function () { return { ok: r.ok }; });
             }).then(function (data) {
@@ -226,6 +319,7 @@
                     status.textContent = t('ok');
                     msg.value = '';
                     overlay.querySelector('#zhl-fb-email').value = '';
+                    shotEl.checked = false;
                     btn.disabled = false;
                     btn.textContent = t('send');
                     setTimeout(close, 2200);

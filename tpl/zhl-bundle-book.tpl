@@ -145,7 +145,7 @@
 				{* Übergabe / Abholung + Einführung — werden per AJAX zum GEWÄHLTEN Aufnahme-Start geladen
 				   (zhl-bundle-book.php?ajax=slots), damit die Termine gegen dein Datum gefiltert werden und
 				   kein Reload nötig ist (Titel/Auswahl bleiben erhalten). Datenattribute steuern das JS. *}
-				{if $EinfCertified}<div class="zhl-ueb-item ok" style="margin-top:16px;"><strong>✓ Du bist bereits eingeführt</strong></div>{/if}
+				{if $EinfCertified}<div class="zhl-ueb-item ok" style="margin-top:16px;"><strong>✓ Keine Einführung nötig</strong></div>{/if}
 				{if $PickupActive || $EinfActive || $ReturnActive}
 					<div id="zhl-slots"
 						data-bid="{$BundleId}"

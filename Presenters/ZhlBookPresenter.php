@@ -99,7 +99,8 @@ class ZhlBookPresenter
 
         $einf = null;
         if ($ueb['einfuehrung'] !== 'keine') {
-            if ($this->userIsCertified($db, $user->UserId, $rid)) {
+            // Admin-Gruppe (Nutzer-Vorgabe 2026-07-15): keine Einführung nötig, unabhängig vom Zertifikatsstatus.
+            if ($user->IsAdmin || $this->userIsCertified($db, $user->UserId, $rid)) {
                 $einf = ['certified' => true];
             } else {
                 $f = $this->fetchEinfuehrungSlots($ueb['einfuehrung_typ'], $ueb['tp_member_id'], $loanStartUtc, $tz);
@@ -234,7 +235,8 @@ class ZhlBookPresenter
         }
 
         // --- Einführungs-Gate (US-16/US-20): Zertifikat ODER Terminplaner-Slot, je nach Gerät ---
-        $certified = $ueb['einfuehrung'] === 'keine' ? true : $this->userIsCertified($db, $user->UserId, $rid);
+        // Admin-Gruppe (Nutzer-Vorgabe 2026-07-15): keine Einführung nötig, unabhängig vom Zertifikatsstatus.
+        $certified = $ueb['einfuehrung'] === 'keine' ? true : ($user->IsAdmin || $this->userIsCertified($db, $user->UserId, $rid));
         $einfRequired = ($ueb['einfuehrung'] === 'notwendig') && !$certified;
         $chosenSlot = $this->post('einf_slot');
 
@@ -812,7 +814,8 @@ class ZhlBookPresenter
             'blocked' => false,
         ];
         if ($ueb['einfuehrung'] !== 'keine') {
-            $einf['certified'] = $this->userIsCertified($db, $user->UserId, $rid);
+            // Admin-Gruppe (Nutzer-Vorgabe 2026-07-15): keine Einführung nötig, unabhängig vom Zertifikatsstatus.
+            $einf['certified'] = $user->IsAdmin || $this->userIsCertified($db, $user->UserId, $rid);
             if (!$einf['certified']) {
                 $loanStartUtc = Date::Parse($beginDate . ' ' . $beginTime, $tz)->ToTimezone('UTC')->Format('Y-m-d H:i:s');
                 $f = $this->fetchEinfuehrungSlots($ueb['einfuehrung_typ'], $ueb['tp_member_id'], $loanStartUtc, $tz);
@@ -1099,7 +1102,8 @@ class ZhlBookPresenter
         if (($ueb['einfuehrung'] ?? 'keine') === 'keine') {
             return true;
         }
-        return $this->userIsCertified($db, (int)$user->UserId, $rid);
+        // Admin-Gruppe (Nutzer-Vorgabe 2026-07-15): keine Einführung nötig, unabhängig vom Zertifikatsstatus.
+        return $user->IsAdmin || $this->userIsCertified($db, (int)$user->UserId, $rid);
     }
 
     /** Alle entity_ids (Ressourcen) eines Geräte-Typs — unabhängig von Permission. @return int[] */

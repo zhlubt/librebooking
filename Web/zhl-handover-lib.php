@@ -312,6 +312,85 @@ function zhl_handover_returns_due(string $startUtc, string $endUtc): array
 }
 
 /**
+ * Anstehende ABHOLUNGEN in einem Zeitfenster (Ausleihen-Übersicht).
+ *
+ * Alle zhl_booking_handover-Zeilen mit type='pickup', deren scheduled_start_utc in
+ * [$startUtc, $endUtc) fällt und die noch nicht abgeschlossen/storniert sind
+ * (status requested|confirmed — 'done' heißt bereits abgeholt, 'cancelled' ist tot).
+ * Joint das Gerät (resources) und den Default-Abholort (zhl_uebergabe).
+ *
+ * @return array<int,array<string,mixed>>
+ */
+function zhl_handover_pickups_due(string $startUtc, string $endUtc): array
+{
+    $stmt = zhl_handover_db()->prepare(
+        "SELECT h.id, h.handover_token, h.reference_number, h.resource_id, h.status,
+                h.staff_member_id, h.staff_role,
+                h.scheduled_start_utc, h.scheduled_end_utc,
+                r.name AS resource_name,
+                u.abholort
+         FROM zhl_booking_handover h
+         LEFT JOIN resources r ON r.resource_id = h.resource_id
+         LEFT JOIN zhl_uebergabe u ON u.resource_id = h.resource_id
+         WHERE h.type = 'pickup'
+           AND h.status IN ('requested', 'confirmed')
+           AND h.scheduled_start_utc >= ?
+           AND h.scheduled_start_utc < ?
+         ORDER BY h.scheduled_start_utc, h.id"
+    );
+    $stmt->execute([$startUtc, $endUtc]);
+    return $stmt->fetchAll();
+}
+
+/** Konfigurierte Übergabe-Typ-Labels (terminplaner-Kategorienamen) — wie im Buchungsflow (ZhlBookPresenter::handoverTypeLabels). */
+function zhl_handover_type_labels(): array
+{
+    $c = zhl_handover_config();
+    if (!empty($c['handover_type_labels']) && is_array($c['handover_type_labels'])) {
+        $labels = array_values(array_filter(array_map('strval', $c['handover_type_labels']), fn($l) => $l !== ''));
+        if ($labels) {
+            return $labels;
+        }
+    }
+    $defaults = ['Übergabe Medien', 'Medienübergabe', 'Abholung/Abgabe'];
+    $legacy = !empty($c['handover_type_label']) ? (string)$c['handover_type_label'] : null;
+    if ($legacy !== null && !in_array($legacy, $defaults, true)) {
+        $defaults[] = $legacy;
+    }
+    return $defaults;
+}
+
+/**
+ * terminplaner member_id -> ['name' => ?string, 'role' => 'primary'|'backup'] für alle
+ * Übergabe-Typ-Labels (Spalte „Zuständig", Ausleihen-Übersicht). Best-effort: bei
+ * Konfig-/Netzwerkfehler leere Map — der Aufrufer fällt dann auf staff_role zurück.
+ *
+ * @return array<int,array{name:?string,role:string}>
+ */
+function zhl_handover_staff_names(array $typeLabels): array
+{
+    require_once ROOT_DIR . 'Presenters/ZhlTerminplaner.php';
+    $map = [];
+    foreach ($typeLabels as $label) {
+        $resp = ZhlTerminplaner::Request('GET', '/api/lesson_slots.php', ['type_label' => $label]);
+        if (!$resp || !isset($resp['members'])) {
+            continue;
+        }
+        foreach ($resp['members'] as $mem) {
+            $id = isset($mem['member_id']) ? (int)$mem['member_id'] : 0;
+            if ($id <= 0 || isset($map[$id])) {
+                continue;
+            }
+            $map[$id] = [
+                'name' => trim((string)($mem['member_name'] ?? '')) ?: null,
+                'role' => ($mem['handover_role'] ?? 'backup') === 'primary' ? 'primary' : 'backup',
+            ];
+        }
+    }
+    return $map;
+}
+
+/**
  * Aktuell offene Rückgabe eines Geräts (Block D3, Material-QR-Scan-Ziel).
  * = type='return', status IN ('requested','confirmed'), älteste Soll-Rückgabe zuerst.
  * Gibt die Zeile (inkl. resource_name + rueckgabeort) oder null zurück.

@@ -122,7 +122,10 @@ class ZhlMedienmanagerPage extends SecurePage
 <div class="container py-4" style="max-width:1100px">
   <div class="d-flex justify-content-between align-items-center mb-1 flex-wrap gap-2">
     <h1 class="h4 mb-0"><i class="bi bi-truck text-success"></i> Medienmanager — Rückgaben</h1>
-    <a class="btn btn-sm btn-outline-secondary" href="zhl-handover-admin.php"><i class="bi bi-box-seam"></i> Alle Übergaben</a>
+    <div class="d-flex gap-2">
+      <a class="btn btn-sm btn-outline-secondary" href="zhl-medienmanager-ausleihen.php"><i class="bi bi-box-arrow-up-right"></i> Ausleihen</a>
+      <a class="btn btn-sm btn-outline-secondary" href="zhl-handover-admin.php"><i class="bi bi-box-seam"></i> Alle Übergaben</a>
+    </div>
   </div>
   <p class="text-muted mb-3">Fällige Rückgaben — gruppiert nach Rückgabeort. Bitte bestätigen Sie jede zurückgegebene Position über die Checkliste.</p>
 

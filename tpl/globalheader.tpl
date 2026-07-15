@@ -198,6 +198,9 @@
                                         <li id="navZhlHandover"><a class="dropdown-item"
                                                 href="{$Path}zhl-handover-admin.php">{translate key="ZhlNavHandovers"}</a>
                                         </li>
+                                        <li id="navZhlAusleihen"><a class="dropdown-item"
+                                                href="{$Path}zhl-medienmanager-ausleihen.php">{translate key="ZhlNavAusleihen"}</a>
+                                        </li>
                                     </ul>
                                 </li>
                             {/if}

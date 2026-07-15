@@ -391,6 +391,121 @@ function zhl_handover_staff_names(array $typeLabels): array
 }
 
 /**
+ * SQL-Fragment: korrelierte Subqueries, die Name + E-Mail des Ausleihenden zu einer
+ * zhl_booking_handover-Zeile (Alias `h`) auflösen — ohne Join-Fan-out und ohne GROUP BY
+ * (MySQL-8-ONLY_FULL_GROUP_BY-sicher). Bevorzugt die LB-Reservierung über reference_number,
+ * Fallback auf den Token-Eigentümer (zhl_handover_token). Liefert die Spalten
+ * `borrower_name` (kann NULL/'' sein → in PHP auf username/email zurückfallen) und
+ * `borrower_email`.
+ */
+function zhl_handover_borrower_sql(): string
+{
+    $nameFromRef =
+        "SELECT NULLIF(TRIM(CONCAT(COALESCE(u.fname,''),' ',COALESCE(u.lname,''))),'')
+         FROM reservation_instances ri
+         JOIN reservation_series rs ON rs.series_id = ri.series_id
+         JOIN users u ON u.user_id = rs.owner_id
+         WHERE ri.reference_number = h.reference_number LIMIT 1";
+    $nameFromTok =
+        "SELECT NULLIF(TRIM(CONCAT(COALESCE(u.fname,''),' ',COALESCE(u.lname,''))),'')
+         FROM zhl_handover_token t JOIN users u ON u.user_id = t.user_id
+         WHERE t.handover_token = h.handover_token LIMIT 1";
+    $mailFromRef =
+        "SELECT u.email FROM reservation_instances ri
+         JOIN reservation_series rs ON rs.series_id = ri.series_id
+         JOIN users u ON u.user_id = rs.owner_id
+         WHERE ri.reference_number = h.reference_number LIMIT 1";
+    $mailFromTok =
+        "SELECT u.email FROM zhl_handover_token t JOIN users u ON u.user_id = t.user_id
+         WHERE t.handover_token = h.handover_token LIMIT 1";
+    return "COALESCE(($nameFromRef), ($nameFromTok)) AS borrower_name,
+            COALESCE(($mailFromRef), ($mailFromTok)) AS borrower_email";
+}
+
+/**
+ * Geplante Übergaben/Rückgaben/Einführungen in einem UTC-Zeitfenster (Admin-Übersicht).
+ *
+ * Liefert alle nicht-stornierten zhl_booking_handover-Zeilen mit scheduled_start_utc in
+ * [$startUtc, $endUtc), inkl. Gerätename, Default-Rückgabeort und Name+E-Mail des
+ * Ausleihenden (zhl_handover_borrower_sql). $type optional auf 'pickup'|'return'|'einf'
+ * filtern. Chronologisch sortiert.
+ *
+ * @return array<int,array<string,mixed>>
+ */
+function zhl_handover_planned(string $startUtc, string $endUtc, ?string $type = null): array
+{
+    $borrower = zhl_handover_borrower_sql();
+    $sql =
+        "SELECT h.id, h.handover_token, h.reference_number, h.resource_id, h.type, h.status,
+                h.scheduled_start_utc, h.scheduled_end_utc, h.staff_role, h.terminplaner_booking_id,
+                r.name AS resource_name, ue.rueckgabeort,
+                $borrower
+         FROM zhl_booking_handover h
+         LEFT JOIN resources r ON r.resource_id = h.resource_id
+         LEFT JOIN zhl_uebergabe ue ON ue.resource_id = h.resource_id
+         WHERE h.status <> 'cancelled'
+           AND h.scheduled_start_utc IS NOT NULL
+           AND h.scheduled_start_utc >= ? AND h.scheduled_start_utc < ?";
+    $params = [$startUtc, $endUtc];
+    if (in_array($type, ['pickup', 'return', 'einf'], true)) {
+        $sql .= ' AND h.type = ?';
+        $params[] = $type;
+    }
+    $sql .= ' ORDER BY h.scheduled_start_utc, h.type, h.id';
+    $stmt = zhl_handover_db()->prepare($sql);
+    $stmt->execute($params);
+    return $stmt->fetchAll();
+}
+
+/** Resource-IDs des/der Videostudio-Geräte (Name enthält „Videostudio"). */
+function zhl_videostudio_resource_ids(): array
+{
+    $stmt = zhl_handover_db()->query(
+        "SELECT resource_id FROM resources WHERE name LIKE '%Videostudio%' ORDER BY resource_id"
+    );
+    return array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
+}
+
+/**
+ * Videostudio-Reservierungen in einem UTC-Zeitfenster (für den Kalender-Feed).
+ *
+ * Echte Buchungen des Studios selbst (nicht nur Übergaben), damit das ZHL-Team im
+ * abonnierten Outlook-Kalender die Studio-Belegung sieht. status_id IN (Created, Pending).
+ *
+ * @return array<int,array<string,mixed>>
+ */
+function zhl_studio_reservations(string $startUtc, string $endUtc): array
+{
+    $ids = zhl_videostudio_resource_ids();
+    if (empty($ids)) {
+        return [];
+    }
+    $in = implode(',', array_fill(0, count($ids), '?'));
+    $sql =
+        "SELECT ri.reservation_instance_id, ri.reference_number, ri.start_date, ri.end_date,
+                rs.title, rs.description, rs.status_id,
+                r.name AS resource_name,
+                TRIM(CONCAT(COALESCE(u.fname,''),' ',COALESCE(u.lname,''))) AS owner_name,
+                u.email AS owner_email
+         FROM reservation_instances ri
+         JOIN reservation_series rs ON rs.series_id = ri.series_id
+         JOIN reservation_resources rr ON rr.series_id = rs.series_id AND rr.resource_id IN ($in)
+         JOIN resources r ON r.resource_id = rr.resource_id
+         LEFT JOIN users u ON u.user_id = rs.owner_id
+         -- ReservationStatus: Created=1, Pending=3 (siehe Domain/Values/ReservationStatus.php);
+         -- Literale, damit diese ZHL-Lib ohne vollen Framework-Bootstrap nutzbar bleibt.
+         WHERE rs.status_id IN (1, 3)
+           -- Overlap statt nur Start im Fenster: auch Buchungen, die vor dem Fenster
+           -- starten und hineinlaufen (z. B. mehrtägige Studio-Belegung), erfassen.
+           AND ri.start_date < ? AND ri.end_date > ?
+         ORDER BY ri.start_date, ri.reservation_instance_id";
+    $params = array_merge($ids, [$endUtc, $startUtc]);
+    $stmt = zhl_handover_db()->prepare($sql);
+    $stmt->execute($params);
+    return $stmt->fetchAll();
+}
+
+/**
  * Aktuell offene Rückgabe eines Geräts (Block D3, Material-QR-Scan-Ziel).
  * = type='return', status IN ('requested','confirmed'), älteste Soll-Rückgabe zuerst.
  * Gibt die Zeile (inkl. resource_name + rueckgabeort) oder null zurück.

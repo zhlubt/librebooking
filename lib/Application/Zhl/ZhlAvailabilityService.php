@@ -105,7 +105,9 @@ class ZhlAvailabilityService
         $end = $start->AddDays($days);
         $items = empty($resourceIds) ? [] : $this->availability->GetItemsBetween($start, $end, $resourceIds);
         // Vorlaufzeit je Ressource (native min_notice_time_add, in SEKUNDEN) → frühester buchbarer Tag (US-17).
-        $noticeMap = empty($resourceIds) ? [] : $this->GetMinNoticeMap($resourceIds);
+        // Admins umgehen die Vorlaufzeit (sofort buchbar, wie im Buch-Flow ZhlBookPresenter) → im Raster
+        // erst gar kein „vorlauf“-Zustand, damit die Anzeige zur tatsächlichen Buchbarkeit passt.
+        $noticeMap = (empty($resourceIds) || $user->IsAdmin) ? [] : $this->GetMinNoticeMap($resourceIds);
 
         // Belegung je Ressource indexieren — Interface-Methoden gelten für Reservierung UND Blackout.
         $byResource = [];

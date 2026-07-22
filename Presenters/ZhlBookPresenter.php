@@ -801,6 +801,12 @@ class ZhlBookPresenter
         $ueb = $this->lookupUebergabe($db, $rid);
 
         $noticeSec = $this->lookupMinNotice($db, $rid);
+        // Admins umgehen die Vorlaufzeit (sofort buchbar) — konsistent zur nativen
+        // ResourceMinimumNoticeRuleAdd (via AdminExcludedRule) und zu Pickup/Einführung/Rückgabe/Dauerlimit,
+        // die Admins ebenfalls ausnehmen. So bleibt der Kalender (weekGrid/monthGrid) ab heute wählbar.
+        if ($user->IsAdmin) {
+            $noticeSec = 0;
+        }
         $minNoticeDays = 0;
         $earliestLabel = null;
         $earliestYmd = null;

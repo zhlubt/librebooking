@@ -7,6 +7,7 @@ require_once(ROOT_DIR . 'Domain/namespace.php');
 require_once(ROOT_DIR . 'Domain/Access/namespace.php');
 require_once(ROOT_DIR . 'lib/Application/Zhl/ZhlLoanOverview.php');
 require_once(ROOT_DIR . 'Web/zhl-handover-lib.php');
+require_once(ROOT_DIR . 'Web/zhl-audit-lib.php');
 
 /**
  * Presenter „Ausleihen" — Agenda für den Ausleihe-Manager: was geht in den nächsten
@@ -93,9 +94,37 @@ class ZhlAusleihenPresenter
             'groups' => $days_grouped,
         ]);
     }
+
+    /**
+     * Admin-Aktion aus der „Derzeit ausgeliehen"-Ansicht: Ausleihe sofort beenden
+     * (Rückgabe als erledigt markieren + Reservierung auf jetzt verkürzen → Gerät wieder frei).
+     */
+    public function HandleEndLoan(UserSession $user): void
+    {
+        $ref = isset($_POST['ref']) ? trim((string)$_POST['ref']) : '';
+        if ($ref === '') {
+            $this->page->RedirectAfterEndLoan('error');
+            return;
+        }
+        try {
+            $res = zhl_handover_end_loan_now($ref);
+            zhl_audit_log(array_merge(zhl_audit_actor($user), [
+                'action' => 'ausleihe.end_loan_now',
+                'entity_type' => 'reservation',
+                'entity_id' => $ref,
+                'reference_number' => $ref,
+                'detail' => $res,
+            ]));
+            $this->page->RedirectAfterEndLoan('ok');
+        } catch (Throwable $e) {
+            Log::Error('ZHL-Ausleihe beenden fehlgeschlagen (ref=%s): %s', $ref, $e->getMessage());
+            $this->page->RedirectAfterEndLoan('error');
+        }
+    }
 }
 
 interface IZhlAusleihenPage
 {
     public function BindAusleihen(array $vm);
+    public function RedirectAfterEndLoan(string $status);
 }

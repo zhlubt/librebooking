@@ -26,6 +26,18 @@
       <span class="cnt" style="margin-left:auto;padding:6px 14px">{$RangeLabel|escape} · {$Total} Ausleihe{if $Total != 1}n{/if}</span>
     </div>
 
+    {if $EndedFlash}
+      <div class="info-box" style="border-color:#bfe3d2">
+        <span class="ib-ic"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="16 10 10.5 15.5 8 13"/></svg></span>
+        <span>Ausleihe beendet — das Gerät ist wieder buchbar.</span>
+      </div>
+    {/if}
+    {if $EndedError}
+      <div class="info-box" style="border-color:var(--err-bd)">
+        <span>Die Ausleihe konnte nicht beendet werden. Bitte erneut versuchen.</span>
+      </div>
+    {/if}
+
     {if $Total == 0}
       <div class="info-box">
         <span class="ib-ic"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="16 10 10.5 15.5 8 13"/></svg></span>
@@ -70,7 +82,16 @@
                     {/if}
                   </td>
                   <td style="font-size:13px">{if $row.location != ''}{$row.location|escape}{else}<span class="muted">—</span>{/if}</td>
-                  <td><span class="badge {$row.badgeClass|escape}">{$row.statusLabel|escape}</span></td>
+                  <td>
+                    <span class="badge {$row.badgeClass|escape}">{$row.statusLabel|escape}</span>
+                    {if $Filter == 'active'}
+                      <form method="post" style="margin-top:8px" onsubmit="return confirm('Diese Ausleihe jetzt als zurückgegeben markieren und beenden? Das Gerät wird sofort wieder buchbar.');">
+                        {csrf_token}
+                        <input type="hidden" name="ref" value="{$row.ref|escape}">
+                        <button type="submit" class="btn btn-outline btn-sm">Ausleihe beenden</button>
+                      </form>
+                    {/if}
+                  </td>
                 </tr>
               {/foreach}
               </tbody>

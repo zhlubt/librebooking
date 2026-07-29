@@ -28,6 +28,12 @@ class ZhlAusleihenPage extends SecurePage implements IZhlAusleihenPage
             return;
         }
 
+        if ($this->IsPost()) {
+            $this->EnforceCSRFCheck();
+            $this->presenter->HandleEndLoan($user);
+            return;
+        }
+
         $daysParam = (int)$this->GetQuerystring('days');
         $days = in_array($daysParam, [7, 14, 30], true) ? $daysParam : 14;
 
@@ -35,6 +41,8 @@ class ZhlAusleihenPage extends SecurePage implements IZhlAusleihenPage
         $filter = in_array($filterParam, ['upcoming', 'this_week', 'active'], true) ? $filterParam : 'upcoming';
 
         $this->presenter->PageLoad($user, $days, $filter);
+        $this->Set('EndedFlash', $this->GetQuerystring('beendet') === '1');
+        $this->Set('EndedError', $this->GetQuerystring('beendet_fehler') === '1');
         $this->Set('HideNavBar', false);
         $this->Display('zhl-ausleihen.tpl');
     }
@@ -44,5 +52,12 @@ class ZhlAusleihenPage extends SecurePage implements IZhlAusleihenPage
         foreach ($vm as $key => $value) {
             $this->Set(ucfirst($key), $value);
         }
+    }
+
+    public function RedirectAfterEndLoan(string $status)
+    {
+        $q = 'zhl-medienmanager-ausleihen.php?filter=active';
+        $q .= $status === 'ok' ? '&beendet=1' : '&beendet_fehler=1';
+        $this->Redirect($q);
     }
 }

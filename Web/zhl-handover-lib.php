@@ -542,3 +542,58 @@ function zhl_handover_shorten_reservation_on_return(string $reference, ?string $
         error_log('zhl_handover_shorten_reservation_on_return: ' . $e->getMessage());
     }
 }
+
+/**
+ * Beendet eine Ausleihe SOFORT (Admin-Aktion aus der „Derzeit ausgeliehen"-Ansicht):
+ * markiert offene Rückgabe(n) dieser Buchung als erledigt UND verkürzt die native Reservierung
+ * auf JETZT — das Gerät ist damit ab sofort wieder buchbar. Anders als
+ * zhl_handover_shorten_reservation_on_return() ist die Verkürzung NICHT an eine bereits erledigte
+ * Rückgabe gebunden (der Admin bestätigt hier aktiv „Gerät ist zurück"). Eine Transaktion,
+ * idempotent (Re-Lauf ändert nichts mehr). Wirft bei DB-Fehler (Aufrufer zeigt Fehler an).
+ *
+ * @return array{handovers_done:int, reservations_shortened:int}
+ */
+function zhl_handover_end_loan_now(string $reference, ?string $nowUtc = null): array
+{
+    $out = ['handovers_done' => 0, 'reservations_shortened' => 0];
+    if ($reference === '') {
+        return $out;
+    }
+    $pdo = zhl_handover_db();
+    $now = $nowUtc ?: gmdate('Y-m-d H:i:s');
+    $inTxn = false;
+    try {
+        $pdo->beginTransaction();
+        $inTxn = true;
+
+        // (1) Offene Rückgabe(n) dieser Buchung als erledigt markieren (Status/Anzeige-Konsistenz).
+        $h = $pdo->prepare(
+            "UPDATE zhl_booking_handover SET status = 'done', updated_at = ?
+             WHERE reference_number = ? AND type = 'return' AND status <> 'done'"
+        );
+        $h->execute([$now, $reference]);
+        $out['handovers_done'] = $h->rowCount();
+
+        // (2) Native Reservierung auf JETZT verkürzen (= echte Verfügbarkeit). LEAST verhindert
+        //     Verlängerung; der start_date-Guard verhindert ein invertiertes Intervall.
+        $r = $pdo->prepare(
+            "UPDATE reservation_instances SET end_date = LEAST(end_date, ?)
+             WHERE reference_number = ? AND end_date > ? AND ? > start_date"
+        );
+        $r->execute([$now, $reference, $now, $now]);
+        $out['reservations_shortened'] = $r->rowCount();
+
+        $pdo->commit();
+    } catch (Throwable $e) {
+        if ($inTxn) {
+            try {
+                $pdo->rollBack();
+            } catch (Throwable $e2) {
+                // ignore
+            }
+        }
+        error_log('zhl_handover_end_loan_now: ' . $e->getMessage());
+        throw $e;
+    }
+    return $out;
+}

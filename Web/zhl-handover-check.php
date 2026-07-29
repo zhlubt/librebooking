@@ -180,6 +180,12 @@ class ZhlHandoverCheckPage extends SecurePage
                 $upd->execute([$now, $ref, $type]);
             }
 
+            // Wenn Rückgabe bestätigt: Reservierung verkürzen auf den tatsächlichen Rückgabetermin.
+            // Verhindert, dass das Medium gesperrt bleibt, obwohl es physisch zurück ist.
+            if ($type === 'return' && $ref !== '') {
+                zhl_handover_shorten_reservation_on_return($ref);
+            }
+
             $pdo->commit();
 
             // Selbst-Rückgabe-Meldungen (SPEC-SELBSTRUECKGABE) zu dieser Rückgabe als bestätigt

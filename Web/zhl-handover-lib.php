@@ -503,3 +503,36 @@ function zhl_handover_status(string $token): array
     }
     return $status;
 }
+
+/**
+ * Wenn Rückgabe für eine reference_number bestätigt wird (status='done'),
+ * die Reservierung auf das tatsächliche Rückgabedatum verkürzen.
+ * Verhindert, dass das Medium gesperrt bleibt, obwohl es physisch zurück ist.
+ * Best-effort: Fehler werden geloggt, nicht geworfen (kein Abbruch der Rückgabe-Bestätigung).
+ */
+function zhl_handover_shorten_reservation_on_return(string $reference): void
+{
+    if (!$reference || $reference === '') {
+        return;
+    }
+    try {
+        $pdo = zhl_handover_db();
+        $stmt = $pdo->prepare(
+            "SELECT scheduled_end_utc FROM zhl_booking_handover
+             WHERE reference_number = ? AND type = 'return' AND status = 'done'
+             ORDER BY scheduled_end_utc DESC LIMIT 1"
+        );
+        $stmt->execute([$reference]);
+        $ho = $stmt->fetch();
+        if ($ho && !empty($ho['scheduled_end_utc'])) {
+            $resStmt = $pdo->prepare(
+                "UPDATE reservation_instances
+                 SET end_date = LEAST(end_date, ?)
+                 WHERE reference_number = ? AND end_date > ?"
+            );
+            $resStmt->execute([$ho['scheduled_end_utc'], $reference, $ho['scheduled_end_utc']]);
+        }
+    } catch (Throwable $e) {
+        error_log('zhl_handover_shorten_reservation_on_return: ' . $e->getMessage());
+    }
+}

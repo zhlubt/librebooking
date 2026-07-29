@@ -102,6 +102,11 @@ class ZhlMahnungenAdminPage extends SecurePage
                 $dis->AddParameter(new Parameter('@hid', (int)$m['handover_id']));
                 $dis->AddParameter(new Parameter('@by', (int)$session->UserId));
                 $db->Execute($dis);
+                // Reservierung auch verkürzen, damit das Medium nicht gesperrt bleibt.
+                require_once __DIR__ . '/zhl-handover-lib.php';
+                if (!empty($m['reference_number'])) {
+                    zhl_handover_shorten_reservation_on_return((string)$m['reference_number']);
+                }
                 zhl_audit_log(array_merge(zhl_audit_actor($session), [
                     'action' => 'rueckgabe.mahnung.returned', 'entity_type' => 'handover',
                     'entity_id' => (string)$m['handover_id'], 'detail' => ['mahnung' => $id],

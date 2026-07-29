@@ -31,7 +31,10 @@ class ZhlAusleihenPage extends SecurePage implements IZhlAusleihenPage
         $daysParam = (int)$this->GetQuerystring('days');
         $days = in_array($daysParam, [7, 14, 30], true) ? $daysParam : 14;
 
-        $this->presenter->PageLoad($user, $days);
+        $filterParam = (string)($this->GetQuerystring('filter') ?? 'upcoming');
+        $filter = in_array($filterParam, ['upcoming', 'this_week', 'active'], true) ? $filterParam : 'upcoming';
+
+        $this->presenter->PageLoad($user, $days, $filter);
         $this->Set('HideNavBar', false);
         $this->Display('zhl-ausleihen.tpl');
     }

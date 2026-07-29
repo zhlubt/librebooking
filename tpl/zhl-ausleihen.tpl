@@ -18,9 +18,11 @@
     </div>
 
     <div class="seg" role="tablist">
-      <a href="{$Path}zhl-medienmanager-ausleihen.php?days=7"{if $Days == 7} class="active"{/if}>7 Tage</a>
-      <a href="{$Path}zhl-medienmanager-ausleihen.php?days=14"{if $Days == 14} class="active"{/if}>14 Tage</a>
-      <a href="{$Path}zhl-medienmanager-ausleihen.php?days=30"{if $Days == 30} class="active"{/if}>30 Tage</a>
+      <a href="{$Path}zhl-medienmanager-ausleihen.php?filter=upcoming&days=7"{if $Filter == 'upcoming' && $Days == 7} class="active"{/if}>Kommend: 7d</a>
+      <a href="{$Path}zhl-medienmanager-ausleihen.php?filter=upcoming&days=14"{if $Filter == 'upcoming' && $Days == 14} class="active"{/if}>Kommend: 14d</a>
+      <a href="{$Path}zhl-medienmanager-ausleihen.php?filter=upcoming&days=30"{if $Filter == 'upcoming' && $Days == 30} class="active"{/if}>Kommend: 30d</a>
+      <a href="{$Path}zhl-medienmanager-ausleihen.php?filter=this_week"{if $Filter == 'this_week'} class="active"{/if}>Diese Woche</a>
+      <a href="{$Path}zhl-medienmanager-ausleihen.php?filter=active"{if $Filter == 'active'} class="active"{/if}>Derzeit ausgeliehen</a>
       <span class="cnt" style="margin-left:auto;padding:6px 14px">{$RangeLabel|escape} · {$Total} Ausleihe{if $Total != 1}n{/if}</span>
     </div>
 

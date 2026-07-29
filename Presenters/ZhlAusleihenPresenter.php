@@ -23,15 +23,40 @@ class ZhlAusleihenPresenter
         $this->page = $page;
     }
 
-    public function PageLoad(UserSession $user, int $days): void
+    public function PageLoad(UserSession $user, int $days, string $filter = 'upcoming'): void
     {
         $tz = $user->Timezone;
         $todayLocal = Date::Now()->ToTimezone($tz);
         $todayLocal = Date::Parse($todayLocal->Format('Y-m-d') . ' 00:00:00', $tz);
-        $windowEndLocal = $todayLocal->AddDays($days);
 
         $pdo = zhl_handover_db();
-        $rows = ZhlLoanOverview::Load($todayLocal, $windowEndLocal, ZhlLoanOverview::EDGE_START, $pdo, $tz);
+
+        if ($filter === 'this_week') {
+            // Diese Woche: Montag bis Sonntag
+            $daysToMonday = (int)$todayLocal->Format('N') - 1;
+            $mondayLocal = $todayLocal->AddDays(-$daysToMonday);
+            $sundayLocal = $mondayLocal->AddDays(6)->AddHours(23)->AddMinutes(59)->AddSeconds(59);
+            $rows = ZhlLoanOverview::Load($mondayLocal, $sundayLocal, ZhlLoanOverview::EDGE_START, $pdo, $tz);
+            $rangeLabel = $mondayLocal->Format('d.m.') . '–' . $sundayLocal->Format('d.m.Y');
+        } elseif ($filter === 'active') {
+            // Derzeit ausgeliehen: gestartet in der Vergangenheit, noch nicht beendet
+            $startBackLocal = $todayLocal->AddDays(-180);
+            $endLocal = $todayLocal->AddDays(1);
+            $allRows = ZhlLoanOverview::Load($startBackLocal, $endLocal, ZhlLoanOverview::EDGE_START, $pdo, $tz);
+            // Filter: Nur behalten, die heute noch gültig sind (gestartet <= heute, ende > heute)
+            $rows = [];
+            foreach ($allRows as $r) {
+                if (isset($r['endLocal']) && $r['endLocal'] > $todayLocal) {
+                    $rows[] = $r;
+                }
+            }
+            $rangeLabel = 'Derzeit ausgeliehen';
+        } else {
+            // upcoming (default)
+            $windowEndLocal = $todayLocal->AddDays($days);
+            $rows = ZhlLoanOverview::Load($todayLocal, $windowEndLocal, ZhlLoanOverview::EDGE_START, $pdo, $tz);
+            $rangeLabel = $todayLocal->Format('d.m.') . '–' . $windowEndLocal->AddDays(-1)->Format('d.m.Y');
+        }
 
         $staffNames = [];
         if ($rows) {
@@ -62,8 +87,9 @@ class ZhlAusleihenPresenter
 
         $this->page->BindAusleihen([
             'days' => $days,
+            'filter' => $filter,
             'total' => count($rows),
-            'rangeLabel' => $todayLocal->Format('d.m.') . '–' . $windowEndLocal->AddDays(-1)->Format('d.m.Y'),
+            'rangeLabel' => $rangeLabel,
             'groups' => $days_grouped,
         ]);
     }

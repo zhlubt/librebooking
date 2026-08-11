@@ -46,7 +46,9 @@ $calName = (string)($conf['calendar_name'] ?? 'ZHL Medien — Übergaben & Studi
 $cfg = require dirname(__DIR__) . '/config/config.php';
 $scriptUrl = rtrim((string)($cfg['settings']['script.url'] ?? ''), '/');
 $host = parse_url($scriptUrl, PHP_URL_HOST) ?: 'media.zhl-ubt.de';
-$detailBase = $scriptUrl !== '' ? $scriptUrl . '/zhl-booking-detail.php?id=' : '';
+// Buchungsakte (Admin-Sicht, zeigt auch FREMDE Buchungen) — zhl-booking-detail.php wäre
+// Owner-only und liefe für das ZHL-Team beim Klick aus dem Kalender ins Leere.
+$detailBase = $scriptUrl !== '' ? $scriptUrl . '/zhl-buchung-admin.php?ref=' : '';
 
 // ----------------------------------------------------------------------------
 // 3) Zeitfenster (UTC) bestimmen.
@@ -67,6 +69,71 @@ try {
     echo 'Kalender momentan nicht verfügbar.';
     exit;
 }
+
+// ----------------------------------------------------------------------------
+// 3b) Anreicherung je Buchung: Eckdaten (Zeitraum/Vorhaben/Telefon/Einrichtung) und
+//     die KOMPLETTE Geräteliste inkl. Übergabe-Konfiguration — damit der Kalender-
+//     eintrag „wer wann was WIE abholt/zurückgibt" vollständig beantwortet.
+//     Best effort: schlägt die Anreicherung fehl, bleibt der Feed mit Basisdaten nutzbar.
+// ----------------------------------------------------------------------------
+$berlin = new DateTimeZone('Europe/Berlin');
+$fmtLocal = static function (?string $utcStr) use ($utc, $berlin): string {
+    if (!$utcStr) {
+        return '';
+    }
+    try {
+        return (new DateTime($utcStr, $utc))->setTimezone($berlin)->format('d.m.Y H:i');
+    } catch (Throwable $e) {
+        return '';
+    }
+};
+
+$bookingInfo = [];     // ref => {start_date, end_date, title, phone, organization}
+$bookingDevices = [];  // ref => [{name, abholung, abholort, rueckgabe, rueckgabeort, einfuehrung}]
+try {
+    $refs = array_values(array_unique(array_filter(array_map(
+        static fn ($r) => (string)($r['reference_number'] ?? ''),
+        $handovers
+    ))));
+    if ($refs) {
+        $pdo = zhl_handover_db();
+        $in = implode(',', array_fill(0, count($refs), '?'));
+
+        $st = $pdo->prepare(
+            "SELECT ri.reference_number, ri.start_date, ri.end_date, rs.title,
+                    u.phone, u.organization
+             FROM reservation_instances ri
+             JOIN reservation_series rs ON rs.series_id = ri.series_id
+             JOIN users u ON u.user_id = rs.owner_id
+             WHERE ri.reference_number IN ($in)"
+        );
+        $st->execute($refs);
+        foreach ($st->fetchAll() as $b) {
+            $bookingInfo[(string)$b['reference_number']] = $b;
+        }
+
+        $st = $pdo->prepare(
+            "SELECT ri.reference_number, r.name,
+                    ue.abholung, ue.abholort, ue.rueckgabe, ue.rueckgabeort, ue.einfuehrung
+             FROM reservation_instances ri
+             JOIN reservation_resources rr ON rr.series_id = ri.series_id
+             JOIN resources r ON r.resource_id = rr.resource_id
+             LEFT JOIN zhl_uebergabe ue ON ue.resource_id = rr.resource_id
+             WHERE ri.reference_number IN ($in)
+             ORDER BY r.name"
+        );
+        $st->execute($refs);
+        foreach ($st->fetchAll() as $d) {
+            $bookingDevices[(string)$d['reference_number']][] = $d;
+        }
+    }
+} catch (Throwable $e) {
+    error_log('zhl-calendar enrich: ' . $e->getMessage());
+}
+
+$abholArt = ['nicht_noetig' => 'keine Abholung nötig', 'abholen' => 'Abholen', 'abholen_persoenlich' => 'persönliche Übergabe', 'ablageort' => 'Ablageort/Hauspost'];
+$rueckArt = ['nicht_noetig' => 'keine Rückgabe nötig', 'abgeben' => 'Abgeben', 'abgeben_persoenlich' => 'persönliche Rückgabe (Termin)'];
+$einfArt = ['moeglich' => 'Einführung möglich', 'notwendig' => 'Einführung PFLICHT'];
 
 // ----------------------------------------------------------------------------
 // 4) iCal-Helfer.
@@ -182,22 +249,87 @@ foreach ($handovers as $r) {
     $st = (string)$r['status'];
     $ort = trim((string)($r['rueckgabeort'] ?? ''));
 
-    $descParts = [
-        'Vorgang: ' . $tl,
-        'Gerät: ' . $resourceName,
-        'Ausleihende:r: ' . $name,
-    ];
+    $info = $ref !== '' ? ($bookingInfo[$ref] ?? null) : null;
+    $devices = $ref !== '' ? ($bookingDevices[$ref] ?? []) : [];
+
+    // Je Gerät die für den Vorgang relevante Art + Ort (+ Einführungspflicht bei Abholung).
+    $deviceLines = [];
+    $firstAbholort = '';
+    foreach ($devices as $d) {
+        $bits = [];
+        if ($t === 'return') {
+            $art = $rueckArt[(string)($d['rueckgabe'] ?? '')] ?? '';
+            if ($art !== '') {
+                $bits[] = 'Rückgabe: ' . $art . (!empty($d['rueckgabeort']) ? ' (' . $d['rueckgabeort'] . ')' : '');
+            }
+        } elseif ($t === 'einf') {
+            $ein = $einfArt[(string)($d['einfuehrung'] ?? '')] ?? '';
+            if ($ein !== '') {
+                $bits[] = $ein;
+            }
+        } else {
+            $art = $abholArt[(string)($d['abholung'] ?? '')] ?? '';
+            if ($art !== '') {
+                $bits[] = 'Abholung: ' . $art . (!empty($d['abholort']) ? ' (' . $d['abholort'] . ')' : '');
+            }
+            $ein = $einfArt[(string)($d['einfuehrung'] ?? '')] ?? '';
+            if ($ein !== '') {
+                $bits[] = $ein;
+            }
+            if ($firstAbholort === '' && !empty($d['abholort'])) {
+                $firstAbholort = (string)$d['abholort'];
+            }
+        }
+        $deviceLines[] = '• ' . (string)$d['name'] . ($bits ? ' — ' . implode(' · ', $bits) : '');
+    }
+
+    // Titel: bei Buchungs-weiten Terminen (resource_id NULL) das erste echte Gerät statt
+    // „Gerät"; bei Bundles die Anzahl der weiteren Geräte anhängen.
+    $sumDevice = $resourceName;
+    if (empty($r['resource_id']) && $devices) {
+        $sumDevice = (string)$devices[0]['name'];
+    }
+    if (count($devices) > 1) {
+        $sumDevice .= ' +' . (count($devices) - 1);
+    }
+
+    $descParts = ['Vorgang: ' . $tl . ($devices ? ' — ' . count($devices) . ' Gerät' . (count($devices) !== 1 ? 'e' : '') : '')];
+    $descParts[] = 'Ausleihende:r: ' . $name;
     if ($email !== '') {
         $descParts[] = 'E-Mail: ' . $email;
     }
-    $descParts[] = 'Status: ' . ($statusLabel[$st] ?? $st);
-    if ($t === 'return' && $ort !== '') {
-        $descParts[] = 'Rückgabeort: ' . $ort;
+    if ($info && trim((string)($info['phone'] ?? '')) !== '') {
+        $descParts[] = 'Telefon: ' . trim((string)$info['phone']);
     }
+    if ($info && trim((string)($info['organization'] ?? '')) !== '') {
+        $descParts[] = 'Einrichtung: ' . trim((string)$info['organization']);
+    }
+    if ($info && trim((string)($info['title'] ?? '')) !== '') {
+        $descParts[] = 'Vorhaben: ' . trim((string)$info['title']);
+    }
+    if ($info) {
+        $von = $fmtLocal((string)$info['start_date']);
+        $bis = $fmtLocal((string)$info['end_date']);
+        if ($von !== '' && $bis !== '') {
+            $descParts[] = 'Ausleihzeitraum: ' . $von . ' – ' . $bis . ' Uhr';
+        }
+    }
+    if ($deviceLines) {
+        $descParts[] = 'Geräte:';
+        foreach ($deviceLines as $dl) {
+            $descParts[] = $dl;
+        }
+    } else {
+        $descParts[] = 'Gerät: ' . $resourceName;
+        if ($t === 'return' && $ort !== '') {
+            $descParts[] = 'Rückgabeort: ' . $ort;
+        }
+    }
+    $descParts[] = 'Status: ' . ($statusLabel[$st] ?? $st);
     if ($ref !== '') {
         $descParts[] = 'Buchung: ' . $ref;
         if ($detailBase !== '') {
-            $descParts[] = $detailBase . rawurlencode($ref);
+            $descParts[] = 'Alle Details: ' . $detailBase . rawurlencode($ref);
         }
     }
 
@@ -206,8 +338,8 @@ foreach ($handovers as $r) {
         'dtstamp' => $dtstamp,
         'start' => $start,
         'end' => $end,
-        'summary' => $tl . ': ' . $resourceName . ' — ' . $name,
-        'location' => ($t === 'return') ? $ort : '',
+        'summary' => $tl . ': ' . $sumDevice . ' — ' . $name,
+        'location' => ($t === 'return') ? $ort : $firstAbholort,
         'description' => implode("\n", $descParts),
         'url' => ($ref !== '' && $detailBase !== '') ? $detailBase . rawurlencode($ref) : '',
         'status' => $statusMap[$st] ?? 'CONFIRMED',

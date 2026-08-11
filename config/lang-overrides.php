@@ -68,6 +68,7 @@ $zhlCommon = [
         'ZhlRueckgabenTitle'      => 'Rückgaben',
         'ZhlUebergabenTitle'      => 'Persönliche Übergaben',
         'ZhlGeraetAdminTitle'     => 'Geräteakte',
+        'ZhlBuchungAdminTitle'    => 'Buchungsakte',
 
         // --- Konto (zhl-account.tpl) ---
         'ZhlAccountTitle'         => 'Mein Konto',
@@ -151,6 +152,7 @@ $zhlCommon = [
         'ZhlRueckgabenTitle'      => 'Returns',
         'ZhlUebergabenTitle'      => 'Personal handovers',
         'ZhlGeraetAdminTitle'     => 'Device details',
+        'ZhlBuchungAdminTitle'    => 'Booking details',
 
         // --- Account (zhl-account.tpl) ---
         'ZhlAccountTitle'         => 'My Account',

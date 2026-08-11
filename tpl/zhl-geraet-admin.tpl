@@ -67,7 +67,7 @@
                 <td style="font-size:13px">{$Current.startLabel|escape} – {$Current.endLabel|escape} Uhr</td>
                 <td>{$Current.borrower|escape}{if $Current.email != ''}<div class="muted" style="font-size:13px"><a href="mailto:{$Current.email|escape}" style="color:inherit">{$Current.email|escape}</a></div>{/if}</td>
                 <td>
-                  {if $Current.title != ''}<strong>{$Current.title|escape}</strong>{else}<span class="muted">—</span>{/if}
+                  <a href="{$Path}zhl-buchung-admin.php?ref={$Current.ref|escape:'url'}" style="color:inherit">{if $Current.title != ''}<strong>{$Current.title|escape}</strong>{else}Buchung ansehen{/if}</a>
                   {if $Current.deviceCount > 1}<div style="font-size:13px"><span class="badge badge-info">Bundle · {$Current.deviceCount} Geräte</span></div>{/if}
                 </td>
                 <td>
@@ -106,7 +106,7 @@
                 <td style="font-size:13px">{$row.startLabel|escape} – {$row.endLabel|escape} Uhr</td>
                 <td>{$row.borrower|escape}{if $row.email != ''}<div class="muted" style="font-size:13px"><a href="mailto:{$row.email|escape}" style="color:inherit">{$row.email|escape}</a></div>{/if}</td>
                 <td>
-                  {if $row.title != ''}<strong>{$row.title|escape}</strong>{else}<span class="muted">—</span>{/if}
+                  <a href="{$Path}zhl-buchung-admin.php?ref={$row.ref|escape:'url'}" style="color:inherit">{if $row.title != ''}<strong>{$row.title|escape}</strong>{else}Buchung ansehen{/if}</a>
                   {if $row.deviceCount > 1}<div style="font-size:13px"><span class="badge badge-info">Bundle · {$row.deviceCount} Geräte</span></div>{/if}
                 </td>
                 <td>
@@ -143,7 +143,7 @@
               <tr>
                 <td style="font-size:13px">{if $row.startLabel != ''}{$row.startLabel|escape} – {$row.endLabel|escape} Uhr{else}<span class="muted">—</span>{/if}</td>
                 <td>{if $row.borrower != ''}{$row.borrower|escape}{else}<span class="muted">unbekannt</span>{/if}</td>
-                <td>{if $row.title != ''}{$row.title|escape}{else}<span class="muted">—</span>{/if}</td>
+                <td><a href="{$Path}zhl-buchung-admin.php?ref={$row.ref|escape:'url'}" style="color:inherit">{if $row.title != ''}{$row.title|escape}{else}Buchung ansehen{/if}</a></td>
                 <td style="font-size:13px">{$row.cancelledLabel|escape} Uhr</td>
               </tr>
             {/foreach}

@@ -83,7 +83,7 @@
             <tr>
               <td><span class="badge {if $row.type == 'return'}badge-info{elseif $row.type == 'einf'}badge-warn{else}badge-muted{/if}">{$row.typeLabel|escape}</span></td>
               <td>{$row.resourceName|escape}</td>
-              <td style="font-size:13px">{$row.ref|escape}</td>
+              <td style="font-size:13px"><a href="{$Path}zhl-buchung-admin.php?ref={$row.ref|escape:'url'}" style="color:inherit;text-decoration:underline">{$row.ref|escape}</a></td>
               <td style="font-size:13px">{$row.scheduledLocal|escape} Uhr</td>
               <td>{if $row.borrower}{$row.borrower|escape}{else}<span class="muted">unbekannt</span>{/if}</td>
               <td style="font-size:13px">{if $row.staffLabel}{$row.staffLabel|escape}{else}<span class="muted">—</span>{/if}</td>

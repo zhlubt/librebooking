@@ -62,7 +62,7 @@
                 <tr>
                   <td>{$row.timeLabel|escape} Uhr</td>
                   <td>
-                    <strong>{$row.title|escape}</strong>
+                    <a href="{$Path}zhl-buchung-admin.php?ref={$row.ref|escape:'url'}" style="color:inherit"><strong>{$row.title|escape}</strong></a>
                     {if $row.kind == 'bundle'}
                       <span class="badge badge-info">Bundle · {$row.deviceCount} Geräte</span>
                     {/if}

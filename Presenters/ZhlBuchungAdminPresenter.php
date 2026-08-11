@@ -305,7 +305,13 @@ class ZhlBuchungAdminPresenter
         }
         try {
             $pdo = zhl_handover_db();
-            $st = $pdo->prepare('SELECT COUNT(*) FROM reservation_instances WHERE reference_number = ?');
+            // Nur LAUFENDE Ausleihen sind beendbar (Codex-Finding: sonst markiert ein
+            // manipulierter POST bei einer erst künftigen Buchung die Rückgabe als done).
+            $st = $pdo->prepare(
+                'SELECT COUNT(*) FROM reservation_instances
+                 WHERE reference_number = ?
+                   AND start_date <= UTC_TIMESTAMP() AND end_date > UTC_TIMESTAMP()'
+            );
             $st->execute([$ref]);
             if ((int)$st->fetchColumn() === 0) {
                 $this->page->RedirectAfterEndLoan($ref, 'error');

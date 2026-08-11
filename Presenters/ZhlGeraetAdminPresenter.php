@@ -146,7 +146,30 @@ class ZhlGeraetAdminPresenter
             $rows = array_slice($rows, 0, self::HISTORY_LIMIT);
         }
 
+        // Die AKTUELL laufende Ausleihe separat holen — sie darf nicht davon abhängen,
+        // ob sie zufällig unter den (per Startdatum) neuesten HISTORY_LIMIT Zeilen ist
+        // (Codex-Finding: viele künftige Reservierungen verdrängen sonst die aktive).
+        $st = $pdo->prepare(
+            'SELECT ri.reference_number, ri.start_date, ri.end_date, rs.title, rs.status_id AS series_status,
+                    u.fname, u.lname, u.email,
+                    (SELECT COUNT(DISTINCT rr2.resource_id) FROM reservation_resources rr2
+                      WHERE rr2.series_id = ri.series_id) AS device_count
+             FROM reservation_instances ri
+             JOIN reservation_series rs ON rs.series_id = ri.series_id
+             JOIN reservation_resources rr ON rr.series_id = ri.series_id AND rr.resource_id = :rid
+             JOIN users u ON u.user_id = rs.owner_id
+             WHERE rs.status_id <> 2
+               AND ri.start_date <= UTC_TIMESTAMP() AND ri.end_date > UTC_TIMESTAMP()
+             ORDER BY ri.start_date DESC LIMIT 1'
+        );
+        $st->execute([':rid' => $rid]);
+        $activeRow = $st->fetch();
+        $activeRef = is_array($activeRow) ? (string)$activeRow['reference_number'] : null;
+
         $refs = array_values(array_unique(array_map(static fn ($r) => (string)$r['reference_number'], $rows)));
+        if ($activeRef !== null && !in_array($activeRef, $refs, true)) {
+            $refs[] = $activeRef;
+        }
         $returnDone = [];
         if ($refs) {
             $in = implode(',', array_fill(0, count($refs), '?'));
@@ -165,44 +188,53 @@ class ZhlGeraetAdminPresenter
         $history = [];
         $current = null;
         foreach ($rows as $r) {
-            $ref = (string)$r['reference_number'];
-            $startUtc = (string)$r['start_date'];
-            $endUtc = (string)$r['end_date'];
-            $borrower = trim((string)$r['fname'] . ' ' . (string)$r['lname']);
-            if ($borrower === '') {
-                $borrower = (string)$r['email'];
-            }
-
-            $doneAt = $returnDone[$ref] ?? null;
-            if ($startUtc > $nowUtc) {
-                $stateLabel = 'geplant';
-                $badge = 'badge-info';
-            } elseif ($endUtc > $nowUtc) {
-                $stateLabel = 'aktiv';
-                $badge = 'badge-warn';
-            } else {
-                $stateLabel = $doneAt !== null ? 'zurückgegeben' : 'beendet';
-                $badge = 'badge-ok';
-            }
-
-            $row = [
-                'ref' => $ref,
-                'startLabel' => $this->fmtLocal($startUtc, $tz),
-                'endLabel' => $this->fmtLocal($endUtc, $tz),
-                'borrower' => $borrower,
-                'email' => (string)$r['email'],
-                'title' => trim((string)$r['title']),
-                'deviceCount' => (int)$r['device_count'],
-                'stateLabel' => $stateLabel,
-                'badgeClass' => $badge,
-                'returnedLabel' => $doneAt !== null ? $this->fmtLocal($doneAt, $tz) : '',
-            ];
+            $row = $this->buildLoanRow($r, $returnDone, $nowUtc, $tz);
             $history[] = $row;
-            if ($current === null && $stateLabel === 'aktiv') {
+            if ($current === null && $row['ref'] === $activeRef) {
                 $current = $row;
             }
         }
+        if ($current === null && is_array($activeRow)) {
+            $current = $this->buildLoanRow($activeRow, $returnDone, $nowUtc, $tz);
+        }
         return [$history, $current, $historyLimited];
+    }
+
+    /** Eine Reservierungs-Zeile (Instanz+Serie+Owner) in die Anzeige-Form der Akte bringen. */
+    private function buildLoanRow(array $r, array $returnDone, string $nowUtc, string $tz): array
+    {
+        $ref = (string)$r['reference_number'];
+        $startUtc = (string)$r['start_date'];
+        $endUtc = (string)$r['end_date'];
+        $borrower = trim((string)$r['fname'] . ' ' . (string)$r['lname']);
+        if ($borrower === '') {
+            $borrower = (string)$r['email'];
+        }
+
+        $doneAt = $returnDone[$ref] ?? null;
+        if ($startUtc > $nowUtc) {
+            $stateLabel = 'geplant';
+            $badge = 'badge-info';
+        } elseif ($endUtc > $nowUtc) {
+            $stateLabel = 'aktiv';
+            $badge = 'badge-warn';
+        } else {
+            $stateLabel = $doneAt !== null ? 'zurückgegeben' : 'beendet';
+            $badge = 'badge-ok';
+        }
+
+        return [
+            'ref' => $ref,
+            'startLabel' => $this->fmtLocal($startUtc, $tz),
+            'endLabel' => $this->fmtLocal($endUtc, $tz),
+            'borrower' => $borrower,
+            'email' => (string)$r['email'],
+            'title' => trim((string)$r['title']),
+            'deviceCount' => (int)$r['device_count'],
+            'stateLabel' => $stateLabel,
+            'badgeClass' => $badge,
+            'returnedLabel' => $doneAt !== null ? $this->fmtLocal($doneAt, $tz) : '',
+        ];
     }
 
     /**
@@ -223,7 +255,9 @@ class ZhlGeraetAdminPresenter
                  ORDER BY cb.cancelled_at DESC
                  LIMIT ' . (self::CANCELLED_LIMIT * 4)
             );
-            $st->execute(['%' . $resourceName . '%']);
+            // LIKE-Metazeichen im Gerätenamen escapen (Codex-Finding: % und _ würden
+            // sonst als Wildcards wirken und den Kandidatensatz verfälschen).
+            $st->execute(['%' . addcslashes($resourceName, '\\%_') . '%']);
         } catch (Throwable $e) {
             return []; // Anzeige-Bonus — ohne Tabelle/Fehler einfach leer.
         }
@@ -267,10 +301,13 @@ class ZhlGeraetAdminPresenter
         }
         try {
             $pdo = zhl_handover_db();
+            // Nur LAUFENDE Ausleihen sind beendbar (Codex-Finding: sonst markiert ein
+            // manipulierter POST bei einer erst künftigen Buchung die Rückgabe als done).
             $st = $pdo->prepare(
                 'SELECT COUNT(*) FROM reservation_instances ri
                  JOIN reservation_resources rr ON rr.series_id = ri.series_id
-                 WHERE ri.reference_number = ? AND rr.resource_id = ?'
+                 WHERE ri.reference_number = ? AND rr.resource_id = ?
+                   AND ri.start_date <= UTC_TIMESTAMP() AND ri.end_date > UTC_TIMESTAMP()'
             );
             $st->execute([$ref, $rid]);
             if ((int)$st->fetchColumn() === 0) {

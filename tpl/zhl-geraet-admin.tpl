@@ -72,7 +72,7 @@
                 </td>
                 <td>
                   <span class="badge {$Current.badgeClass|escape}">{$Current.stateLabel|escape}</span>
-                  <form method="post" style="margin-top:8px" onsubmit="return confirm('Diese Ausleihe jetzt als zurückgegeben markieren und beenden? Das Gerät wird sofort wieder buchbar.');">
+                  <form method="post" style="margin-top:8px" onsubmit="return confirm('Diese Ausleihe jetzt als zurückgegeben markieren und beenden? Es wird die GESAMTE Buchung beendet — bei Bundle-Buchungen werden alle enthaltenen Geräte sofort wieder buchbar.');">
                     {csrf_token}
                     <input type="hidden" name="ref" value="{$Current.ref|escape}">
                     <button type="submit" class="btn btn-outline btn-sm">Ausleihe beenden</button>

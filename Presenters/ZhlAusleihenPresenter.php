@@ -107,6 +107,19 @@ class ZhlAusleihenPresenter
             return;
         }
         try {
+            // Nur LAUFENDE Ausleihen sind beendbar (Codex-Finding: sonst markiert ein
+            // manipulierter POST bei einer erst künftigen Buchung die Rückgabe als done).
+            $st = zhl_handover_db()->prepare(
+                'SELECT COUNT(*) FROM reservation_instances
+                 WHERE reference_number = ?
+                   AND start_date <= UTC_TIMESTAMP() AND end_date > UTC_TIMESTAMP()'
+            );
+            $st->execute([$ref]);
+            if ((int)$st->fetchColumn() === 0) {
+                $this->page->RedirectAfterEndLoan('error');
+                return;
+            }
+
             $res = zhl_handover_end_loan_now($ref);
             zhl_audit_log(array_merge(zhl_audit_actor($user), [
                 'action' => 'ausleihe.end_loan_now',

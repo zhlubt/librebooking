@@ -46,6 +46,7 @@ class ZhlAccountPresenter
         }
 
         $certificates = $this->loadCertificates((int)$session->UserId, $session->Timezone);
+        $acquirable = $this->loadAcquirableCertificates((int)$session->UserId);
 
         $this->page->BindAccount([
             'firstName' => (string)$session->FirstName,
@@ -57,6 +58,8 @@ class ZhlAccountPresenter
             'languageCode' => (string)$session->LanguageCode,
             'certificates' => $certificates,
             'hasCertificates' => count($certificates) > 0,
+            'acquirableCerts' => $acquirable,
+            'hasAcquirable' => count($acquirable) > 0,
             'isAdmin' => (bool)$session->IsAdmin,
         ]);
     }
@@ -107,6 +110,7 @@ class ZhlAccountPresenter
                     'expiryLabel' => $expiryLabel,
                     'expired' => $expired,
                     'devices' => [],
+                    'anfrageRid' => 0,
                 ];
             }
             $reader->Free();
@@ -115,7 +119,7 @@ class ZhlAccountPresenter
                 // Abgedeckte Geräte je Zertifikat (nur für die gehaltenen Typen).
                 $ids = implode(',', array_map('intval', array_keys($typeIds)));
                 $reader = $db->Query(new AdHocCommand(
-                    'SELECT ctr.cert_type_id, r.name FROM zhl_cert_type_resource ctr ' .
+                    'SELECT ctr.cert_type_id, r.resource_id, r.status_id, r.name FROM zhl_cert_type_resource ctr ' .
                     'JOIN resources r ON r.resource_id = ctr.resource_id ' .
                     'WHERE ctr.cert_type_id IN (' . $ids . ') ORDER BY r.name'
                 ));
@@ -123,6 +127,10 @@ class ZhlAccountPresenter
                     $typeId = (int)$row['cert_type_id'];
                     if (isset($rows[$typeId])) {
                         $rows[$typeId]['devices'][] = (string)$row['name'];
+                        // Erstes AKTIVES Gerät trägt den „Termin anfragen“-Link (Erneuerung abgelaufener Zertifikate).
+                        if ($rows[$typeId]['anfrageRid'] === 0 && (int)$row['status_id'] === 1) {
+                            $rows[$typeId]['anfrageRid'] = (int)$row['resource_id'];
+                        }
                     }
                 }
                 $reader->Free();
@@ -152,5 +160,59 @@ class ZhlAccountPresenter
             return [];
         }
         return $out;
+    }
+
+    /**
+     * Noch NICHT erworbene, aktive Zertifikatstypen — als Angebot „diese Einführungen
+     * können Sie machen“. Je Typ die abgedeckten aktiven Geräte; das erste aktive Gerät
+     * trägt den Link auf die bestehende Termin-Anfrage (zhl-termin-anfrage.php?rid=…).
+     * Typen ohne aktives Gerät werden ausgeblendet. Best effort wie loadCertificates.
+     *
+     * @return array[] [{name, devices, anfrageRid}]
+     */
+    private function loadAcquirableCertificates(int $userId): array
+    {
+        try {
+            $db = ServiceLocator::GetDatabase();
+
+            $cmd = new AdHocCommand(
+                'SELECT t.id, t.name FROM zhl_cert_type t ' .
+                'WHERE t.active = 1 AND NOT EXISTS ' .
+                '(SELECT 1 FROM zhl_cert_grant g WHERE g.cert_type_id = t.id AND g.user_id = @uid) ' .
+                'ORDER BY t.sort_order, t.name'
+            );
+            $cmd->AddParameter(new Parameter('@uid', $userId));
+            $reader = $db->Query($cmd);
+            $rows = [];
+            while ($row = $reader->GetRow()) {
+                $rows[(int)$row['id']] = ['name' => (string)$row['name'], 'devices' => [], 'anfrageRid' => 0];
+            }
+            $reader->Free();
+            if (empty($rows)) {
+                return [];
+            }
+
+            $ids = implode(',', array_map('intval', array_keys($rows)));
+            $reader = $db->Query(new AdHocCommand(
+                'SELECT ctr.cert_type_id, r.resource_id, r.name FROM zhl_cert_type_resource ctr ' .
+                'JOIN resources r ON r.resource_id = ctr.resource_id ' .
+                'WHERE ctr.cert_type_id IN (' . $ids . ') AND r.status_id = 1 ORDER BY r.name'
+            ));
+            while ($row = $reader->GetRow()) {
+                $typeId = (int)$row['cert_type_id'];
+                if (isset($rows[$typeId])) {
+                    $rows[$typeId]['devices'][] = (string)$row['name'];
+                    if ($rows[$typeId]['anfrageRid'] === 0) {
+                        $rows[$typeId]['anfrageRid'] = (int)$row['resource_id'];
+                    }
+                }
+            }
+            $reader->Free();
+
+            return array_values(array_filter($rows, static fn ($r) => $r['anfrageRid'] > 0));
+        } catch (Exception $e) {
+            Log::Debug('ZHL-Konto: erwerbbare Zertifikate konnten nicht geladen werden: %s', $e->getMessage());
+            return [];
+        }
     }
 }

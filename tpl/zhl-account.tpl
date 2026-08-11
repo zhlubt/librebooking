@@ -72,6 +72,9 @@
                     {if $cert.grantedLabel != ''}<span>{translate key="ZhlAccountCertGranted"} {$cert.grantedLabel|escape}</span>{/if}
                     {if $cert.expiryLabel != ''}<span>{if $cert.expired}{translate key="ZhlAccountCertExpiredOn"}{else}{translate key="ZhlAccountCertValidUntil"}{/if} {$cert.expiryLabel|escape}</span>{else}<span>{translate key="ZhlAccountCertUnlimited"}</span>{/if}
                   </div>
+                  {if $cert.expired && $cert.anfrageRid > 0}
+                    <div style="margin-top:8px"><a class="btn btn-light" style="font-size:13.5px;padding:7px 13px" href="{$Path}zhl-termin-anfrage.php?rid={$cert.anfrageRid}">{translate key="ZhlAccountCertRenew"}</a></div>
+                  {/if}
                   {if !$cert.expired && $cert.confidential.has}
                     <div class="zc-conf">
                       <div class="zc-conf-head"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> Vertrauliche Infos <span class="zc-conf-note">— nur für Sie sichtbar</span></div>
@@ -100,6 +103,32 @@
           <div class="info-box">
             <span class="ib-ic"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></span>
             <span>{translate key="ZhlAccountNoCerts"}</span>
+          </div>
+        {/if}
+
+        {if $HasAcquirable}
+          <div style="{if $HasCertificates}margin-top:22px;padding-top:18px;border-top:1px solid var(--line){else}margin-top:18px{/if}">
+            <h3 style="font-size:15px;margin:0 0 4px">{translate key="ZhlAccountCertAvailableHead"}</h3>
+            <p class="hint" style="margin-bottom:14px">{translate key="ZhlAccountCertAvailableHint"}</p>
+            <div class="zhl-cert-list">
+              {foreach from=$AcquirableCerts item=ac}
+                <div class="zhl-cert">
+                  <span class="zc-ic">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                  </span>
+                  <div class="zc-main">
+                    <div class="zc-title">{$ac.name|escape}</div>
+                    {if $ac.devices|@count > 0}
+                      <div class="zc-devices">{foreach from=$ac.devices item=dev name=adl}{$dev|escape}{if !$smarty.foreach.adl.last} · {/if}{/foreach}</div>
+                    {/if}
+                    <div style="margin-top:10px">
+                      <a class="btn btn-primary" style="font-size:14px;padding:8px 14px" href="{$Path}zhl-termin-anfrage.php?rid={$ac.anfrageRid}">{translate key="ZhlAccountCertRequest"}</a>
+                    </div>
+                  </div>
+                  <span class="badge badge-info">{translate key="ZhlAccountCertBadgeAvailable"}</span>
+                </div>
+              {/foreach}
+            </div>
           </div>
         {/if}
       </div>

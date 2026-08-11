@@ -360,9 +360,10 @@ $bookDate = date('Y-m-d', strtotime('+7 days'));
   .sets-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:20px; }
   .set-card { position:relative; background:var(--card); border:1px solid var(--line); border-radius:var(--r-lg); padding:24px; box-shadow:var(--shadow); display:flex; flex-direction:column; transition:transform .12s var(--ease),box-shadow .15s var(--ease); }
   .set-card:hover { transform:translateY(-3px); box-shadow:var(--shadow-lg); }
-  .set-card h3 { font-size:18px; margin:0 0 4px; padding-right:96px; }
+  .set-card h3 { font-size:18px; margin:0 0 4px; }
   .set-card .uc { color:var(--muted); font-size:14px; margin:0 0 16px; }
-  .badge { position:absolute; top:22px; right:22px; font-size:11px; font-weight:700; letter-spacing:.03em; padding:4px 10px; border-radius:999px; text-transform:uppercase; }
+  /* Statisch über dem Titel statt absolut — lange Labels („Fortgeschritten") überlappten sonst die Überschrift. */
+  .badge { align-self:flex-start; margin:0 0 10px; font-size:11px; font-weight:700; letter-spacing:.03em; padding:4px 10px; border-radius:999px; text-transform:uppercase; }
   .badge.einfach { background:#e6f7ef; color:#067a4b; }
   .badge.fortgeschritten { background:#fff4e0; color:#a86a12; }
   .badge.profi { background:#fde8e8; color:#b3261e; }
@@ -373,7 +374,11 @@ $bookDate = date('Y-m-d', strtotime('+7 days'));
   .set-card ul.items li.muted { color:var(--muted); }
   .set-card ul.items li.muted svg { stroke:var(--muted); }
   .set-card ul.items li .q { color:var(--muted); font-weight:600; }
-  .set-card .hint { font-size:13px; color:var(--muted); margin:auto 0 0; padding-top:14px; border-top:1px solid var(--line); }
+  .set-card .hint { font-size:13px; color:var(--muted); margin:14px 0 0; padding-top:14px; border-top:1px solid var(--line); }
+  .set-card .set-tuts { display:flex; flex-wrap:wrap; gap:2px 16px; margin-top:2px; }
+  .set-card .set-tuts .tut-link { margin-top:8px; }
+  .set-card .set-cta { margin-top:auto; padding-top:18px; }
+  .set-card .set-cta .btn { width:100%; justify-content:center; padding:11px 18px; font-size:15px; }
   .set-card .einw { display:inline-flex; align-items:center; gap:7px; font-size:12.5px; font-weight:600; padding:6px 11px; border-radius:999px; background:var(--bg-soft); color:var(--ink-2); margin-top:14px; align-self:flex-start; }
   .set-card .einw svg { width:15px; height:15px; flex:none; }
   .set-card .einw.zwingend { background:#fde8e8; color:#b3261e; }
@@ -544,7 +549,34 @@ $bookDate = date('Y-m-d', strtotime('+7 days'));
           <span data-en="<?= e(einwLabelEn($lvl)) ?>"><?= e(einwLabel($lvl)) ?></span>
         </span>
         <?php endif; ?>
+        <?php
+            // Anleitungen der enthaltenen Geräte-Typen (Ersatz für Bundle-Bilder): je Typ mit
+            // gepflegtem zhl_type_info-Link ein „Anleitung“-Verweis, dedupliziert.
+            $tuts = [];
+            foreach ($b['items'] as $it) {
+                $tl = trim((string)$it['type_label']);
+                if ($tl !== '' && isset($typeInfo[$tl]) && !isset($tuts[$tl])) {
+                    $tuts[$tl] = $typeInfo[$tl];
+                }
+            }
+        ?>
+        <?php if ($tuts): ?>
+        <div class="set-tuts">
+          <?php foreach ($tuts as $tl => $url): ?>
+          <a class="tut-link" href="<?= e($url) ?>" target="_blank" rel="noopener">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+            <span><span data-en="Guide:">Anleitung:</span> <?= e($tl) ?></span>
+          </a>
+          <?php endforeach; ?>
+        </div>
+        <?php endif; ?>
         <?php if (!empty($b['hint'])): ?><p class="hint"><?= e($b['hint']) ?></p><?php endif; ?>
+        <div class="set-cta">
+          <a class="btn btn-primary" href="zhl-bundle-book.php?bid=<?= (int)$b['id'] ?>">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            <span data-en="Book this set">Dieses Set buchen</span>
+          </a>
+        </div>
       </div>
       <?php endforeach; ?>
     </div>

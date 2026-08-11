@@ -36,7 +36,7 @@
                 <td>
                   <strong>{$row.title|escape}</strong>
                   {if $row.kind == 'bundle'}<span class="badge badge-info">Bundle · {$row.deviceCount} Geräte</span>{/if}
-                  <div class="muted" style="font-size:13px">{$row.devicesLabel|escape}</div>
+                  <div class="muted" style="font-size:13px">{if isset($row.devicesFull)}{foreach from=$row.devicesFull item=dev name=devs}<a href="{$Path}zhl-geraet-admin.php?rid={$dev.id}" style="color:inherit;text-decoration:underline">{$dev.name|escape}</a>{if !$smarty.foreach.devs.last}, {/if}{/foreach}{else}{$row.devicesLabel|escape}{/if}</div>
                   {if $row.selfReturn}<div style="font-size:13px"><span class="badge badge-info">selbst abgelegt{if $row.selfReturnLocation != ''} · {$row.selfReturnLocation|escape}{/if}</span></div>{/if}
                 </td>
                 <td>{if $row.borrower != ''}{$row.borrower|escape}{else}<span class="muted">unbekannt</span>{/if}</td>
@@ -95,7 +95,7 @@
                     <td>
                       <strong>{$row.title|escape}</strong>
                       {if $row.kind == 'bundle'}<span class="badge badge-info">Bundle · {$row.deviceCount} Geräte</span>{/if}
-                      <div class="muted" style="font-size:13px">{$row.devicesLabel|escape}</div>
+                      <div class="muted" style="font-size:13px">{if isset($row.devicesFull)}{foreach from=$row.devicesFull item=dev name=devs}<a href="{$Path}zhl-geraet-admin.php?rid={$dev.id}" style="color:inherit;text-decoration:underline">{$dev.name|escape}</a>{if !$smarty.foreach.devs.last}, {/if}{/foreach}{else}{$row.devicesLabel|escape}{/if}</div>
                       {if $row.selfReturn}<div style="font-size:13px"><span class="badge badge-info">selbst abgelegt{if $row.selfReturnLocation != ''} · {$row.selfReturnLocation|escape}{/if}</span></div>{/if}
                     </td>
                     <td>{if $row.borrower != ''}{$row.borrower|escape}{else}<span class="muted">unbekannt</span>{/if}</td>

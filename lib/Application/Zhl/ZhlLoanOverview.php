@@ -205,6 +205,10 @@ class ZhlLoanOverview
             ]];
         }
         $deviceNames = array_column($resources, 'name');
+        $devicesFull = [];
+        foreach ($resources as $res) {
+            $devicesFull[] = ['id' => (int)($res['resource_id'] ?? 0), 'name' => (string)$res['name']];
+        }
         $deviceCount = count($resources);
 
         $modeKey = $edge === self::EDGE_END ? 'rueckgabe' : 'abholung';
@@ -282,6 +286,7 @@ class ZhlLoanOverview
             'kind' => $deviceCount > 1 ? 'bundle' : 'device',
             'deviceCount' => $deviceCount,
             'devices' => $deviceNames,
+            'devicesFull' => $devicesFull,
             'borrower' => $borrower,
             'needsPersonal' => $needsPersonal,
             'einfuehrungNoetig' => $einfuehrungNoetig,
